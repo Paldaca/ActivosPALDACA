@@ -126,10 +126,20 @@ class Activo(models.Model):
         return self.subcategoria.categoria
 
     def clean(self):
+        from django.core.exceptions import ValidationError
+
         super().clean()
         if self.codigo_inventario:
             self.codigo_inventario = self.codigo_inventario.upper().strip()
-
+        usuario = self.usuario_asignado
+        if usuario is not None and getattr(usuario, "is_superuser", False):
+            raise ValidationError(
+                {
+                    "usuario_asignado": (
+                        "Los superusuarios no pueden tener activos asignados."
+                    )
+                }
+            )
     def _generar_codigo_inventario(self):
         prefijo = self.subcategoria.prefijo.strip().upper()
         base = f"PAL-{prefijo}-"
@@ -147,9 +157,21 @@ class Activo(models.Model):
         return f"{base}{ultimo + 1:03d}"
 
     def save(self, *args, **kwargs):
+        from django.core.exceptions import ValidationError
+
         if not self.codigo_inventario:
             self.codigo_inventario = self._generar_codigo_inventario()
         self.codigo_inventario = self.codigo_inventario.upper().strip()
+        if self.usuario_asignado_id:
+            usuario = self.usuario_asignado
+            if usuario is not None and usuario.is_superuser:
+                raise ValidationError(
+                    {
+                        "usuario_asignado": (
+                            "Los superusuarios no pueden tener activos asignados."
+                        )
+                    }
+                )
         super().save(*args, **kwargs)
 
 

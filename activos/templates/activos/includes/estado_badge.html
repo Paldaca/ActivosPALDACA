@@ -1,0 +1,10 @@
+{% comment %}
+Badge de estado operativo. Fuente única de verdad para color + etiqueta.
+Uso:  {% badge_estado activo %}  ·  {% badge_estado activo tamano='lg' %}
+{% endcomment %}
+<span class="ax-estado ax-estado--{{ key }}{% if tamano %} ax-estado--{{ tamano }}{% endif %}{% if sobre_hero %} ax-estado--onhero{% endif %}"
+      title="{{ ayuda }}">
+    <span class="ax-estado-dot" aria-hidden="true"></span>
+    <i class="bi {{ icono }}" aria-hidden="true"></i>
+    {{ label }}
+</span>

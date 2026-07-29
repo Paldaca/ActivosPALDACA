@@ -1,305 +1,278 @@
 {% extends 'base.html' %}
+{% load static %}
+{% load activo_filters %}
 
-{% block title %}{{ usuario.get_full_name|default:usuario.username }} - Perfil - {{ block.super }}{% endblock %}
+{% block title %}{{ usuario|nombre_completo }} - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/activos-ui.css' %}">
+{% endblock %}
 
 {% block content %}
-<div class="px-4 py-4 usuario-profile-page">
-<div class="form-container usuario-profile-container">
-    <!-- Información del usuario -->
-    <div class="card mb-4" style="background-color: var(--e-global-color-moradopaldaca); color: white;">
-        <div class="card-body">
-            <div class="row align-items-center g-3">
-                <div class="col-12 col-md-2">
-                    <div class="user-avatar-large text-center">
-                        <i class="bi bi-person-circle" style="font-size: 5rem;"></i>
-                    </div>
-                </div>
-                <div class="col-12 col-md-8">
-                    <h2 class="mb-2">{{ usuario.get_full_name|default:usuario.username }}</h2>
-                    <h5 class="mb-3">{{ usuario.perfil.nombre|default:"Sin perfil asignado" }}</h5>
+<div class="ax-page">
 
-                    <div class="row">
-                        <div class="col-md-6">
-                            <p class="mb-2">
-                                <i class="bi bi-envelope me-2"></i>
-                                <strong>Correo:</strong> {{ usuario.email|default:"No especificado" }}
-                            </p>
-                        </div>
-                        <div class="col-md-6">
-                            <p class="mb-2">
-                                <i class="bi bi-telephone me-2"></i>
-                                <strong>Teléfono:</strong> {{ usuario.telefono|default:"No especificado" }}
-                            </p>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-12 col-md-2 text-md-end">
-                    <div class="user-actions">
-                        <a href="{% url 'usuarios:usuario-update' usuario.pk %}" class="btn btn-light btn-sm mb-2">
-                            <i class="bi bi-pencil"></i> Editar
-                        </a>
-                        <a href="{% url 'usuarios:usuario-delete' usuario.pk %}" class="btn btn-outline-light btn-sm">
-                            <i class="bi bi-trash"></i> Eliminar
-                        </a>
+    <nav class="ax-crumbs" aria-label="Ruta de navegación">
+        <a href="{% url 'usuarios:usuario-search' %}">Personas</a>
+        <span class="sep">/</span>
+        <span aria-current="page">{{ usuario|nombre_completo }}</span>
+    </nav>
+
+    <header class="ax-hero">
+        <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
+            <div class="d-flex align-items-center gap-3 ax-min0">
+                <span class="ax-avatar ax-avatar--xl ax-avatar--c{{ usuario|tono_avatar }}" aria-hidden="true">
+                    {{ usuario|iniciales }}
+                </span>
+                <div class="ax-min0">
+                    <span class="ax-hero-eyebrow">
+                        {{ usuario.perfil.nombre|default:"Sin perfil asignado" }}
+                    </span>
+                    <h1 class="ax-hero-title">{{ usuario|nombre_completo }}</h1>
+                    <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
+                        {% if usuario.is_active %}
+                        <span class="ax-estado ax-estado--onhero">
+                            <span class="ax-estado-dot"></span> Activa
+                        </span>
+                        {% else %}
+                        <span class="ax-estado ax-estado--onhero">
+                            <span class="ax-estado-dot"></span> Desactivada
+                        </span>
+                        {% endif %}
+                        {% if usuario.disciplina %}
+                        <span class="ax-estado ax-estado--onhero">{{ usuario.disciplina.nombre }}</span>
+                        {% endif %}
                     </div>
                 </div>
             </div>
+            <div class="ax-hero-actions">
+                <a href="{% url 'usuarios:usuario-search' %}" class="btn-pastel btn-pastel--glass">Volver</a>
+                <a href="{% url 'usuarios:usuario-update' usuario.pk %}" class="btn-pastel btn-pastel--cta">
+                    Editar datos
+                </a>
+            </div>
         </div>
-    </div>
+    </header>
 
-    <!-- Planilla de asignación -->
-    <div class="card mb-4 planilla-card">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="mb-0"><i class="bi bi-file-earmark-pdf me-1"></i> Planilla de Asignación</h5>
-            {% if usuario.pdf_asignacion %}
-            <span class="planilla-status">
-                <i class="bi bi-check-circle-fill"></i> Cargada
-            </span>
-            {% else %}
-            <span class="planilla-status planilla-status-empty">
-                <i class="bi bi-exclamation-circle"></i> Sin planilla
-            </span>
-            {% endif %}
-        </div>
-        <div class="card-body">
-            <form method="post" enctype="multipart/form-data" class="row g-2 align-items-end">
-                {% csrf_token %}
-                <div class="col-md-7">
-                    <label for="pdf_asignacion" class="form-label">Seleccionar planilla (PDF)</label>
-                    <input type="file" class="form-control" id="pdf_asignacion" name="pdf_asignacion" accept="application/pdf,.pdf" required>
-                    <small class="text-muted">Solo formato PDF.</small>
-                </div>
-                <div class="col-md-5">
-                    <div class="planilla-actions">
-                        {% if usuario.pdf_asignacion %}
-                        <a href="{{ usuario.pdf_asignacion.url }}" target="_blank" class="btn btn-sm planilla-btn planilla-btn-view">
-                            <i class="bi bi-eye"></i> Ver planilla
-                        </a>
-                        {% endif %}
-                        <button type="submit" class="btn btn-sm planilla-btn planilla-btn-upload">
-                            <i class="bi bi-upload"></i> Cargar planilla
-                        </button>
-                    </div>
-                </div>
-            </form>
-        </div>
-    </div>
+    <div class="row g-3">
 
-    <!-- Activos asignados -->
-    <div class="card">
-        <div class="card-header">
-            <h4 class="mb-0">
-                <i class="bi bi-box-seam"></i> Activos Asignados
-                <span class="badge bg-primary ms-2">{{ activos_asignados.count }}</span>
-            </h4>
-        </div>
-        <div class="card-body">
-            {% if activos_asignados %}
-                <div class="table-responsive">
-                    <table class="table table-hover usuario-activos-table">
+        {# ================================================================= #}
+        {#  Activos a cargo                                                  #}
+        {# ================================================================= #}
+        <div class="col-lg-8">
+            <section class="ax-card">
+                <div class="ax-card-head">
+                    <h2 class="ax-card-title">
+                        Activos a su cargo
+                        <span class="ax-tag ms-1">{{ total_activos }}</span>
+                    </h2>
+                    <a href="{% url 'activos:activo-list' %}?estado=AC&amp;asignacion=libre"
+                       class="btn-pastel btn-pastel--menta btn-pastel--sm">
+                        Asignar un equipo
+                    </a>
+                </div>
+
+                {% if activos_asignados %}
+                <div class="ax-table-wrap">
+                    <table class="ax-table">
                         <thead>
                             <tr>
-                                <th>Código</th>
-                                <th>Descripción</th>
-                                <th>Categoría</th>
-                                <th>Ubicación</th>
-                                <th>Estado</th>
-                                <th class="text-end">Acciones</th>
+                                <th scope="col">Código</th>
+                                <th scope="col">Equipo</th>
+                                <th scope="col">Ubicación</th>
+                                <th scope="col">Estado</th>
+                                <th scope="col" class="ax-col-tight text-end">
+                                    <span class="visually-hidden">Acciones</span>
+                                </th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody data-ax-stagger="30">
                             {% for activo in activos_asignados %}
                             <tr>
                                 <td data-label="Código">
-                                    <strong>{{ activo.codigo_inventario }}</strong>
+                                    <a href="{% url 'activos:activo-detail' activo.pk %}" class="ax-code">
+                                        {{ activo.codigo_inventario }}
+                                        <i class="bi bi-chevron-right" aria-hidden="true"></i>
+                                    </a>
                                 </td>
-                                <td data-label="Descripción">
-                                    {{ activo.marca }} {{ activo.modelo }}
-                                    {% if activo.numero_serial %}
-                                        <br><small class="text-muted">S/N: {{ activo.numero_serial }}</small>
-                                    {% endif %}
-                                </td>
-                                <td data-label="Categoría">
-                                    <span class="badge bg-info">
-                                        {{ activo.subcategoria.categoria.nombre }}
-                                    </span>
-                                    <br>
-                                    <small class="text-muted">{{ activo.subcategoria.nombre }}</small>
+                                <td data-label="Equipo">
+                                    <div class="ax-equipo">
+                                        <span class="ax-type" aria-hidden="true">
+                                            <i class="bi {{ activo|icono_activo }}"></i>
+                                        </span>
+                                        <div class="ax-min0">
+                                            <div class="ax-equipo-main">{{ activo.marca }} {{ activo.modelo }}</div>
+                                            <div class="ax-equipo-sub">
+                                                {% if activo.numero_serial %}
+                                                <span class="ax-serial">{{ activo.numero_serial }}</span>
+                                                {% else %}
+                                                <span class="fst-italic">Sin número de serie</span>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </div>
                                 </td>
                                 <td data-label="Ubicación">
-                                    <i class="bi bi-geo-alt"></i> {{ activo.ubicacion.nombre }}
+                                    <span class="ax-meta">
+                                        <i class="bi bi-geo-alt"></i><span>{{ activo.ubicacion.nombre }}</span>
+                                    </span>
                                 </td>
-                                <td data-label="Estado">
-                                    {% if activo.estado == 'AC' %}
-                                        <span class="badge bg-success">Activo</span>
-                                    {% elif activo.estado == 'IN' %}
-                                        <span class="badge bg-secondary">Inactivo</span>
-                                    {% elif activo.estado == 'EM' %}
-                                        <span class="badge bg-warning">En Mantenimiento</span>
-                                    {% endif %}
-                                </td>
-                                <td class="text-end" data-label="Acciones">
-                                    <a href="{% url 'activos:activo-detail' activo.pk %}" 
-                                       class="btn btn-sm btn-outline-primary">
-                                        <i class="bi bi-eye"></i> Ver
-                                    </a>
+                                <td data-label="Estado">{% badge_estado activo %}</td>
+                                <td class="text-end ax-col-tight" data-label="Acciones">
+                                    <div class="ax-row-actions justify-content-end">
+                                        <a href="{% url 'activos:activo-reasignar' activo.pk %}"
+                                           class="btn-pastel btn-pastel--lila btn-pastel--icon"
+                                           title="Reasignar a otra persona"
+                                           data-ax-reasignar
+                                           data-url="{% url 'activos:activo-reasignar' activo.pk %}"
+                                           data-codigo="{{ activo.codigo_inventario }}"
+                                           data-equipo="{{ activo.marca }} {{ activo.modelo }}"
+                                           data-serial="{{ activo.numero_serial|default:'' }}"
+                                           data-icono="{{ activo|icono_activo }}"
+                                           data-usuario-id="{{ activo.usuario_asignado_id|default:'' }}"
+                                           data-usuario-nombre="{{ activo.usuario_asignado|nombre_completo }}">
+                                            <i class="bi bi-person-gear"></i>
+                                            <span class="visually-hidden">Reasignar {{ activo.codigo_inventario }}</span>
+                                        </a>
+                                    </div>
                                 </td>
                             </tr>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
-            {% else %}
-                <div class="text-center py-4">
-                    <i class="bi bi-box-seam" style="font-size: 3rem; color: #ccc;"></i>
-                    <h5 class="mt-3 text-muted">No tiene activos asignados</h5>
-                    <p class="text-muted">Este usuario no tiene ningún activo asignado actualmente.</p>
+                {% else %}
+                <div class="ax-empty py-4">
+                    <div class="ax-empty-icon" style="width:62px;height:62px;font-size:1.7rem;">
+                        <i class="bi bi-inbox"></i>
+                    </div>
+                    <h3>No tiene equipos a su cargo</h3>
+                    <p>Cuando se le asigne un activo aparecerá aquí, junto con su estado y ubicación.</p>
+                    <a href="{% url 'activos:activo-list' %}?estado=AC&amp;asignacion=libre"
+                       class="btn-pastel btn-pastel--menta">Ver equipos disponibles</a>
                 </div>
-            {% endif %}
+                {% endif %}
+            </section>
+        </div>
+
+        {# ================================================================= #}
+        {#  Datos y acciones                                                 #}
+        {# ================================================================= #}
+        <div class="col-lg-4">
+            <div class="ax-sticky d-flex flex-column gap-3">
+
+                <section class="ax-card">
+                    <div class="ax-card-head"><h2 class="ax-card-title">Datos de contacto</h2></div>
+                    <div class="ax-card-body">
+                        <div class="ax-spec" data-ax-stagger="6">
+                            <div class="ax-spec-item">
+                                <div class="ax-spec-label">Correo electrónico</div>
+                                <div class="ax-spec-value {% if not usuario.email %}ax-spec-value--muted{% endif %}">
+                                    {{ usuario.email|default:"No registrado" }}
+                                </div>
+                            </div>
+                            <div class="ax-spec-item">
+                                <div class="ax-spec-label">Teléfono</div>
+                                <div class="ax-spec-value {% if not usuario.telefono %}ax-spec-value--muted{% endif %}">
+                                    {{ usuario.telefono|default:"No registrado" }}
+                                </div>
+                            </div>
+                            <div class="ax-spec-item">
+                                <div class="ax-spec-label">Perfil</div>
+                                <div class="ax-spec-value {% if not usuario.perfil %}ax-spec-value--muted{% endif %}">
+                                    {{ usuario.perfil.nombre|default:"Sin perfil asignado" }}
+                                </div>
+                            </div>
+                            <div class="ax-spec-item">
+                                <div class="ax-spec-label">Alta en el sistema</div>
+                                <div class="ax-spec-value">{{ usuario.date_joined|date:"d/m/Y" }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                {# Responsiva de todos sus equipos en un solo PDF #}
+                {% if activos_asignados %}
+                <section class="ax-card">
+                    <div class="ax-card-head"><h2 class="ax-card-title">Responsiva</h2></div>
+                    <div class="ax-card-body ax-form">
+                        <p class="ax-hint mt-0 mb-3">
+                            Genera la nota de entrega con los {{ total_activos }} equipo(s) a su cargo
+                            y espacio para las firmas de entrega y recepción.
+                        </p>
+                        <form method="post" action="{% url 'reportes:nota-entrega' %}">
+                            {% csrf_token %}
+                            {% for activo in activos_asignados %}
+                            <input type="hidden" name="activos_seleccionados" value="{{ activo.pk }}">
+                            {% endfor %}
+                            <div class="mb-2">
+                                <label class="form-label" for="axResponsableEntrega">
+                                    Entrega <span class="ax-req">*</span>
+                                </label>
+                                <input type="text" name="responsable_entrega" id="axResponsableEntrega"
+                                       class="form-control form-control-sm" placeholder="Nombre y Apellido" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label" for="axObsEntrega">Observaciones</label>
+                                <input type="text" name="observaciones" id="axObsEntrega"
+                                       class="form-control form-control-sm" placeholder="Accesorios, estado…">
+                            </div>
+                            <button type="submit" class="btn-pastel btn-pastel--durazno btn-pastel--block">
+                                Generar nota de entrega
+                            </button>
+                        </form>
+                    </div>
+                </section>
+                {% endif %}
+
+                {# Baja lógica: core_usuario es identidad SSO, jamás se elimina #}
+                <section class="ax-card">
+                    <div class="ax-card-head"><h2 class="ax-card-title">Estado de la cuenta</h2></div>
+                    <div class="ax-card-body">
+                        {% if usuario.is_active %}
+                            {% if total_activos %}
+                            <div class="ax-callout ax-callout--warn mb-3">
+                                <i class="bi bi-shield-exclamation"></i>
+                                <span>
+                                    Tiene <strong>{{ total_activos }}</strong> equipo(s) a su cargo.
+                                    Reasígnalos antes de desactivar la cuenta.
+                                </span>
+                            </div>
+                            {% else %}
+                            <p class="ax-hint mt-0 mb-3">
+                                Desactivar impide que se le asignen equipos. No se borra nada:
+                                la identidad es compartida por todos los programas Paldaca.
+                            </p>
+                            <form method="post" action="{% url 'usuarios:usuario-estado' usuario.pk %}">
+                                {% csrf_token %}
+                                <input type="hidden" name="activar" value="0">
+                                <button type="submit" class="btn-pastel btn-pastel--rosa btn-pastel--block">
+                                    Desactivar cuenta
+                                </button>
+                            </form>
+                            {% endif %}
+                        {% else %}
+                        <div class="ax-callout mb-3">
+                            <i class="bi bi-info-circle"></i>
+                            <span>Esta cuenta está desactivada y no aparece como asignable.</span>
+                        </div>
+                        <form method="post" action="{% url 'usuarios:usuario-estado' usuario.pk %}">
+                            {% csrf_token %}
+                            <input type="hidden" name="activar" value="1">
+                            <button type="submit" class="btn-pastel btn-pastel--menta btn-pastel--block">
+                                Reactivar cuenta
+                            </button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </section>
+            </div>
         </div>
     </div>
-
-    <!-- Botones de navegación -->
-    <div class="text-center mt-4">
-        <a href="{% url 'usuarios:usuario-search' %}" class="btn btn-secondary">
-            <i class="bi bi-arrow-left"></i> Volver a Búsqueda
-        </a>
-    </div>
-</div>
 </div>
 
-<style>
-.user-avatar-large {
-    text-align: center;
-}
+{% include 'activos/includes/_drawer_reasignar.html' with usuarios_asignables=usuarios_asignables %}
+{% endblock %}
 
-.user-actions .btn {
-    width: 100%;
-}
-
-.card-header {
-    background-color: var(--e-global-color-azulmarino);
-    color: white;
-}
-
-.table th {
-    background-color: #f8f9fa;
-    border-top: none;
-}
-.planilla-card .card-body {
-    background: #f9fbff;
-}
-.planilla-status {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    font-size: 0.78rem;
-    font-weight: 600;
-    background: rgba(46, 160, 67, 0.15);
-    color: #1f7a33;
-    border: 1px solid rgba(46, 160, 67, 0.25);
-    padding: 0.22rem 0.55rem;
-    border-radius: 999px;
-}
-.planilla-status-empty {
-    background: rgba(255, 193, 7, 0.18);
-    color: #8a6d00;
-    border-color: rgba(255, 193, 7, 0.35);
-}
-.planilla-actions {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-    gap: 0.45rem;
-}
-.planilla-btn {
-    border-radius: 8px;
-    font-weight: 600;
-    padding: 0.34rem 0.7rem;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    justify-content: center;
-    min-width: 140px;
-}
-.planilla-btn-view {
-    background: #eef2ff;
-    border: 1px solid #ccd8ff;
-    color: #2e3f83;
-}
-.planilla-btn-view:hover {
-    background: #dfe7ff;
-    border-color: #b8c8ff;
-    color: #1f2f6f;
-}
-.planilla-btn-upload {
-    background: linear-gradient(135deg, #32407b 0%, #282c89 100%);
-    border: 1px solid #282c89;
-    color: #fff;
-}
-.planilla-btn-upload:hover {
-    background: linear-gradient(135deg, #2a3566 0%, #242679 100%);
-    border-color: #242679;
-    color: #fff;
-}
-@media (max-width: 767.98px) {
-    .usuario-profile-page {
-        padding: 0.9rem 0.4rem !important;
-    }
-    .usuario-profile-container {
-        padding: 1rem !important;
-    }
-    .user-actions {
-        display: flex;
-        gap: 0.5rem;
-    }
-    .user-actions .btn {
-        width: 100%;
-    }
-    .usuario-activos-table thead {
-        display: none;
-    }
-    .usuario-activos-table tbody,
-    .usuario-activos-table tr,
-    .usuario-activos-table td {
-        display: block;
-        width: 100%;
-    }
-    .usuario-activos-table tr {
-        background: #fff;
-        border: 1px solid #e7ecfa;
-        border-radius: 12px;
-        padding: 0.6rem 0.75rem;
-        margin-bottom: 0.7rem;
-        box-shadow: 0 4px 10px rgba(20, 22, 68, 0.06);
-    }
-    .usuario-activos-table td {
-        border: 0 !important;
-        padding: 0.35rem 0 !important;
-        text-align: left !important;
-    }
-    .usuario-activos-table td::before {
-        content: attr(data-label);
-        display: block;
-        font-size: 0.72rem;
-        font-weight: 700;
-        color: #5e6a9f;
-        text-transform: uppercase;
-        letter-spacing: 0.03em;
-        margin-bottom: 0.15rem;
-    }
-    .planilla-status {
-        font-size: 0.72rem;
-    }
-    .planilla-actions {
-        justify-content: stretch;
-        margin-top: 0.2rem;
-    }
-    .planilla-btn {
-        width: 100%;
-        min-width: unset;
-        padding: 0.42rem 0.65rem;
-    }
-}
-</style>
+{% block extra_js %}
+<script src="{% static 'js/activos-ui.js' %}"></script>
 {% endblock %}

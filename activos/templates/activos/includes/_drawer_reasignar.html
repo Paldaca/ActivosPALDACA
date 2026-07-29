@@ -1,0 +1,92 @@
+{% load activo_filters %}{% comment %}
+Drawer de reasignación rápida. Se renderiza UNA vez por página y lo alimenta
+cualquier disparador con [data-ax-reasignar].
+
+Requiere en el contexto: usuarios_asignables
+Disparador (enlace real, para que funcione también sin JavaScript):
+
+  <a href="{% url 'activos:activo-reasignar' a.pk %}"
+     data-ax-reasignar
+     data-url="{% url 'activos:activo-reasignar' a.pk %}"
+     data-codigo="…" data-equipo="…" data-serial="…" data-icono="bi-laptop"
+     data-usuario-id="…" data-usuario-nombre="…">
+{% endcomment %}
+<div class="offcanvas offcanvas-end ax-drawer" tabindex="-1" id="drawerReasignar"
+     aria-labelledby="drawerReasignarTitulo">
+
+    <div class="offcanvas-header">
+        <h5 class="offcanvas-title" id="drawerReasignarTitulo">
+            <i class="bi bi-person-gear me-1"></i> Reasignar activo
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Cerrar"></button>
+    </div>
+
+    <form method="post" action="">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+
+        <div class="offcanvas-body">
+
+            {# 1 · QUÉ se mueve — confirmación visual antes de tocar nada #}
+            <div class="ax-drawer-asset">
+                <span class="ax-type"><i class="bi bi-box-seam" data-ax-fill="tipo"></i></span>
+                <div class="ax-min0">
+                    <span class="ax-code ax-code--plain" data-ax-fill="codigo">—</span>
+                    <div class="ax-equipo-main mt-1" data-ax-fill="equipo"></div>
+                    <div class="ax-equipo-sub">
+                        <i class="bi bi-upc-scan"></i>
+                        <span class="ax-serial" data-ax-fill="serial"></span>
+                    </div>
+                </div>
+            </div>
+
+            {# 2 · DE quién A quién — el cambio se lee de un vistazo #}
+            <div class="ax-transfer">
+                <div class="ax-transfer-side">
+                    <div class="ax-transfer-label">Responsable actual</div>
+                    <span class="ax-person" data-ax-fill="origen"></span>
+                </div>
+                <div class="ax-transfer-arrow" aria-hidden="true"><i class="bi bi-arrow-right"></i></div>
+                <div class="ax-transfer-side">
+                    <div class="ax-transfer-label">Nuevo responsable</div>
+                    <span class="ax-person" data-ax-fill="destino"></span>
+                </div>
+            </div>
+
+            <div class="ax-form">
+                <label class="form-label" for="drawerReasignarSelect">
+                    <i class="bi bi-search me-1"></i> Buscar persona
+                </label>
+                <div class="ax-combo"
+                     data-combo-placeholder="Escribe un nombre o apellido…"
+                     data-combo-empty-label="Sin asignar · liberar equipo">
+                    <select name="usuario_asignado" id="drawerReasignarSelect"
+                            class="ax-combo-native form-select" data-ax-origen-id="">
+                        <option value="">Sin asignar · liberar equipo</option>
+                        {% for persona in usuarios_asignables %}
+                        <option value="{{ persona.pk }}">{{ persona|nombre_completo }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <small class="ax-hint">
+                    <i class="bi bi-info-circle"></i>
+                    Al guardar queda registrado en el historial del activo, con fecha y autor.
+                </small>
+            </div>
+
+            <div class="ax-callout ax-callout--warn" data-ax-fill="aviso" hidden>
+                <i class="bi bi-exclamation-circle"></i>
+                <span>Elige una persona distinta a la actual para poder guardar.</span>
+            </div>
+        </div>
+
+        <div class="ax-formbar rounded-0 border-0 border-top m-0">
+            <button type="button" class="btn-pastel btn-pastel--neutro" data-bs-dismiss="offcanvas">
+                <i class="bi bi-x-lg"></i> Cancelar
+            </button>
+            <button type="submit" class="btn-pastel btn-pastel--menta" data-ax-submit disabled>
+                <i class="bi bi-check2-circle"></i> Confirmar reasignación
+            </button>
+        </div>
+    </form>
+</div>

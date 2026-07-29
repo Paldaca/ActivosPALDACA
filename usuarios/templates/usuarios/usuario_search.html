@@ -1,147 +1,242 @@
 {% extends 'base.html' %}
 {% load static %}
-{% block title %}Usuarios - {{ block.super }}{% endblock %}
+{% load activo_filters %}
+
+{% block title %}Personas - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/activos-ui.css' %}">
+{% endblock %}
 
 {% block content %}
-<div class="px-5 py-4">
-    <div class="form-container">
-        <h2 class="form-title">
-            <img src="{% static 'core/img/Iconos/usuario.svg' %}" alt="Icono" style="width: 40px; height: 40px; margin-right: 15px;">
-            Usuarios
-        </h2>
-        <hr class="linea" style="border-color: #32407b;">
-    
-    <!-- Buscador de usuarios -->
-    <div class="card mb-4">
-        <div class="card-body">
-            <form method="get" class="row g-3">
-                <div class="col-md-10">
-                    <label for="buscar" class="form-label">Buscar Usuario</label>
-                    <div class="input-group">
-                        <span class="input-group-text">
-                            <i class="bi bi-search"></i>
-                        </span>
-                        <input type="text" 
-                               class="form-control" 
-                               id="buscar" 
-                               name="buscar" 
-                               value="{{ buscar }}"
-                               placeholder="Buscar por nombre, correo o teléfono...">
-                    </div>
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label">&nbsp;</label>
-                    <button type="submit" class="btn btn-primary-custom w-100">
-                        <i class="bi bi-search"></i> BUSCAR
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
+<div class="ax-page">
 
-    <!-- Resultados de búsqueda -->
-    {% if usuarios %}
-        {% for usuario in usuarios %}
-        <div class="card mb-3 usuario-card" onclick="window.location.href='{% url 'usuarios:usuario-profile' usuario.pk %}'">
-            <div class="card-body">
-                <div class="row align-items-center">
-                    <div class="col-md-1">
-                        <div class="user-avatar">
-                            <i class="bi bi-person-circle" style="font-size: 3rem; color: var(--e-global-color-moradopaldaca);"></i>
-                        </div>
-                    </div>
-                    <div class="col-md-8">
-                        <h5 class="mb-1">{{ usuario.get_full_name|default:usuario.username }}</h5>
-                        <p class="mb-1 text-muted">
-                            <i class="bi bi-envelope"></i> {{ usuario.email|default:"Sin correo" }}
-                        </p>
-                        <p class="mb-0 text-muted">
-                            <i class="bi bi-briefcase"></i> {{ usuario.perfil.nombre|default:"Sin perfil" }}
-                        </p>
-                    </div>
-                    <div class="col-md-3 text-end">
-                        <div class="user-stats">
-                            <span class="badge bg-info me-2">
-                                <i class="bi bi-box-seam"></i> {{ usuario.activos_asignados.count }} activos
-                            </span>
-                            <span class="badge bg-success">
-                                <i class="bi bi-check-circle"></i> Activo
-                            </span>
-                        </div>
-                    </div>
-                </div>
+    <nav class="ax-crumbs" aria-label="Ruta de navegación">
+        <a href="{% url 'core:home' %}">Inicio</a>
+        <span class="sep">/</span>
+        <span aria-current="page">Personas</span>
+    </nav>
+
+    <header class="ax-hero">
+        <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
+            <div>
+                <span class="ax-hero-eyebrow">Responsables de activos</span>
+                <h1 class="ax-hero-title">Personas</h1>
+                <p class="ax-hero-sub">
+                    Quién responde por cada equipo. Busca por nombre, apellido, perfil,
+                    teléfono o incluso por el código de inventario que tiene asignado.
+                </p>
+            </div>
+            <div class="ax-hero-actions">
+                <a href="{% url 'usuarios:usuario-create' %}" class="btn-pastel btn-pastel--cta">
+                    Registrar persona
+                </a>
             </div>
         </div>
-        {% endfor %}
+    </header>
 
-        <!-- Paginación -->
-        {% if is_paginated %}
-        <nav aria-label="Page navigation" class="mt-3">
-            <ul class="pagination justify-content-center">
-                {% if page_obj.has_previous %}
-                <li class="page-item">
-                    <a class="page-link" href="?page=1{% if buscar %}&buscar={{ buscar }}{% endif %}">&laquo; Primera</a>
-                </li>
-                <li class="page-item">
-                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if buscar %}&buscar={{ buscar }}{% endif %}">Anterior</a>
-                </li>
-                {% endif %}
-
-                <li class="page-item active">
-                    <span class="page-link">
-                        Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
-                    </span>
-                </li>
-
-                {% if page_obj.has_next %}
-                <li class="page-item">
-                    <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if buscar %}&buscar={{ buscar }}{% endif %}">Siguiente</a>
-                </li>
-                <li class="page-item">
-                    <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if buscar %}&buscar={{ buscar }}{% endif %}">Última &raquo;</a>
-                </li>
-                {% endif %}
-            </ul>
-        </nav>
-        {% endif %}
-
-    {% elif buscar %}
-        <div class="alert alert-info">
-            <i class="bi bi-info-circle"></i> No se encontraron usuarios que coincidan con "{{ buscar }}".
-        </div>
-    {% else %}
-        <div class="alert alert-info">
-            <i class="bi bi-info-circle"></i> Utiliza el buscador para encontrar usuarios del sistema.
-        </div>
-    {% endif %}
-
-    <!-- Botón para crear nuevo usuario -->
-    <div class="text-center mt-4">
-        <a href="{% url 'usuarios:usuario-create' %}" class="btn btn-primary-custom">
-            <i class="bi bi-person-plus"></i> Crear Nuevo Usuario
+    {# ===================================================================== #}
+    {#  Indicadores                                                          #}
+    {# ===================================================================== #}
+    <section class="ax-kpis" aria-label="Resumen de personas" data-ax-stagger="4">
+        <a href="?estado=activos" class="ax-kpi ax-kpi--total {% filtro_activo 'estado' 'activos' %}">
+            <span class="ax-kpi-head">
+                <span class="ax-kpi-label">Personas activas</span>
+                <span class="ax-kpi-icon"><i class="bi bi-people"></i></span>
+            </span>
+            <span class="ax-kpi-value"><span class="ax-count" data-value="{{ resumen.total }}">0</span></span>
+            <span class="ax-kpi-meter"><span style="width:100%"></span></span>
+            <span class="ax-kpi-foot"><span>Pueden recibir equipos</span><span class="ax-kpi-share">100%</span></span>
         </a>
-    </div>
+
+        <a href="?estado=con_activos" class="ax-kpi ax-kpi--asignado {% filtro_activo 'estado' 'con_activos' %}">
+            <span class="ax-kpi-head">
+                <span class="ax-kpi-label">Con equipos</span>
+                <span class="ax-kpi-icon"><i class="bi bi-person-check"></i></span>
+            </span>
+            <span class="ax-kpi-value"><span class="ax-count" data-value="{{ resumen.con_activos }}">0</span></span>
+            <span class="ax-kpi-meter"><span style="width:{{ resumen.con_activos|porcentaje_css:resumen.total }}%"></span></span>
+            <span class="ax-kpi-foot">
+                <span>Responsables</span>
+                <span class="ax-kpi-share">{{ resumen.con_activos|porcentaje:resumen.total }}%</span>
+            </span>
+        </a>
+
+        <a href="?estado=sin_activos" class="ax-kpi ax-kpi--disponible {% filtro_activo 'estado' 'sin_activos' %}">
+            <span class="ax-kpi-head">
+                <span class="ax-kpi-label">Sin equipos</span>
+                <span class="ax-kpi-icon"><i class="bi bi-person-dash"></i></span>
+            </span>
+            <span class="ax-kpi-value"><span class="ax-count" data-value="{{ resumen.sin_activos }}">0</span></span>
+            <span class="ax-kpi-meter"><span style="width:{{ resumen.sin_activos|porcentaje_css:resumen.total }}%"></span></span>
+            <span class="ax-kpi-foot">
+                <span>Nada a su cargo</span>
+                <span class="ax-kpi-share">{{ resumen.sin_activos|porcentaje:resumen.total }}%</span>
+            </span>
+        </a>
+
+        <a href="?estado=inactivos" class="ax-kpi ax-kpi--baja {% filtro_activo 'estado' 'inactivos' %}">
+            <span class="ax-kpi-head">
+                <span class="ax-kpi-label">Desactivadas</span>
+                <span class="ax-kpi-icon"><i class="bi bi-person-slash"></i></span>
+            </span>
+            <span class="ax-kpi-value"><span class="ax-count" data-value="{{ resumen.inactivos }}">0</span></span>
+            <span class="ax-kpi-meter"><span style="width:{{ resumen.inactivos|porcentaje_css:resumen.total }}%"></span></span>
+            <span class="ax-kpi-foot"><span>Se pueden reactivar</span></span>
+        </a>
+    </section>
+
+    {# ===================================================================== #}
+    {#  Búsqueda                                                             #}
+    {# ===================================================================== #}
+    <section class="ax-card mb-3">
+        <div class="ax-card-body">
+            <form method="get" role="search">
+                <input type="hidden" name="estado" value="{{ estado_actual }}">
+                <div class="ax-searchbar">
+                    <i class="bi bi-search" aria-hidden="true"></i>
+                    <input type="search" name="buscar" data-ax-buscar value="{{ buscar }}"
+                           placeholder="Nombre, apellido, perfil, teléfono, correo o código de inventario…"
+                           aria-label="Buscar personas">
+                    <kbd class="ax-kbd d-none d-md-inline">/</kbd>
+                    <button type="submit" class="btn-pastel btn-pastel--lila btn-pastel--sm">Buscar</button>
+                </div>
+            </form>
+
+            {% if buscar %}
+            <div class="d-flex flex-wrap align-items-center gap-2 mt-3">
+                <span class="ax-filter-pill">
+                    Búsqueda: <strong>{{ buscar }}</strong>
+                    <a href="?estado={{ estado_actual }}" title="Quitar la búsqueda"><i class="bi bi-x"></i></a>
+                </span>
+            </div>
+            {% endif %}
+        </div>
+    </section>
+
+    {# ===================================================================== #}
+    {#  Listado                                                              #}
+    {# ===================================================================== #}
+    <section class="ax-card">
+        <div class="ax-card-head">
+            <h2 class="ax-card-title">
+                Resultados
+                <span class="ax-tag ms-1">{{ page_obj.paginator.count|default:usuarios|length }}</span>
+            </h2>
+        </div>
+
+        {% if usuarios %}
+        <div class="ax-table-wrap">
+            <table class="ax-table">
+                <thead>
+                    <tr>
+                        <th scope="col">Persona</th>
+                        <th scope="col">Perfil</th>
+                        <th scope="col">Contacto</th>
+                        <th scope="col">Activos a cargo</th>
+                        <th scope="col">Estado</th>
+                        <th scope="col" class="ax-col-tight text-end">
+                            <span class="visually-hidden">Acciones</span>
+                        </th>
+                    </tr>
+                </thead>
+                <tbody data-ax-stagger="30">
+                    {% for persona in usuarios %}
+                    <tr>
+                        <td data-label="Persona">
+                            <a href="{% url 'usuarios:usuario-profile' persona.pk %}"
+                               class="ax-person text-decoration-none">
+                                <span class="ax-avatar ax-avatar--c{{ persona|tono_avatar }}" aria-hidden="true">
+                                    {{ persona|iniciales }}
+                                </span>
+                                <span class="ax-min0">
+                                    <span class="ax-person-name d-block">{{ persona|nombre_completo }}</span>
+                                    {% if persona.disciplina %}
+                                    <span class="ax-person-meta">{{ persona.disciplina.nombre }}</span>
+                                    {% endif %}
+                                </span>
+                            </a>
+                        </td>
+                        <td data-label="Perfil">
+                            {% if persona.perfil %}
+                            <span class="ax-tag">{{ persona.perfil.nombre }}</span>
+                            {% else %}
+                            <span class="ax-hint">Sin perfil</span>
+                            {% endif %}
+                        </td>
+                        <td data-label="Contacto">
+                            {% if persona.telefono %}
+                            <span class="ax-meta"><i class="bi bi-telephone"></i><span>{{ persona.telefono }}</span></span>
+                            {% endif %}
+                            {% if persona.email %}
+                            <div class="ax-equipo-sub">{{ persona.email }}</div>
+                            {% endif %}
+                            {% if not persona.telefono and not persona.email %}
+                            <span class="ax-hint">Sin datos de contacto</span>
+                            {% endif %}
+                        </td>
+                        <td data-label="Activos a cargo">
+                            {% if persona.num_activos %}
+                            <a href="{% url 'activos:activo-list' %}?usuario_asignado={{ persona.pk }}"
+                               class="ax-tag" style="background: var(--ax-cielo); color: var(--ax-cielo-ink);">
+                                {{ persona.num_activos }} equipo(s)
+                            </a>
+                            {% else %}
+                            <span class="ax-hint">Ninguno</span>
+                            {% endif %}
+                        </td>
+                        <td data-label="Estado">
+                            {% if persona.is_active %}
+                            <span class="ax-estado ax-estado--disponible">
+                                <span class="ax-estado-dot"></span> Activa
+                            </span>
+                            {% else %}
+                            <span class="ax-estado ax-estado--baja">
+                                <span class="ax-estado-dot"></span> Desactivada
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end ax-col-tight" data-label="Acciones">
+                            <div class="ax-row-actions justify-content-end">
+                                <a href="{% url 'usuarios:usuario-profile' persona.pk %}"
+                                   class="btn-pastel btn-pastel--cielo btn-pastel--icon" title="Ver ficha">
+                                    <i class="bi bi-eye"></i>
+                                    <span class="visually-hidden">Ver ficha de {{ persona|nombre_completo }}</span>
+                                </a>
+                                <a href="{% url 'usuarios:usuario-update' persona.pk %}"
+                                   class="btn-pastel btn-pastel--lila btn-pastel--icon" title="Editar">
+                                    <i class="bi bi-pencil"></i>
+                                    <span class="visually-hidden">Editar {{ persona|nombre_completo }}</span>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="ax-empty">
+            <div class="ax-empty-icon"><i class="bi bi-people"></i></div>
+            {% if buscar %}
+            <h3>Nadie coincide con «{{ buscar }}»</h3>
+            <p>Prueba con otro término o revisa si la persona está desactivada.</p>
+            <a href="?estado=inactivos" class="btn-pastel btn-pastel--neutro">Ver desactivadas</a>
+            {% else %}
+            <h3>Aún no hay personas registradas</h3>
+            <p>Registra a quienes van a responder por los equipos del inventario.</p>
+            <a href="{% url 'usuarios:usuario-create' %}" class="btn-pastel btn-pastel--cta">
+                Registrar la primera
+            </a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </section>
+
+    {% include 'activos/includes/_paginacion.html' %}
 </div>
+{% endblock %}
 
-<style>
-.usuario-card {
-    cursor: pointer;
-    transition: all 0.3s ease;
-    border: 1px solid #e0e0e0;
-}
-
-.usuario-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    border-color: var(--e-global-color-moradopaldaca);
-}
-
-.user-avatar {
-    text-align: center;
-}
-
-.user-stats .badge {
-    font-size: 0.8rem;
-}
-</style>
+{% block extra_js %}
+<script src="{% static 'js/activos-ui.js' %}"></script>
 {% endblock %}

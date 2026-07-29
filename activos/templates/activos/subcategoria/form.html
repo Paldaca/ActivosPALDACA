@@ -1,76 +1,113 @@
 {% extends 'base.html' %}
 {% load static %}
-{% block title %}{{ object|yesno:"Editar,Crear" }} Subcategoría - {{ block.super }}{% endblock %}
+
+{% block title %}{% if object %}Editar{% else %}Nueva{% endif %} Subcategoría - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/activos-ui.css' %}">
+{% endblock %}
 
 {% block content %}
-<div class="px-5 py-4 mt-2">
-    <div class="form-container">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <h2 class="form-title mb-0">
-                <img src="{% static 'core/img/Iconos/nueva-categoria.svg' %}" alt="Icono" style="width: 40px; height: 40px; margin-right: 15px;">
-                Subcategorías
-            </h2>
-            <a href="{% url 'activos:categoria-create' %}" class="btn btn-primary-custom">
-                <i class="bi bi-plus-circle"></i> Nueva Categoría
-            </a>
-        </div>
-        <hr class="linea" style="border-color: #32407b;">
+<div class="ax-page ax-page--form">
 
-        <form method="post">
-            {% csrf_token %}
+    <nav class="ax-crumbs" aria-label="Ruta de navegación">
+        <a href="{% url 'activos:activo-list' %}"><i class="bi bi-boxes"></i> Activos</a>
+        <span class="sep">/</span>
+        <a href="{% url 'activos:subcategoria-list' %}">Subcategorías</a>
+        <span class="sep">/</span>
+        <span aria-current="page">{% if object %}Editar{% else %}Nueva{% endif %}</span>
+    </nav>
 
-            <div class="mb-3">
-                <label for="{{ form.nombre.id_for_label }}" class="form-label">
-                    Nombre <span class="text-danger">*</span>
-                </label>
-                {{ form.nombre }}
-                {% if form.nombre.errors %}
-                <div class="invalid-feedback d-block">
-                    {{ form.nombre.errors }}
+    <header class="ax-hero">
+        <span class="ax-hero-eyebrow"><i class="bi bi-diagram-3"></i> Catálogo</span>
+        <h1 class="ax-hero-title">
+            <img src="{% static 'core/img/Iconos/nueva-categoria.svg' %}" alt="" aria-hidden="true">
+            {% if object %}Editar subcategoría{% else %}Nueva subcategoría{% endif %}
+        </h1>
+    </header>
+
+    <section class="ax-card">
+        <div class="ax-card-body ax-form">
+            <form method="post">
+                {% csrf_token %}
+
+                <div class="ax-field mb-3" style="--i:0">
+                    <label class="form-label" for="{{ form.nombre.id_for_label }}">
+                        Nombre <span class="ax-req">*</span>
+                    </label>
+                    {{ form.nombre }}
+                    {% if form.nombre.errors %}
+                    <div class="ax-error"><i class="bi bi-exclamation-circle"></i> {{ form.nombre.errors }}</div>
+                    {% endif %}
+                    <small class="ax-hint">
+                        Ejemplos: <em>Laptop</em>, <em>Monitor</em>, <em>Impresora</em>.
+                        El nombre también determina el icono que se muestra en el listado.
+                    </small>
+                </div>
+
+                <div class="ax-field mb-3" style="--i:1">
+                    <label class="form-label" for="{{ form.categoria.id_for_label }}">
+                        Categoría <span class="ax-req">*</span>
+                    </label>
+                    <div class="input-group">
+                        {{ form.categoria }}
+                        <button type="button" class="btn-pastel btn-pastel--lila"
+                                style="border-radius: 0 var(--ax-r) var(--ax-r) 0;"
+                                data-ax-crear-abrir
+                                data-tipo="categoria"
+                                data-url="{% url 'activos:crear-rapido' 'categoria' %}"
+                                data-target="#{{ form.categoria.auto_id }}"
+                                data-titulo="Nueva categoría"
+                                title="Crear una categoría aquí mismo">
+                            <i class="bi bi-plus-lg"></i>
+                        </button>
+                    </div>
+                    {% if form.categoria.errors %}
+                    <div class="ax-error"><i class="bi bi-exclamation-circle"></i> {{ form.categoria.errors }}</div>
+                    {% endif %}
+                </div>
+
+                <div class="ax-field mb-3" style="--i:2">
+                    <label class="form-label" for="{{ form.prefijo.id_for_label }}">
+                        Prefijo de inventario <span class="ax-req">*</span>
+                    </label>
+                    {{ form.prefijo }}
+                    {% if form.prefijo.errors %}
+                    <div class="ax-error"><i class="bi bi-exclamation-circle"></i> {{ form.prefijo.errors }}</div>
+                    {% endif %}
+                    <small class="ax-hint">
+                        Hasta 5 letras o números. Genera códigos como
+                        <span class="ax-code ax-code--plain">PAL-{{ form.prefijo.value|default:'X'|upper }}-001</span>
+                    </small>
+                </div>
+
+                {% if object %}
+                <div class="ax-callout ax-callout--warn">
+                    <i class="bi bi-exclamation-circle"></i>
+                    <span>
+                        Cambiar el prefijo <strong>no renombra</strong> los
+                        {{ object.activos.count }} activo(s) ya registrados: solo afecta
+                        a los que se creen a partir de ahora.
+                    </span>
                 </div>
                 {% endif %}
-            </div>
 
-            <div class="mb-3">
-                <label for="{{ form.categoria.id_for_label }}" class="form-label">
-                    Categoría <span class="text-danger">*</span>
-                </label>
-                <div class="input-group">
-                    {{ form.categoria }}
-                    <button type="button" class="btn btn-outline-secondary" onclick="window.open('{% url 'activos:categoria-create' %}', '_blank')">
-                        <i class="bi bi-plus"></i>
+                <div class="ax-formbar">
+                    <a href="{% url 'activos:subcategoria-list' %}" class="btn-pastel btn-pastel--neutro">
+                        <i class="bi bi-x-lg"></i> Cancelar
+                    </a>
+                    <button type="submit" class="btn-pastel btn-pastel--menta">
+                        <i class="bi bi-check2-circle"></i> Guardar
                     </button>
                 </div>
-                {% if form.categoria.errors %}
-                <div class="invalid-feedback d-block">
-                    {{ form.categoria.errors }}
-                </div>
-                {% endif %}
-            </div>
-
-            <div class="mb-3">
-                <label for="{{ form.prefijo.id_for_label }}" class="form-label">
-                    Prefijo de inventario <span class="text-danger">*</span>
-                </label>
-                {{ form.prefijo }}
-                {% if form.prefijo.errors %}
-                <div class="invalid-feedback d-block">
-                    {{ form.prefijo.errors }}
-                </div>
-                {% endif %}
-                <small class="form-text text-muted">Se usará para generar códigos como PAL-{{ form.prefijo.value|default:'X'|upper }}-001.</small>
-            </div>
-
-            <hr>
-            <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                <a href="{% url 'activos:subcategoria-list' %}" class="btn btn-secondary">
-                    <i class="bi bi-x-circle"></i> Cancelar
-                </a>
-                <button type="submit" class="btn btn-primary">
-                    <i class="bi bi-save"></i> Guardar
-                </button>
-            </div>
-        </form>
-    </div>
+            </form>
+        </div>
+    </section>
 </div>
+
+{% include 'activos/includes/_modal_crear_rapido.html' %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/activos-ui.js' %}"></script>
 {% endblock %}

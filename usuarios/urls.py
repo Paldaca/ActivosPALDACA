@@ -6,12 +6,14 @@ app_name = 'usuarios'
 urlpatterns = [
     # Vista principal con buscador
     path('', views.UsuarioSearchView.as_view(), name='usuario-search'),
-    
+
     # Perfil de usuario
     path('<int:pk>/perfil/', views.UsuarioProfileView.as_view(), name='usuario-profile'),
-    
-    # CRUD de usuarios
+
+    # Alta y edición
     path('crear/', views.UsuarioCreateView.as_view(), name='usuario-create'),
     path('<int:pk>/editar/', views.UsuarioUpdateView.as_view(), name='usuario-update'),
-    path('<int:pk>/eliminar/', views.UsuarioDeleteView.as_view(), name='usuario-delete'),
+
+    # Baja lógica: core_usuario es la identidad SSO compartida y no se elimina.
+    path('<int:pk>/estado/', views.cambiar_estado_usuario, name='usuario-estado'),
 ]

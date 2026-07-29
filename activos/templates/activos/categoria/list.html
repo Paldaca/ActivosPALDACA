@@ -1,70 +1,102 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load activo_filters %}
+
 {% block title %}Categorías - {{ block.super }}{% endblock %}
 
 {% block extra_css %}
-<style>
-    .btn-primary-custom {
-        background-color: var(--e-global-color-moradopaldaca);
-        border-color: var(--e-global-color-moradopaldaca);
-        color: white;
-    }
-    .btn-primary-custom:hover {
-        background-color: var(--e-global-color-azul);
-        border-color: var(--e-global-color-azul);
-    }
-</style>
+<link rel="stylesheet" href="{% static 'css/activos-ui.css' %}">
 {% endblock %}
 
 {% block content %}
-<div class="px-5 py-4 mt-2">
-    <div class="form-container">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <h2 class="form-title mb-0">
-                <img src="{% static 'core/img/Iconos/nueva-categoria.svg' %}" alt="Icono" style="width: 40px; height: 40px; margin-right: 15px;">
-                Categorías
-            </h2>
-            <div class="d-flex gap-2">
-                <a href="{% url 'activos:subcategoria-list' %}" class="btn btn-outline-secondary">
-                    <i class="bi bi-diagram-3"></i> Ver Subcategorías
+<div class="ax-page ax-page--narrow">
+
+    <nav class="ax-crumbs" aria-label="Ruta de navegación">
+        <a href="{% url 'activos:activo-list' %}"><i class="bi bi-boxes"></i> Activos</a>
+        <span class="sep">/</span>
+        <span aria-current="page">Categorías</span>
+    </nav>
+
+    <header class="ax-hero">
+        <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
+            <div>
+                <span class="ax-hero-eyebrow"><i class="bi bi-folder2"></i> Catálogo</span>
+                <h1 class="ax-hero-title">
+                    <img src="{% static 'core/img/Iconos/nueva-categoria.svg' %}" alt="" aria-hidden="true">
+                    Categorías
+                </h1>
+                <p class="ax-hero-sub">
+                    Primer nivel de organización del inventario. Cada categoría agrupa
+                    subcategorías, y son estas las que definen el prefijo del código.
+                </p>
+            </div>
+            <div class="ax-hero-actions">
+                <a href="{% url 'activos:subcategoria-list' %}" class="btn-pastel btn-pastel--glass">
+                    <i class="bi bi-diagram-3"></i> Subcategorías
                 </a>
-                <a href="{% url 'activos:categoria-create' %}" class="btn btn-primary-custom">
-                    <i class="bi bi-plus-circle"></i> Nueva Categoría
+                <a href="{% url 'activos:categoria-create' %}" class="btn-pastel btn-pastel--cta">
+                    <i class="bi bi-plus-lg"></i> Nueva categoría
                 </a>
             </div>
         </div>
-        <hr class="linea" style="border-color: #32407b;">
+    </header>
 
-{% if categorias %}
-<div class="card">
-    <div class="card-body">
-        <div class="table-responsive">
-            <table class="table table-hover">
+    <section class="ax-card">
+        {% if categorias %}
+        <div class="ax-table-wrap">
+            <table class="ax-table">
                 <thead>
                     <tr>
-                        <th>Nombre</th>
-                        <th>Subcategorías</th>
-                        <th class="text-end">Acciones</th>
+                        <th scope="col">Categoría</th>
+                        <th scope="col">Subcategorías</th>
+                        <th scope="col">Activos</th>
+                        <th scope="col" class="ax-col-tight text-end">
+                            <span class="visually-hidden">Acciones</span>
+                        </th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody data-ax-stagger="30">
                     {% for categoria in categorias %}
                     <tr>
-                        <td>{{ categoria.nombre }}</td>
-                        <td>
-                            <span class="badge bg-info">
-                                {{ categoria.subcategorias.count }}
-                            </span>
+                        <td data-label="Categoría">
+                            <div class="ax-equipo">
+                                <span class="ax-type" aria-hidden="true"><i class="bi bi-folder2"></i></span>
+                                <span class="ax-equipo-main">{{ categoria.nombre }}</span>
+                            </div>
                         </td>
-                        <td class="text-end">
-                            <div class="btn-group" role="group">
-                                <a href="{% url 'activos:categoria-update' categoria.pk %}" 
-                                   class="btn btn-sm btn-outline-primary">
-                                    <i class="bi bi-pencil"></i> Editar
+                        <td data-label="Subcategorías">
+                            <a href="{% url 'activos:subcategoria-list' %}?categoria={{ categoria.pk }}" class="ax-tag">
+                                {{ categoria.num_subcategorias }} subcategoría(s)
+                            </a>
+                        </td>
+                        <td data-label="Activos">
+                            <a href="{% url 'activos:activo-list' %}?categoria={{ categoria.pk }}" class="ax-meta">
+                                <i class="bi bi-boxes"></i>
+                                <span>{{ categoria.num_activos }} activo(s)</span>
+                            </a>
+                        </td>
+                        <td class="text-end ax-col-tight" data-label="Acciones">
+                            <div class="ax-row-actions justify-content-end">
+                                <a href="{% url 'activos:categoria-update' categoria.pk %}"
+                                   class="btn-pastel btn-pastel--lila btn-pastel--icon" title="Editar">
+                                    <i class="bi bi-pencil"></i>
+                                    <span class="visually-hidden">Editar {{ categoria.nombre }}</span>
                                 </a>
-                                <a href="{% url 'activos:categoria-delete' categoria.pk %}" 
-                                   class="btn btn-sm btn-outline-danger">
-                                    <i class="bi bi-trash"></i> Eliminar
+                                <a href="{% url 'activos:categoria-list' %}"
+                                   class="btn-pastel btn-pastel--rosa btn-pastel--icon"
+                                   title="{% if categoria.num_subcategorias %}Tiene subcategorías asociadas{% else %}Eliminar{% endif %}"
+                                   data-ax-eliminar
+                                   data-url="{% url 'activos:categoria-delete' categoria.pk %}"
+                                   data-icono="bi-folder2"
+                                   data-titulo="¿Eliminar la categoría «{{ categoria.nombre }}»?"
+                                   data-ficha="{{ categoria.num_subcategorias }} subcategoría(s) · {{ categoria.num_activos }} activo(s)"
+                                   {% if categoria.num_subcategorias %}
+                                   data-bloqueado="No se puede eliminar: tiene {{ categoria.num_subcategorias }} subcategoría(s) asociada(s). Muévelas o elimínalas primero."
+                                   {% else %}
+                                   data-impacto="La categoría está vacía y se eliminará de forma permanente."
+                                   {% endif %}>
+                                    <i class="bi bi-trash"></i>
+                                    <span class="visually-hidden">Eliminar {{ categoria.nombre }}</span>
                                 </a>
                             </div>
                         </td>
@@ -73,45 +105,24 @@
                 </tbody>
             </table>
         </div>
-    </div>
-</div>
-
-{% if is_paginated %}
-<nav aria-label="Page navigation" class="mt-3">
-    <ul class="pagination justify-content-center">
-        {% if page_obj.has_previous %}
-        <li class="page-item">
-            <a class="page-link" href="?page=1">&laquo; Primera</a>
-        </li>
-        <li class="page-item">
-            <a class="page-link" href="?page={{ page_obj.previous_page_number }}">Anterior</a>
-        </li>
+        {% else %}
+        <div class="ax-empty">
+            <div class="ax-empty-icon"><i class="bi bi-folder-plus"></i></div>
+            <h3>Aún no hay categorías</h3>
+            <p>Crea la primera para empezar a clasificar los activos del inventario.</p>
+            <a href="{% url 'activos:categoria-create' %}" class="btn-pastel btn-pastel--cta">
+                <i class="bi bi-plus-lg"></i> Crear la primera categoría
+            </a>
+        </div>
         {% endif %}
+    </section>
 
-        <li class="page-item active">
-            <span class="page-link">
-                Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
-            </span>
-        </li>
-
-        {% if page_obj.has_next %}
-        <li class="page-item">
-            <a class="page-link" href="?page={{ page_obj.next_page_number }}">Siguiente</a>
-        </li>
-        <li class="page-item">
-            <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}">Última &raquo;</a>
-        </li>
-        {% endif %}
-    </ul>
-</nav>
-{% endif %}
-
-{% else %}
-<div class="alert alert-info">
-    <i class="bi bi-info-circle"></i> No hay categorías registradas.
-    <a href="{% url 'activos:categoria-create' %}">Crear la primera categoría</a>
+    {% include 'activos/includes/_paginacion.html' %}
 </div>
-{% endif %}
-    </div>
-</div>
+
+{% include 'activos/includes/_modal_eliminar.html' %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/activos-ui.js' %}"></script>
 {% endblock %}

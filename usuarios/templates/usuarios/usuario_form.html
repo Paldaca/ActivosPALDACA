@@ -1,93 +1,140 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load activo_filters %}
 
-{% block title %}{{ object|yesno:"Editar,Crear" }} Usuario - {{ block.super }}{% endblock %}
+{% block title %}{% if object %}Editar{% else %}Registrar{% endif %} persona - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/activos-ui.css' %}">
+{% endblock %}
 
 {% block content %}
-<div class="px-5 py-4">
-    <div class="form-container">
-        <h2 class="form-title">
-            <img src="{% static 'core/img/Iconos/usuario.svg' %}" alt="Icono" style="width: 40px; height: 40px; margin-right: 15px;">
-            {% if object %}Editar Usuario{% else %}Crear Nuevo Usuario{% endif %}
-        </h2>
-        <hr class="linea" style="border-color: #32407b;">
+<div class="ax-page ax-page--form">
 
-    <form method="post">
-        {% csrf_token %}
+    <nav class="ax-crumbs" aria-label="Ruta de navegación">
+        <a href="{% url 'usuarios:usuario-search' %}">Personas</a>
+        <span class="sep">/</span>
+        {% if object %}
+        <a href="{% url 'usuarios:usuario-profile' object.pk %}">{{ object|nombre_completo }}</a>
+        <span class="sep">/</span>
+        <span aria-current="page">Editar</span>
+        {% else %}
+        <span aria-current="page">Registrar</span>
+        {% endif %}
+    </nav>
 
-        <h5 class="mb-3"><i class="bi bi-person"></i> Información personal</h5>
+    <header class="ax-hero">
+        <span class="ax-hero-eyebrow">Responsables de activos</span>
+        <h1 class="ax-hero-title">
+            {% if object %}Editar a {{ object|nombre_completo }}{% else %}Registrar persona{% endif %}
+        </h1>
+        <p class="ax-hero-sub">
+            {% if object %}
+            Los cambios se reflejan en todo el módulo: la persona se muestra siempre
+            por su nombre y apellido.
+            {% else %}
+            Solo hacen falta el nombre y el apellido. El resto puede completarse más tarde.
+            {% endif %}
+        </p>
+    </header>
 
-        <div class="row">
-            <div class="col-md-6 mb-3">
-                <label for="{{ form.first_name.id_for_label }}" class="form-label">
-                    Nombres <span class="text-danger">*</span>
-                </label>
-                {{ form.first_name }}
-                {% if form.first_name.errors %}
-                <div class="invalid-feedback d-block">{{ form.first_name.errors }}</div>
-                {% endif %}
-            </div>
-            <div class="col-md-6 mb-3">
-                <label for="{{ form.last_name.id_for_label }}" class="form-label">
-                    Apellidos <span class="text-danger">*</span>
-                </label>
-                {{ form.last_name }}
-                {% if form.last_name.errors %}
-                <div class="invalid-feedback d-block">{{ form.last_name.errors }}</div>
-                {% endif %}
-            </div>
-        </div>
+    <section class="ax-card">
+        <div class="ax-card-body ax-form">
+            <form method="post">
+                {% csrf_token %}
 
-        <div class="row">
-            <div class="col-md-6 mb-3">
-                <label for="{{ form.email.id_for_label }}" class="form-label">Correo electrónico</label>
-                {{ form.email }}
-                {% if form.email.errors %}
-                <div class="invalid-feedback d-block">{{ form.email.errors }}</div>
-                {% endif %}
-            </div>
-            <div class="col-md-6 mb-3">
-                <label for="{{ form.telefono.id_for_label }}" class="form-label">Teléfono</label>
-                {{ form.telefono }}
-                {% if form.telefono.errors %}
-                <div class="invalid-feedback d-block">{{ form.telefono.errors }}</div>
-                {% endif %}
-            </div>
-        </div>
-
-        <hr>
-        <h5 class="mb-3"><i class="bi bi-briefcase"></i> Perfil y estado</h5>
-
-        <div class="row">
-            <div class="col-md-6 mb-3">
-                <label for="{{ form.perfil.id_for_label }}" class="form-label">Perfil</label>
-                {{ form.perfil }}
-                {% if form.perfil.errors %}
-                <div class="invalid-feedback d-block">{{ form.perfil.errors }}</div>
-                {% endif %}
-            </div>
-            <div class="col-md-6 mb-3">
-                <div class="form-check mt-4">
-                    {{ form.is_active }}
-                    <label class="form-check-label" for="{{ form.is_active.id_for_label }}">
-                        Usuario activo
-                    </label>
+                {% if form.non_field_errors %}
+                <div class="ax-callout ax-callout--danger mb-3">
+                    <i class="bi bi-exclamation-octagon"></i>
+                    <div>{{ form.non_field_errors }}</div>
                 </div>
-                {% if form.is_active.errors %}
-                <div class="invalid-feedback d-block">{{ form.is_active.errors }}</div>
                 {% endif %}
-            </div>
-        </div>
 
-        <hr>
-        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-            <a href="{% url 'usuarios:usuario-search' %}" class="btn btn-secondary">
-                <i class="bi bi-x-circle"></i> Cancelar
-            </a>
-            <button type="submit" class="btn btn-primary">
-                <i class="bi bi-save"></i> Guardar
-            </button>
+                <div class="ax-fieldset">
+                    <h2 class="ax-fieldset-legend"><span class="num">1</span> Identificación</h2>
+
+                    <div class="row g-3">
+                        <div class="col-md-6 ax-field" style="--i:0">
+                            <label class="form-label" for="{{ form.first_name.id_for_label }}">
+                                {{ form.first_name.label }} <span class="ax-req">*</span>
+                            </label>
+                            {{ form.first_name }}
+                            {% if form.first_name.errors %}
+                            <div class="ax-error"><i class="bi bi-exclamation-circle"></i> {{ form.first_name.errors }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6 ax-field" style="--i:1">
+                            <label class="form-label" for="{{ form.last_name.id_for_label }}">
+                                {{ form.last_name.label }} <span class="ax-req">*</span>
+                            </label>
+                            {{ form.last_name }}
+                            {% if form.last_name.errors %}
+                            <div class="ax-error"><i class="bi bi-exclamation-circle"></i> {{ form.last_name.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <small class="ax-hint mt-2">
+                        <i class="bi bi-info-circle"></i>
+                        Nombre y apellido son obligatorios porque es lo único que se
+                        muestra en toda la interfaz: el usuario técnico nunca aparece.
+                    </small>
+                </div>
+
+                <div class="ax-fieldset">
+                    <h2 class="ax-fieldset-legend"><span class="num">2</span> Contacto y perfil</h2>
+
+                    <div class="row g-3">
+                        <div class="col-md-6 ax-field" style="--i:0">
+                            <label class="form-label" for="{{ form.email.id_for_label }}">{{ form.email.label }}</label>
+                            {{ form.email }}
+                            {% if form.email.errors %}
+                            <div class="ax-error"><i class="bi bi-exclamation-circle"></i> {{ form.email.errors }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6 ax-field" style="--i:1">
+                            <label class="form-label" for="{{ form.telefono.id_for_label }}">{{ form.telefono.label }}</label>
+                            {{ form.telefono }}
+                            {% if form.telefono.errors %}
+                            <div class="ax-error"><i class="bi bi-exclamation-circle"></i> {{ form.telefono.errors }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="col-12 ax-field" style="--i:2">
+                            <label class="form-label" for="{{ form.perfil.id_for_label }}">{{ form.perfil.label }}</label>
+                            {{ form.perfil }}
+                            {% if form.perfil.errors %}
+                            <div class="ax-error"><i class="bi bi-exclamation-circle"></i> {{ form.perfil.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="form-check mt-3">
+                        {{ form.is_active }}
+                        <label class="form-check-label" for="{{ form.is_active.id_for_label }}">
+                            {{ form.is_active.label }}
+                        </label>
+                        <small class="ax-hint">
+                            Solo las personas activas pueden recibir equipos.
+                        </small>
+                    </div>
+                </div>
+
+                <div class="ax-formbar">
+                    <span class="ax-formbar-info">
+                        <i class="bi bi-shield-check"></i> Nada se guarda hasta que confirmes.
+                    </span>
+                    <a href="{% if object %}{% url 'usuarios:usuario-profile' object.pk %}{% else %}{% url 'usuarios:usuario-search' %}{% endif %}"
+                       class="btn-pastel btn-pastel--neutro">Cancelar</a>
+                    <button type="submit" class="btn-pastel btn-pastel--menta">
+                        {% if object %}Guardar cambios{% else %}Registrar persona{% endif %}
+                    </button>
+                </div>
+            </form>
         </div>
-    </form>
+    </section>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/activos-ui.js' %}"></script>
 {% endblock %}

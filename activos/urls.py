@@ -33,5 +33,11 @@ urlpatterns = [
     path('<int:pk>/reasignar/', views.reasignar_activo, name='activo-reasignar'),
     path('<int:pk>/reubicar/', views.reubicar_activo, name='activo-reubicar'),
     path('<int:pk>/historial/', views.ActivoHistorialView.as_view(), name='activo-historial'),
+
+    # Acciones en lote (reasignar / reubicar varios activos a la vez)
+    path('acciones-masivas/', views.acciones_masivas, name='activo-acciones-masivas'),
+
+    # Alta express de catálogo desde el formulario de activos (JSON)
+    path('catalogo/<slug:tipo>/rapido/', views.crear_rapido, name='crear-rapido'),
 ]
 

@@ -1,0 +1,39 @@
+{% load activo_filters %}{% comment %}
+Paginación que conserva todos los filtros activos.
+Uso: {% include 'activos/includes/_paginacion.html' %}  (necesita page_obj)
+{% endcomment %}
+{% if is_paginated %}
+<nav class="ax-pager" aria-label="Paginación de resultados">
+    {% if page_obj.has_previous %}
+    <a href="{% query_params page=1 %}" aria-label="Primera página"><i class="bi bi-chevron-double-left"></i></a>
+    <a href="{% query_params page=page_obj.previous_page_number %}" rel="prev" aria-label="Página anterior">
+        <i class="bi bi-chevron-left"></i>
+    </a>
+    {% else %}
+    <span class="is-disabled" aria-hidden="true"><i class="bi bi-chevron-double-left"></i></span>
+    <span class="is-disabled" aria-hidden="true"><i class="bi bi-chevron-left"></i></span>
+    {% endif %}
+
+    {% for numero in page_obj.paginator.page_range %}
+        {% if numero == page_obj.number %}
+        <span class="is-current" aria-current="page">{{ numero }}</span>
+        {% elif numero > page_obj.number|add:"-3" and numero < page_obj.number|add:"3" %}
+        <a href="{% query_params page=numero %}">{{ numero }}</a>
+        {% elif numero == 1 or numero == page_obj.paginator.num_pages %}
+        <a href="{% query_params page=numero %}">{{ numero }}</a>
+        {% endif %}
+    {% endfor %}
+
+    {% if page_obj.has_next %}
+    <a href="{% query_params page=page_obj.next_page_number %}" rel="next" aria-label="Página siguiente">
+        <i class="bi bi-chevron-right"></i>
+    </a>
+    <a href="{% query_params page=page_obj.paginator.num_pages %}" aria-label="Última página">
+        <i class="bi bi-chevron-double-right"></i>
+    </a>
+    {% else %}
+    <span class="is-disabled" aria-hidden="true"><i class="bi bi-chevron-right"></i></span>
+    <span class="is-disabled" aria-hidden="true"><i class="bi bi-chevron-double-right"></i></span>
+    {% endif %}
+</nav>
+{% endif %}

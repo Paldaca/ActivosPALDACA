@@ -4,13 +4,61 @@ from django.views.generic import (
     ListView, DetailView, CreateView, UpdateView, DeleteView
 )
 from django.contrib import messages
+from django.contrib.auth import get_user_model
+from django.db import transaction
 from django.db.models import Q, Count
+from django.http import JsonResponse
+from django.utils.http import url_has_allowed_host_and_scheme
+from django.views.decorators.http import require_POST
 from .models import Categoria, SubCategoria, Ubicacion, Activo, HistorialMovimiento
 from .forms import (
-    CategoriaForm, SubCategoriaForm, UbicacionForm, 
-    ActivoForm, ActivoFilterForm, ReasignarActivoForm, ReubicarActivoForm
+    CategoriaForm, SubCategoriaForm, UbicacionForm,
+    ActivoForm, ActivoFilterForm, ReasignarActivoForm, ReubicarActivoForm,
+    usuarios_asignables,
 )
 from .decorators import ModuloActivoRequiredMixin, requiere_modulo_paldaca
+
+
+def _url_de_retorno(request, url, fallback='activos:activo-list'):
+    """Valida el `next` recibido para no convertirlo en un redirect abierto."""
+    if url and url_has_allowed_host_and_scheme(
+        url,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        return url
+    return reverse(fallback)
+
+
+class SinPaginaDeBorradoMixin:
+    """El borrado se confirma en un modal, no en una pantalla aparte.
+
+    Evita una navegación completa (y su vuelta atrás) para una acción de un
+    solo clic. La vista queda como endpoint POST; un GET directo — un enlace
+    viejo, un marcador — devuelve al usuario a donde tiene sentido seguir
+    trabajando en lugar de dejarlo en una página huérfana.
+    """
+
+    def get(self, request, *args, **kwargs):
+        return redirect(self.get_redireccion_get())
+
+    def get_redireccion_get(self):
+        return self.success_url
+
+
+def _resumen_inventario():
+    """KPIs del encabezado, en una sola consulta.
+
+    Los estados que ve el usuario se derivan de (estado, usuario_asignado):
+    el modelo solo guarda AC / IN / EM.
+    """
+    return Activo.objects.aggregate(
+        total=Count('id'),
+        disponibles=Count('id', filter=Q(estado='AC', usuario_asignado__isnull=True)),
+        asignados=Count('id', filter=Q(estado='AC', usuario_asignado__isnull=False)),
+        mantenimiento=Count('id', filter=Q(estado='EM')),
+        baja=Count('id', filter=Q(estado='IN')),
+    )
 
 # ============== VISTAS DE CATEGORÍA ==============
 class CategoriaListView(ModuloActivoRequiredMixin, ListView):
@@ -18,6 +66,15 @@ class CategoriaListView(ModuloActivoRequiredMixin, ListView):
     template_name = 'activos/categoria/list.html'
     context_object_name = 'categorias'
     paginate_by = 20
+
+    def get_queryset(self):
+        # Contadores por anotación: evita una consulta por fila en la plantilla.
+        # `order_by` explícito porque annotate() descarta el Meta.ordering y
+        # dejaría la paginación sin un orden estable.
+        return super().get_queryset().annotate(
+            num_subcategorias=Count('subcategorias', distinct=True),
+            num_activos=Count('subcategorias__activos', distinct=True),
+        ).order_by('nombre')
 
 
 class CategoriaCreateView(ModuloActivoRequiredMixin, CreateView):
@@ -42,21 +99,24 @@ class CategoriaUpdateView(ModuloActivoRequiredMixin, UpdateView):
         return super().form_valid(form)
 
 
-class CategoriaDeleteView(ModuloActivoRequiredMixin, DeleteView):
+class CategoriaDeleteView(SinPaginaDeBorradoMixin, ModuloActivoRequiredMixin, DeleteView):
     model = Categoria
-    template_name = 'activos/categoria/confirm_delete.html'
     success_url = reverse_lazy('activos:categoria-list')
-    
-    def delete(self, request, *args, **kwargs):
-        self.object = self.get_object()
-        
-        # Verificar si tiene subcategorías asociadas
+
+    # Desde Django 4.0 `DeleteView.post()` llama a `form_valid()`, no a
+    # `delete()`. La guarda vive aquí para que realmente se ejecute; de lo
+    # contrario el PROTECT del modelo devolvería un 500.
+    def form_valid(self, form):
         if self.object.subcategorias.exists():
-            messages.error(self.request, f'No se puede eliminar la categoría "{self.object.nombre}" porque tiene subcategorías asociadas.')
+            messages.error(
+                self.request,
+                f'No se puede eliminar la categoría "{self.object.nombre}" '
+                'porque tiene subcategorías asociadas.',
+            )
             return redirect('activos:categoria-list')
-        
+
         messages.success(self.request, 'Categoría eliminada exitosamente.')
-        return super().delete(request, *args, **kwargs)
+        return super().form_valid(form)
 
 
 # ============== VISTAS DE SUBCATEGORÍA ==============
@@ -68,12 +128,14 @@ class SubCategoriaListView(ModuloActivoRequiredMixin, ListView):
     paginate_by = 20
     
     def get_queryset(self):
-        queryset = super().get_queryset().select_related('categoria')
+        queryset = super().get_queryset().select_related('categoria').annotate(
+            num_activos=Count('activos', distinct=True),
+        ).order_by('categoria__nombre', 'nombre')
         categoria_id = self.request.GET.get('categoria')
         if categoria_id:
             queryset = queryset.filter(categoria_id=categoria_id)
         return queryset
-    
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['categorias'] = Categoria.objects.all()
@@ -102,21 +164,21 @@ class SubCategoriaUpdateView(ModuloActivoRequiredMixin, UpdateView):
         return super().form_valid(form)
 
 
-class SubCategoriaDeleteView(ModuloActivoRequiredMixin, DeleteView):
+class SubCategoriaDeleteView(SinPaginaDeBorradoMixin, ModuloActivoRequiredMixin, DeleteView):
     model = SubCategoria
-    template_name = 'activos/subcategoria/confirm_delete.html'
     success_url = reverse_lazy('activos:subcategoria-list')
     
-    def delete(self, request, *args, **kwargs):
-        self.object = self.get_object()
-        
-        # Verificar si tiene activos asociados
+    def form_valid(self, form):
         if self.object.activos.exists():
-            messages.error(self.request, f'No se puede eliminar la subcategoría "{self.object}" porque tiene activos asociados.')
+            messages.error(
+                self.request,
+                f'No se puede eliminar la subcategoría "{self.object}" '
+                'porque tiene activos asociados.',
+            )
             return redirect('activos:subcategoria-list')
-        
+
         messages.success(self.request, 'Subcategoría eliminada exitosamente.')
-        return super().delete(request, *args, **kwargs)
+        return super().form_valid(form)
 
 
 # ============== VISTAS DE UBICACIÓN ==============
@@ -126,6 +188,11 @@ class UbicacionListView(ModuloActivoRequiredMixin, ListView):
     template_name = 'activos/ubicacion/list.html'
     context_object_name = 'ubicaciones'
     paginate_by = 20
+
+    def get_queryset(self):
+        return super().get_queryset().annotate(
+            num_activos=Count('activos', distinct=True),
+        ).order_by('nombre')
 
 
 class UbicacionCreateView(ModuloActivoRequiredMixin, CreateView):
@@ -150,21 +217,21 @@ class UbicacionUpdateView(ModuloActivoRequiredMixin, UpdateView):
         return super().form_valid(form)
 
 
-class UbicacionDeleteView(ModuloActivoRequiredMixin, DeleteView):
+class UbicacionDeleteView(SinPaginaDeBorradoMixin, ModuloActivoRequiredMixin, DeleteView):
     model = Ubicacion
-    template_name = 'activos/ubicacion/confirm_delete.html'
     success_url = reverse_lazy('activos:ubicacion-list')
     
-    def delete(self, request, *args, **kwargs):
-        self.object = self.get_object()
-        
-        # Verificar si tiene activos asociados
+    def form_valid(self, form):
         if self.object.activos.exists():
-            messages.error(self.request, f'No se puede eliminar la ubicación "{self.object.nombre}" porque tiene activos asociados.')
+            messages.error(
+                self.request,
+                f'No se puede eliminar la ubicación "{self.object.nombre}" '
+                'porque tiene activos asociados.',
+            )
             return redirect('activos:ubicacion-list')
-        
+
         messages.success(self.request, 'Ubicación eliminada exitosamente.')
-        return super().delete(request, *args, **kwargs)
+        return super().form_valid(form)
 
 
 # ============== VISTAS DE ACTIVO ==============
@@ -185,8 +252,10 @@ class ActivoListView(ModuloActivoRequiredMixin, ListView):
         subcategoria_id = self.request.GET.get('subcategoria')
         ubicacion_id = self.request.GET.get('ubicacion')
         estado = self.request.GET.get('estado')
+        asignacion = self.request.GET.get('asignacion')
+        usuario_id = self.request.GET.get('usuario_asignado')
         buscar = self.request.GET.get('buscar')
-        
+
         if categoria_id:
             queryset = queryset.filter(subcategoria__categoria_id=categoria_id)
         if subcategoria_id:
@@ -195,37 +264,94 @@ class ActivoListView(ModuloActivoRequiredMixin, ListView):
             queryset = queryset.filter(ubicacion_id=ubicacion_id)
         if estado:
             queryset = queryset.filter(estado=estado)
+        # Distingue "Disponible" (sin responsable) de "Asignado" sin tocar el modelo.
+        if asignacion == 'libre':
+            queryset = queryset.filter(usuario_asignado__isnull=True)
+        elif asignacion == 'asignado':
+            queryset = queryset.filter(usuario_asignado__isnull=False)
+        if usuario_id:
+            queryset = queryset.filter(usuario_asignado_id=usuario_id)
         if buscar:
+            # Buscar también por persona: "¿qué tiene asignado Ana?" es una
+            # pregunta diaria y antes obligaba a recorrer la tabla a mano.
             queryset = queryset.filter(
                 Q(codigo_inventario__icontains=buscar) |
                 Q(marca__icontains=buscar) |
                 Q(modelo__icontains=buscar) |
-                Q(numero_serial__icontains=buscar)
+                Q(numero_serial__icontains=buscar) |
+                Q(usuario_asignado__first_name__icontains=buscar) |
+                Q(usuario_asignado__last_name__icontains=buscar) |
+                Q(ubicacion__nombre__icontains=buscar)
             )
-        
+
         return queryset
-    
+
+    def _filtros_activos(self):
+        """Filtros vigentes, ya resueltos a etiqueta legible.
+
+        Alimenta las píldoras "quitar filtro" del listado: el usuario siempre
+        ve por qué está viendo lo que ve, y puede deshacerlo en un clic.
+        """
+        get = self.request.GET
+        pills = []
+
+        def agregar(param, etiqueta, valor):
+            if valor:
+                pills.append({'param': param, 'etiqueta': etiqueta, 'valor': valor})
+
+        agregar('buscar', 'Búsqueda', get.get('buscar'))
+
+        if get.get('categoria'):
+            obj = Categoria.objects.filter(pk=get['categoria']).first()
+            agregar('categoria', 'Categoría', obj.nombre if obj else None)
+
+        if get.get('subcategoria'):
+            obj = SubCategoria.objects.filter(pk=get['subcategoria']).first()
+            agregar('subcategoria', 'Subcategoría', obj.nombre if obj else None)
+
+        if get.get('ubicacion'):
+            obj = Ubicacion.objects.filter(pk=get['ubicacion']).first()
+            agregar('ubicacion', 'Ubicación', obj.nombre if obj else None)
+
+        if get.get('usuario_asignado'):
+            obj = usuarios_asignables().filter(pk=get['usuario_asignado']).first()
+            agregar('usuario_asignado', 'Responsable', _nombre(obj) if obj else None)
+
+        return pills
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['filter_form'] = ActivoFilterForm(self.request.GET or None)
-        context['total_activos'] = self.get_queryset().count()
-        
-        # Estadísticas para el dashboard
-        # Total de activos por categoría (top 5 con activos)
+
+        # Resultados de la consulta actual (ya paginada arriba)
+        paginator = context.get('paginator')
+        context['total_activos'] = (
+            paginator.count if paginator else self.get_queryset().count()
+        )
+
+        # KPIs sobre el inventario completo: el encabezado responde
+        # "¿cómo está todo?", no "¿cómo está lo que filtré?".
+        context['resumen'] = _resumen_inventario()
+        context['filtros_activos'] = self._filtros_activos()
+        context['hay_filtros'] = bool(context['filtros_activos'])
+
+        # Datos para los drawers de acción rápida (se renderizan una sola vez)
+        context['usuarios_asignables'] = usuarios_asignables()
+        context['ubicaciones'] = Ubicacion.objects.all()
+
+        # Distribución (top 5 con activos)
         context['activos_por_categoria'] = Categoria.objects.annotate(
             total_activos=Count('subcategorias__activos')
         ).filter(total_activos__gt=0).order_by('-total_activos')[:5]
-        
-        # Total de activos por ubicación (top 5 con activos)
+
         context['activos_por_ubicacion'] = Ubicacion.objects.annotate(
             total_activos=Count('activos')
         ).filter(total_activos__gt=0).order_by('-total_activos')[:5]
-        
-        # Estadísticas generales
+
         context['total_categorias'] = Categoria.objects.count()
         context['total_ubicaciones'] = Ubicacion.objects.count()
-        context['total_activos_sistema'] = Activo.objects.count()
-        
+        context['total_activos_sistema'] = context['resumen']['total']
+
         return context
 
 
@@ -233,28 +359,58 @@ class ActivoDetailView(ModuloActivoRequiredMixin, DetailView):
     model = Activo
     template_name = 'activos/activo/detail.html'
     context_object_name = 'activo'
-    
+
     def get_queryset(self):
         return super().get_queryset().select_related(
             'subcategoria__categoria', 'ubicacion', 'usuario_asignado'
+        ).prefetch_related('mantenimientos')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # Últimos movimientos en la propia ficha: el historial completo sigue
+        # teniendo su vista, pero lo habitual es querer ver los 5 recientes.
+        context['movimientos_recientes'] = (
+            self.object.historial_movimientos
+            .select_related('usuario')
+            .order_by('-fecha_movimiento')[:6]
         )
+        context['total_movimientos'] = self.object.historial_movimientos.count()
+        context['usuarios_asignables'] = usuarios_asignables()
+        context['ubicaciones'] = Ubicacion.objects.all()
+        return context
 
 
-class ActivoCreateView(ModuloActivoRequiredMixin, CreateView):
+class ActivoFormContextMixin:
+    """Catálogos que necesita el alta express dentro del formulario de activos."""
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['categorias_catalogo'] = Categoria.objects.all()
+        return context
+
+
+class ActivoCreateView(ActivoFormContextMixin, ModuloActivoRequiredMixin, CreateView):
     model = Activo
     form_class = ActivoForm
     template_name = 'activos/activo/form.html'
     success_url = reverse_lazy('activos:activo-list')
-    
+
     def form_valid(self, form):
-        messages.success(self.request, 'Activo creado exitosamente.')
-        return super().form_valid(form)
+        response = super().form_valid(form)
+        messages.success(
+            self.request,
+            f'Activo {self.object.codigo_inventario} creado exitosamente.',
+        )
+        return response
 
     def get_success_url(self):
+        # "Guardar y registrar otro": alta en serie sin volver al listado.
+        if 'guardar_y_nuevo' in self.request.POST:
+            return reverse('activos:activo-create')
         return reverse('activos:activo-detail', kwargs={'pk': self.object.pk})
 
 
-class ActivoUpdateView(ModuloActivoRequiredMixin, UpdateView):
+class ActivoUpdateView(ActivoFormContextMixin, ModuloActivoRequiredMixin, UpdateView):
     model = Activo
     form_class = ActivoForm
     template_name = 'activos/activo/form.html'
@@ -283,14 +439,26 @@ class ActivoUpdateView(ModuloActivoRequiredMixin, UpdateView):
         return response
 
 
-class ActivoDeleteView(ModuloActivoRequiredMixin, DeleteView):
+class ActivoDeleteView(SinPaginaDeBorradoMixin, ModuloActivoRequiredMixin, DeleteView):
     model = Activo
-    template_name = 'activos/activo/confirm_delete.html'
     success_url = reverse_lazy('activos:activo-list')
-    
-    def delete(self, request, *args, **kwargs):
-        messages.success(self.request, 'Activo eliminado exitosamente.')
-        return super().delete(request, *args, **kwargs)
+
+    def get_queryset(self):
+        return super().get_queryset().select_related(
+            'subcategoria__categoria', 'ubicacion', 'usuario_asignado'
+        )
+
+    def get_redireccion_get(self):
+        # Un GET aquí suele ser un enlace antiguo: se devuelve a la ficha, que
+        # es donde vive el botón real de eliminar.
+        return reverse('activos:activo-detail', kwargs={'pk': self.kwargs['pk']})
+
+    def form_valid(self, form):
+        messages.success(
+            self.request,
+            f'Activo {self.object.codigo_inventario} eliminado exitosamente.',
+        )
+        return super().form_valid(form)
 
 
 def _registrar_reubicacion_en_historial(activo, ubicacion_anterior, ubicacion_nueva, usuario):
@@ -318,8 +486,9 @@ def _registrar_reasignacion_en_historial(activo, usuario_anterior, usuario_nuevo
         usuario_nuevo.id if usuario_nuevo else None
     ):
         return
-    valor_anterior = str(usuario_anterior) if usuario_anterior else 'Sin asignar'
-    valor_nuevo = str(usuario_nuevo) if usuario_nuevo else 'Sin asignar'
+    # El historial también respeta la regla: "Nombre Apellido", nunca username.
+    valor_anterior = _nombre(usuario_anterior)
+    valor_nuevo = _nombre(usuario_nuevo)
     HistorialMovimiento.objects.create(
         activo=activo,
         tipo_movimiento=HistorialMovimiento.TipoMovimiento.REASIGNACION,
@@ -335,9 +504,22 @@ def _registrar_reasignacion_en_historial(activo, usuario_anterior, usuario_nuevo
 
 @requiere_modulo_paldaca
 def reasignar_activo(request, pk):
-    """Vista para reasignar un activo a otro usuario"""
-    activo = get_object_or_404(Activo, pk=pk)
-    
+    """Reasigna un activo a otra persona.
+
+    Sirve a dos interfaces con el mismo endpoint: el drawer lateral (que envía
+    `next` para volver al listado sin perder filtros) y la página completa, que
+    queda como respaldo accesible y sin JavaScript.
+    """
+    activo = get_object_or_404(
+        Activo.objects.select_related('subcategoria__categoria', 'ubicacion', 'usuario_asignado'),
+        pk=pk,
+    )
+    destino = _url_de_retorno(
+        request,
+        request.POST.get('next') or request.GET.get('next'),
+        fallback='activos:activo-list',
+    )
+
     if request.method == 'POST':
         # Guardamos estado original desde BD antes de que el ModelForm
         # muta la instancia en memoria durante is_valid().
@@ -355,22 +537,37 @@ def reasignar_activo(request, pk):
                 request.user,
             )
 
-            messages.success(request, f'Activo {activo.codigo_inventario} reasignado exitosamente.')
+            messages.success(
+                request,
+                f'{activo.codigo_inventario} · {_nombre(usuario_anterior)} → {_nombre(usuario_nuevo)}',
+            )
+            if request.POST.get('next'):
+                return redirect(destino)
             return redirect('activos:activo-detail', pk=pk)
     else:
         form = ReasignarActivoForm(instance=activo)
-    
+
     return render(request, 'activos/activo/reasignar.html', {
         'form': form,
-        'activo': activo
+        'activo': activo,
+        'usuarios_asignables': usuarios_asignables(),
+        'next': destino,
     })
 
 
 @requiere_modulo_paldaca
 def reubicar_activo(request, pk):
-    """Vista para reubicar un activo"""
-    activo = get_object_or_404(Activo, pk=pk)
-    
+    """Reubica un activo. Mismo contrato que `reasignar_activo`."""
+    activo = get_object_or_404(
+        Activo.objects.select_related('subcategoria__categoria', 'ubicacion', 'usuario_asignado'),
+        pk=pk,
+    )
+    destino = _url_de_retorno(
+        request,
+        request.POST.get('next') or request.GET.get('next'),
+        fallback='activos:activo-list',
+    )
+
     if request.method == 'POST':
         # Guardamos estado original desde BD antes de que el ModelForm
         # muta la instancia en memoria durante is_valid().
@@ -388,15 +585,164 @@ def reubicar_activo(request, pk):
                 request.user,
             )
 
-            messages.success(request, f'Activo {activo.codigo_inventario} reubicado exitosamente.')
+            messages.success(
+                request,
+                f'{activo.codigo_inventario} · {ubicacion_anterior} → {ubicacion_nueva}',
+            )
+            if request.POST.get('next'):
+                return redirect(destino)
             return redirect('activos:activo-detail', pk=pk)
     else:
         form = ReubicarActivoForm(instance=activo)
-    
+
     return render(request, 'activos/activo/reubicar.html', {
         'form': form,
-        'activo': activo
+        'activo': activo,
+        'ubicaciones': Ubicacion.objects.all(),
+        'next': destino,
     })
+
+
+def _nombre(usuario):
+    """Nombre y Apellido para los mensajes del sistema; nunca el username."""
+    if not usuario:
+        return 'Sin asignar'
+    return (usuario.get_full_name() or '').strip() or usuario.username
+
+
+@require_POST
+@requiere_modulo_paldaca
+def crear_rapido(request, tipo):
+    """Alta express de catálogo sin abandonar el formulario de activos.
+
+    Antes, registrar un equipo cuya subcategoría o ubicación no existía obligaba
+    a abrir otra pestaña, crear el catálogo, volver y recargar. Aquí se resuelve
+    en el sitio y la opción nueva queda seleccionada al instante.
+    """
+    nombre = (request.POST.get('nombre') or '').strip()
+    if not nombre:
+        return JsonResponse(
+            {'ok': False, 'errores': {'nombre': ['Escribe un nombre.']}},
+            status=400,
+        )
+
+    if tipo == 'ubicacion':
+        obj, creado = Ubicacion.objects.get_or_create(nombre=nombre)
+        return JsonResponse({'ok': True, 'id': obj.pk, 'texto': obj.nombre, 'creado': creado})
+
+    if tipo == 'categoria':
+        obj, creado = Categoria.objects.get_or_create(nombre=nombre)
+        return JsonResponse({'ok': True, 'id': obj.pk, 'texto': obj.nombre, 'creado': creado})
+
+    if tipo == 'subcategoria':
+        # La categoría puede elegirse o escribirse en el mismo paso: así el
+        # caso "no existe nada todavía" no se convierte en tres formularios.
+        categoria = None
+        categoria_nueva = (request.POST.get('categoria_nueva') or '').strip()
+        if categoria_nueva:
+            categoria, _ = Categoria.objects.get_or_create(nombre=categoria_nueva)
+        elif request.POST.get('categoria'):
+            categoria = Categoria.objects.filter(pk=request.POST['categoria']).first()
+
+        if categoria is None:
+            return JsonResponse(
+                {'ok': False, 'errores': {'categoria': ['Elige o escribe una categoría.']}},
+                status=400,
+            )
+
+        form = SubCategoriaForm({
+            'nombre': nombre,
+            'prefijo': request.POST.get('prefijo', ''),
+            'categoria': categoria.pk,
+        })
+        if not form.is_valid():
+            return JsonResponse({'ok': False, 'errores': form.errors}, status=400)
+
+        obj = form.save()
+        return JsonResponse({
+            'ok': True,
+            'id': obj.pk,
+            'texto': str(obj),
+            'creado': True,
+            'categoria': {'id': categoria.pk, 'texto': categoria.nombre},
+        })
+
+    return JsonResponse(
+        {'ok': False, 'errores': {'__all__': ['Tipo de catálogo no soportado.']}},
+        status=400,
+    )
+
+
+@require_POST
+@requiere_modulo_paldaca
+def acciones_masivas(request):
+    """Reasigna o reubica varios activos en un solo envío.
+
+    Es el mayor ahorro de clics del módulo: entregar 8 equipos a una persona
+    pasa de 8 flujos completos a una selección + una confirmación.
+    """
+    accion = request.POST.get('accion')
+    ids = request.POST.getlist('activos')
+    destino_id = (request.POST.get('destino') or '').strip()
+    volver = _url_de_retorno(request, request.POST.get('next'))
+
+    if not ids:
+        messages.warning(request, 'No seleccionaste ningún activo.')
+        return redirect(volver)
+
+    activos = Activo.objects.select_related('usuario_asignado', 'ubicacion').filter(pk__in=ids)
+    cambios = 0
+
+    if accion == 'reasignar':
+        usuario = None
+        if destino_id:
+            usuario = usuarios_asignables().filter(pk=destino_id).first()
+            if usuario is None:
+                messages.error(request, 'La persona seleccionada no está disponible.')
+                return redirect(volver)
+
+        with transaction.atomic():
+            for activo in activos:
+                if activo.usuario_asignado_id == (usuario.pk if usuario else None):
+                    continue
+                anterior = activo.usuario_asignado
+                activo.usuario_asignado = usuario
+                activo.save(update_fields=['usuario_asignado', 'fecha_actualizacion'])
+                _registrar_reasignacion_en_historial(activo, anterior, usuario, request.user)
+                cambios += 1
+
+        messages.success(
+            request,
+            f'{cambios} activo(s) reasignado(s) a {_nombre(usuario)}.'
+            if cambios else 'Los activos seleccionados ya tenían ese responsable.',
+        )
+
+    elif accion == 'reubicar':
+        ubicacion = Ubicacion.objects.filter(pk=destino_id).first() if destino_id else None
+        if ubicacion is None:
+            messages.error(request, 'Selecciona una ubicación válida.')
+            return redirect(volver)
+
+        with transaction.atomic():
+            for activo in activos:
+                if activo.ubicacion_id == ubicacion.pk:
+                    continue
+                anterior = activo.ubicacion
+                activo.ubicacion = ubicacion
+                activo.save(update_fields=['ubicacion', 'fecha_actualizacion'])
+                _registrar_reubicacion_en_historial(activo, anterior, ubicacion, request.user)
+                cambios += 1
+
+        messages.success(
+            request,
+            f'{cambios} activo(s) reubicado(s) en {ubicacion.nombre}.'
+            if cambios else 'Los activos seleccionados ya estaban en esa ubicación.',
+        )
+
+    else:
+        messages.error(request, 'Acción no reconocida.')
+
+    return redirect(volver)
 
 
 class ActivoHistorialView(ModuloActivoRequiredMixin, DetailView):
@@ -405,8 +751,16 @@ class ActivoHistorialView(ModuloActivoRequiredMixin, DetailView):
     template_name = 'activos/activo/historial.html'
     context_object_name = 'activo'
     
+    def get_queryset(self):
+        return super().get_queryset().select_related(
+            'subcategoria__categoria', 'ubicacion', 'usuario_asignado'
+        )
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        activo = self.get_object()
-        context['historial'] = activo.historial_movimientos.all().order_by('-fecha_movimiento')
+        context['historial'] = (
+            self.object.historial_movimientos
+            .select_related('usuario')
+            .order_by('-fecha_movimiento')
+        )
         return context

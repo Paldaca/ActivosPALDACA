@@ -64,3 +64,90 @@ def test_crear_usuario_core(usuario_activos_admin, client):
     user = UserModel.objects.get(email="maria@test.com")
     assert user.first_name == "María"
     assert user.email == "maria@test.com"
+
+
+@pytest.mark.django_db
+def test_busqueda_excluye_superusuarios(usuario_activos_admin, client):
+    UserModel.objects.create_user(
+        username="empleado-ok",
+        email="empleado@test.com",
+        password="unused",
+        first_name="Ana",
+        last_name="Normal",
+        is_active=True,
+    )
+    UserModel.objects.create_superuser(
+        username="root-admin",
+        email="root@test.com",
+        password="unused",
+        first_name="Root",
+        last_name="Super",
+    )
+    response = client.get(reverse("usuarios:usuario-search"))
+    assert response.status_code == 200
+    assert b"Ana" in response.content
+    assert b"Root" not in response.content
+    assert b"Super" not in response.content
+
+
+@pytest.mark.django_db
+def test_perfil_superusuario_no_existe(usuario_activos_admin, client):
+    superuser = UserModel.objects.create_superuser(
+        username="root-admin",
+        email="root@test.com",
+        password="unused",
+    )
+    response = client.get(
+        reverse("usuarios:usuario-profile", kwargs={"pk": superuser.pk})
+    )
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_usuarios_asignables_excluye_superusuarios(db):
+    from activos.forms import usuarios_asignables
+
+    normal = UserModel.objects.create_user(
+        username="persona",
+        email="persona@test.com",
+        password="unused",
+        first_name="Luis",
+        last_name="Perez",
+        is_active=True,
+    )
+    UserModel.objects.create_superuser(
+        username="root-admin",
+        email="root@test.com",
+        password="unused",
+    )
+    ids = set(usuarios_asignables().values_list("pk", flat=True))
+    assert normal.pk in ids
+    assert not any(
+        UserModel.objects.filter(pk=pk, is_superuser=True).exists() for pk in ids
+    )
+
+
+@pytest.mark.django_db
+def test_no_asignar_activo_a_superusuario(db):
+    from django.core.exceptions import ValidationError
+
+    from activos.models import Activo, Categoria, SubCategoria, Ubicacion
+
+    cat = Categoria.objects.create(nombre="Computacion")
+    sub = SubCategoria.objects.create(nombre="Laptop", prefijo="LAP", categoria=cat)
+    ubi = Ubicacion.objects.create(nombre="Oficina")
+    superuser = UserModel.objects.create_superuser(
+        username="root-admin",
+        email="root@test.com",
+        password="unused",
+    )
+    activo = Activo(
+        subcategoria=sub,
+        marca="HP",
+        modelo="X",
+        ubicacion=ubi,
+        usuario_asignado=superuser,
+        estado=Activo.EstadoActivo.ACTIVO,
+    )
+    with pytest.raises(ValidationError):
+        activo.save()

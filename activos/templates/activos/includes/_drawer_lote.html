@@ -1,0 +1,91 @@
+{% load activo_filters %}{% comment %}
+Drawer de acción en lote. Se incluye dos veces con distinto `modo`:
+  {% include 'activos/includes/_drawer_lote.html' with modo='reasignar' %}
+  {% include 'activos/includes/_drawer_lote.html' with modo='reubicar' %}
+Los IDs seleccionados los inyecta activos-ui.js al enviar (data-ax-bulk-form).
+{% endcomment %}
+{% if modo == 'reasignar' %}
+    {% firstof 'drawerLoteReasignar' as drawer_id %}
+{% else %}
+    {% firstof 'drawerLoteReubicar' as drawer_id %}
+{% endif %}
+<div class="offcanvas offcanvas-end ax-drawer" tabindex="-1" id="{{ drawer_id }}"
+     aria-labelledby="{{ drawer_id }}Titulo">
+
+    <div class="offcanvas-header">
+        <h5 class="offcanvas-title" id="{{ drawer_id }}Titulo">
+            {% if modo == 'reasignar' %}
+            <i class="bi bi-people me-1"></i> Reasignar en lote
+            {% else %}
+            <i class="bi bi-geo me-1"></i> Reubicar en lote
+            {% endif %}
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Cerrar"></button>
+    </div>
+
+    <form method="post" action="{% url 'activos:activo-acciones-masivas' %}" data-ax-bulk-form="activos">
+        {% csrf_token %}
+        <input type="hidden" name="accion" value="{{ modo }}">
+        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+
+        <div class="offcanvas-body">
+            <div class="ax-callout">
+                <i class="bi bi-collection"></i>
+                <span>
+                    Vas a
+                    {% if modo == 'reasignar' %}reasignar{% else %}reubicar{% endif %}
+                    <strong data-ax-bulk-label="{n} activo(s)">0 activo(s)</strong>
+                    en una sola operación. Cada uno queda registrado en su historial
+                    de forma individual.
+                </span>
+            </div>
+
+            <div class="ax-form mt-3">
+                {% if modo == 'reasignar' %}
+                <label class="form-label" for="{{ drawer_id }}Select">
+                    <i class="bi bi-person-check me-1"></i> Nuevo responsable <span class="ax-req">*</span>
+                </label>
+                <div class="ax-combo"
+                     data-combo-placeholder="Escribe un nombre o apellido…"
+                     data-combo-empty-label="Sin asignar · liberar equipos">
+                    <select name="destino" id="{{ drawer_id }}Select" class="ax-combo-native form-select">
+                        <option value="">Sin asignar · liberar equipos</option>
+                        {% for persona in usuarios_asignables %}
+                        <option value="{{ persona.pk }}">{{ persona|nombre_completo }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% else %}
+                <label class="form-label" for="{{ drawer_id }}Select">
+                    <i class="bi bi-geo-alt me-1"></i> Nueva ubicación <span class="ax-req">*</span>
+                </label>
+                <div class="ax-combo"
+                     data-combo-placeholder="Escribe una ubicación…"
+                     data-combo-empty-label="Sin definir">
+                    <select name="destino" id="{{ drawer_id }}Select" class="ax-combo-native form-select" required>
+                        {% for lugar in ubicaciones %}
+                        <option value="{{ lugar.pk }}">{{ lugar.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+                <small class="ax-hint">
+                    <i class="bi bi-shield-check"></i>
+                    Los activos que ya tuvieran ese
+                    {% if modo == 'reasignar' %}responsable{% else %}destino{% endif %}
+                    se omiten: no se generan movimientos en falso.
+                </small>
+            </div>
+        </div>
+
+        <div class="ax-formbar rounded-0 border-0 border-top m-0">
+            <button type="button" class="btn-pastel btn-pastel--neutro" data-bs-dismiss="offcanvas">
+                <i class="bi bi-x-lg"></i> Cancelar
+            </button>
+            <button type="submit" class="btn-pastel {% if modo == 'reasignar' %}btn-pastel--menta{% else %}btn-pastel--cielo{% endif %}">
+                <i class="bi bi-check2-all"></i>
+                <span data-ax-bulk-label="Aplicar a {n}">Aplicar</span>
+            </button>
+        </div>
+    </form>
+</div>

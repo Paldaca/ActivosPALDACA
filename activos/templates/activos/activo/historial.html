@@ -1,163 +1,101 @@
 {% extends 'base.html' %}
-
 {% load static %}
-{% block title %}Historial - {{ activo.codigo_inventario }} - {{ block.super }}{% endblock %}
+{% load activo_filters %}
+
+{% block title %}Historial {{ activo.codigo_inventario }} - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/activos-ui.css' %}">
+{% endblock %}
 
 {% block content %}
-<div class="px-5 py-4 mt-2">
-<div class="form-container">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="form-title">
-            <img src="{% static 'core/img/Iconos/activos.svg' %}" alt="Icono" style="width: 32px; height: 32px; margin-right: 10px;">
-            Historial de Movimientos
-        </h2>
-        <a href="{% url 'activos:activo-detail' activo.pk %}" class="btn btn-secondary">
-            <i class="bi bi-arrow-left"></i> Volver al Activo
-        </a>
-    </div>
+<div class="ax-page ax-page--narrow">
 
-    <div class="card mb-4">
-        <div class="card-header">
-            <h5 class="mb-0">
-                <i class="bi bi-box-seam"></i> {{ activo.codigo_inventario }} - {{ activo.marca }} {{ activo.modelo }}
-            </h5>
-        </div>
-        <div class="card-body">
-            <div class="row">
-                <div class="col-md-6">
-                    <p><strong>Categoría:</strong> {{ activo.subcategoria.categoria.nombre }} - {{ activo.subcategoria.nombre }}</p>
-                    <p><strong>Ubicación:</strong> {{ activo.ubicacion.nombre }}</p>
+    <nav class="ax-crumbs" aria-label="Ruta de navegación">
+        <a href="{% url 'activos:activo-list' %}"><i class="bi bi-boxes"></i> Activos</a>
+        <span class="sep">/</span>
+        <a href="{% url 'activos:activo-detail' activo.pk %}">{{ activo.codigo_inventario }}</a>
+        <span class="sep">/</span>
+        <span aria-current="page">Historial</span>
+    </nav>
+
+    <header class="ax-hero">
+        <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
+            <div>
+                <span class="ax-hero-eyebrow"><i class="bi bi-clock-history"></i> Trazabilidad</span>
+                <h1 class="ax-hero-title">{{ activo.codigo_inventario }}</h1>
+                <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
+                    {% badge_estado activo sobre_hero=True %}
+                    <span class="ax-estado ax-estado--onhero">
+                        <i class="bi {{ activo|icono_activo }}"></i> {{ activo.marca }} {{ activo.modelo }}
+                    </span>
                 </div>
-                <div class="col-md-6">
-                    <p><strong>Usuario Asignado:</strong> {{ activo.usuario_asignado|default:"Sin asignar" }}</p>
-                    <p><strong>Estado:</strong>
-                        {% if activo.estado == 'AC' %}
-                            <span class="badge bg-success">Activo</span>
-                        {% elif activo.estado == 'IN' %}
-                            <span class="badge bg-secondary">Inactivo</span>
-                        {% else %}
-                            <span class="badge bg-warning">En Mantenimiento</span>
-                        {% endif %}
-                    </p>
+            </div>
+            <div class="ax-hero-actions">
+                <a href="{% url 'activos:activo-detail' activo.pk %}" class="btn-pastel btn-pastel--glass">
+                    <i class="bi bi-arrow-left"></i> Volver a la ficha
+                </a>
+            </div>
+        </div>
+    </header>
+
+    {# Estado actual, para leer el historial con contexto #}
+    <section class="ax-card mb-3">
+        <div class="ax-card-body">
+            <div class="ax-spec" data-ax-stagger="6">
+                <div class="ax-spec-item">
+                    <div class="ax-spec-label"><i class="bi bi-person-badge"></i> Responsable actual</div>
+                    <div class="ax-spec-value">
+                        {% include 'activos/includes/_persona.html' with persona=activo.usuario_asignado %}
+                    </div>
+                </div>
+                <div class="ax-spec-item">
+                    <div class="ax-spec-label"><i class="bi bi-geo-alt"></i> Ubicación actual</div>
+                    <div class="ax-spec-value">{{ activo.ubicacion.nombre }}</div>
+                </div>
+                <div class="ax-spec-item">
+                    <div class="ax-spec-label"><i class="bi bi-folder2"></i> Categoría</div>
+                    <div class="ax-spec-value">
+                        {{ activo.subcategoria.categoria.nombre }} · {{ activo.subcategoria.nombre }}
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
+    </section>
 
-    <div class="card">
-        <div class="card-header">
-            <h5 class="mb-0">
-                <i class="bi bi-clock-history"></i> Movimientos Registrados
-            </h5>
+    <section class="ax-card">
+        <div class="ax-card-head">
+            <h2 class="ax-card-title"><i class="bi bi-list-ul"></i> Movimientos registrados</h2>
+            <span class="ax-tag">{{ historial|length }} movimiento(s)</span>
         </div>
-        <div class="card-body">
-            {% if historial %}
-                <div class="timeline">
-                    {% for movimiento in historial %}
-                    <div class="timeline-item">
-                        <div class="timeline-marker">
-                            {% if movimiento.tipo_movimiento == 'CR' %}
-                                <i class="bi bi-plus-circle text-success"></i>
-                            {% elif movimiento.tipo_movimiento == 'AC' %}
-                                <i class="bi bi-pencil text-primary"></i>
-                            {% elif movimiento.tipo_movimiento == 'RE' %}
-                                <i class="bi bi-person-check text-info"></i>
-                            {% elif movimiento.tipo_movimiento == 'RU' %}
-                                <i class="bi bi-geo-alt text-warning"></i>
-                            {% elif movimiento.tipo_movimiento == 'CE' %}
-                                <i class="bi bi-arrow-repeat text-secondary"></i>
-                            {% elif movimiento.tipo_movimiento == 'EL' %}
-                                <i class="bi bi-trash text-danger"></i>
-                            {% endif %}
-                        </div>
-                        <div class="timeline-content">
-                            <div class="timeline-header">
-                                <h6 class="mb-1">{{ movimiento.get_tipo_movimiento_display }}</h6>
-                                <small class="text-muted">
-                                    <i class="bi bi-calendar"></i> {{ movimiento.fecha_movimiento|date:"d/m/Y H:i" }}
-                                    {% if movimiento.usuario %}
-                                        | <i class="bi bi-person"></i> {{ movimiento.usuario.get_full_name|default:movimiento.usuario.username }}
-                                    {% endif %}
-                                </small>
-                            </div>
-                            <div class="timeline-body">
-                                <p class="mb-2">{{ movimiento.descripcion }}</p>
+        <div class="ax-card-body">
+            <ol class="ax-timeline list-unstyled" data-ax-stagger="40">
+                {% for movimiento in historial %}
+                {% include 'activos/includes/_movimiento.html' %}
+                {% endfor %}
 
-                                {% if movimiento.valor_anterior and movimiento.valor_nuevo %}
-                                <div class="alert alert-light p-2">
-                                    <small>
-                                        <strong>Valor anterior:</strong> <span class="text-danger">{{ movimiento.valor_anterior }}</span><br>
-                                        <strong>Valor nuevo:</strong> <span class="text-success">{{ movimiento.valor_nuevo }}</span>
-                                    </small>
-                                </div>
-                                {% endif %}
-                            </div>
+                {# El alta siempre cierra la línea de tiempo #}
+                <li class="ax-tl-item ax-tl--creacion">
+                    <span class="ax-tl-dot" aria-hidden="true"><i class="bi bi-plus-lg"></i></span>
+                    <div class="ax-tl-card">
+                        <p class="ax-tl-title">Alta en el inventario</p>
+                        <div class="ax-tl-meta">
+                            <span><i class="bi bi-calendar3"></i> {{ activo.fecha_creacion|date:"d/m/Y H:i" }}</span>
+                            <span><i class="bi bi-upc"></i> {{ activo.codigo_inventario }}</span>
                         </div>
+                        {% if not historial %}
+                        <p class="ax-hint mt-2 mb-0">
+                            Este activo no ha tenido movimientos desde su registro.
+                        </p>
+                        {% endif %}
                     </div>
-                    {% endfor %}
-                </div>
-            {% else %}
-                <div class="text-center py-4">
-                    <i class="bi bi-clock-history" style="font-size: 3rem; color: #ccc;"></i>
-                    <h5 class="mt-3 text-muted">Sin historial de movimientos</h5>
-                    <p class="text-muted">Este activo no tiene movimientos registrados.</p>
-                </div>
-            {% endif %}
+                </li>
+            </ol>
         </div>
-    </div>
+    </section>
 </div>
-</div>
+{% endblock %}
 
-<style>
-.timeline {
-    position: relative;
-    padding-left: 30px;
-}
-
-.timeline::before {
-    content: '';
-    position: absolute;
-    left: 15px;
-    top: 0;
-    bottom: 0;
-    width: 2px;
-    background: #e9ecef;
-}
-
-.timeline-item {
-    position: relative;
-    margin-bottom: 30px;
-}
-
-.timeline-marker {
-    position: absolute;
-    left: -22px;
-    top: 5px;
-    width: 30px;
-    height: 30px;
-    background: white;
-    border: 2px solid #e9ecef;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 14px;
-}
-
-.timeline-content {
-    background: #f8f9fa;
-    padding: 15px;
-    border-radius: 8px;
-    border-left: 3px solid var(--e-global-color-moradopaldaca);
-}
-
-.timeline-header h6 {
-    color: var(--e-global-color-moradopaldaca);
-    font-weight: 600;
-}
-
-.timeline-body {
-    margin-top: 10px;
-}
-</style>
+{% block extra_js %}
+<script src="{% static 'js/activos-ui.js' %}"></script>
 {% endblock %}

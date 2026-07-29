@@ -14,16 +14,18 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-from .db import DATABASEPROD
-
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 _key_env = BASE_DIR / "key.env"
+_dev_env = BASE_DIR / "dev.env"
 if _key_env.exists():
     load_dotenv(_key_env)
 else:
     load_dotenv(BASE_DIR / ".env" / "key.env")
+if _dev_env.exists():
+    load_dotenv(_dev_env, override=True)
 
+from .db import DATABASEDES, DATABASEPROD
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
@@ -94,8 +96,8 @@ WSGI_APPLICATION = 'SSAPI.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
-
-DATABASES = DATABASEPROD
+# Local: existe dev.env → DATABASEDES. Producción (sin dev.env) → DATABASEPROD.
+DATABASES = DATABASEDES if _dev_env.exists() else DATABASEPROD
 
 AUTH_USER_MODEL = "core.UsuarioPaldaca"
 

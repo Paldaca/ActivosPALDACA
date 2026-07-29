@@ -39,6 +39,13 @@ def generar_reporte_activos(request):
             queryset = queryset.filter(ubicacion_id=ubicacion_id)
         if estado:
             queryset = queryset.filter(estado=estado)
+        # Mismo criterio que los chips del listado: el PDF debe reflejar
+        # exactamente lo que el usuario está viendo en pantalla.
+        asignacion = request.GET.get('asignacion', '')
+        if asignacion == 'libre':
+            queryset = queryset.filter(usuario_asignado__isnull=True)
+        elif asignacion == 'asignado':
+            queryset = queryset.filter(usuario_asignado__isnull=False)
         if usuario_asignado_id:
             queryset = queryset.filter(usuario_asignado_id=usuario_asignado_id)
         if buscar:
@@ -46,7 +53,10 @@ def generar_reporte_activos(request):
                 Q(codigo_inventario__icontains=buscar) |
                 Q(marca__icontains=buscar) |
                 Q(modelo__icontains=buscar) |
-                Q(numero_serial__icontains=buscar)
+                Q(numero_serial__icontains=buscar) |
+                Q(usuario_asignado__first_name__icontains=buscar) |
+                Q(usuario_asignado__last_name__icontains=buscar) |
+                Q(ubicacion__nombre__icontains=buscar)
             )
         
         # Preparar contexto para el template

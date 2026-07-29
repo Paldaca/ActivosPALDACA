@@ -125,8 +125,11 @@ def test_editar_activo_registra_reubicacion_y_reasignacion_en_historial(
         tipo_movimiento=HistorialMovimiento.TipoMovimiento.REASIGNACION
     ).first()
     assert re.usuario_id == user.pk
-    assert str(catalogo["usuario_a"]) in re.valor_anterior
-    assert str(catalogo["usuario_b"]) in re.valor_nuevo
+    # El historial guarda "Nombre Apellido", no el username: es la instantánea
+    # de lo que la interfaz debe mostrar aunque el usuario cambie o se elimine.
+    assert catalogo["usuario_a"].get_full_name() in re.valor_anterior
+    assert catalogo["usuario_b"].get_full_name() in re.valor_nuevo
+    assert catalogo["usuario_a"].username not in re.valor_anterior
 
     # La vista de historial debe cargar entradas previas + las generadas al editar.
     hist_url = reverse("activos:activo-historial", args=[act.pk])

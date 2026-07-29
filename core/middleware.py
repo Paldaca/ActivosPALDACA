@@ -93,6 +93,13 @@ class ErrorHandlingMiddleware(MiddlewareMixin):
         """
         Captura todas las excepciones no manejadas y las registra
         """
+        from django.core.exceptions import PermissionDenied
+        from django.http import Http404
+
+        # Dejar que Django resuelva 404/403 con sus handlers normales.
+        if isinstance(exception, (Http404, PermissionDenied)):
+            return None
+
         # Obtener información del usuario
         user_info = "Anónimo"
         if hasattr(request, 'user') and request.user.is_authenticated:

@@ -1,51 +1,92 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load activo_filters %}
+
 {% block title %}Ubicaciones - {{ block.super }}{% endblock %}
 
-{% block content %}
-<div class="px-5 py-4 mt-2">
-    <div class="form-container">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2 class="form-title">
-                <img src="{% static 'core/img/Iconos/nueva_ubicacion.svg' %}" alt="Icono" style="width: 32px; height: 32px; margin-right: 10px;">
-                Ubicaciones
-            </h2>
-            <a href="{% url 'activos:ubicacion-create' %}" class="btn btn-primary-custom">
-                <i class="bi bi-plus-circle"></i> Nueva Ubicación
-            </a>
-        </div>
-        <hr class="linea" style="border-color: #32407b;">
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/activos-ui.css' %}">
+{% endblock %}
 
-{% if ubicaciones %}
-<div class="card">
-    <div class="card-body">
-        <div class="table-responsive">
-            <table class="table table-hover">
+{% block content %}
+<div class="ax-page ax-page--narrow">
+
+    <nav class="ax-crumbs" aria-label="Ruta de navegación">
+        <a href="{% url 'activos:activo-list' %}"><i class="bi bi-boxes"></i> Activos</a>
+        <span class="sep">/</span>
+        <span aria-current="page">Ubicaciones</span>
+    </nav>
+
+    <header class="ax-hero">
+        <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
+            <div>
+                <span class="ax-hero-eyebrow"><i class="bi bi-geo-alt"></i> Catálogo</span>
+                <h1 class="ax-hero-title">
+                    <img src="{% static 'core/img/Iconos/nueva_ubicacion.svg' %}" alt="" aria-hidden="true">
+                    Ubicaciones
+                </h1>
+                <p class="ax-hero-sub">
+                    Dónde está físicamente cada equipo: sedes, pisos, oficinas o depósitos.
+                </p>
+            </div>
+            <div class="ax-hero-actions">
+                <a href="{% url 'activos:ubicacion-create' %}" class="btn-pastel btn-pastel--cta">
+                    <i class="bi bi-plus-lg"></i> Nueva ubicación
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <section class="ax-card">
+        {% if ubicaciones %}
+        <div class="ax-table-wrap">
+            <table class="ax-table">
                 <thead>
                     <tr>
-                        <th>Nombre</th>
-                        <th>Activos</th>
-                        <th class="text-end">Acciones</th>
+                        <th scope="col">Ubicación</th>
+                        <th scope="col">Activos</th>
+                        <th scope="col" class="ax-col-tight text-end">
+                            <span class="visually-hidden">Acciones</span>
+                        </th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody data-ax-stagger="30">
                     {% for ubicacion in ubicaciones %}
                     <tr>
-                        <td>{{ ubicacion.nombre }}</td>
-                        <td>
-                            <span class="badge bg-info">
-                                {{ ubicacion.activos.count }}
-                            </span>
+                        <td data-label="Ubicación">
+                            <div class="ax-equipo">
+                                <span class="ax-type" aria-hidden="true"><i class="bi bi-geo-alt"></i></span>
+                                <span class="ax-equipo-main">{{ ubicacion.nombre }}</span>
+                            </div>
                         </td>
-                        <td class="text-end">
-                            <div class="btn-group" role="group">
+                        <td data-label="Activos">
+                            <a href="{% url 'activos:activo-list' %}?ubicacion={{ ubicacion.pk }}" class="ax-meta">
+                                <i class="bi bi-boxes"></i>
+                                <span>{{ ubicacion.num_activos }} activo(s)</span>
+                            </a>
+                        </td>
+                        <td class="text-end ax-col-tight" data-label="Acciones">
+                            <div class="ax-row-actions justify-content-end">
                                 <a href="{% url 'activos:ubicacion-update' ubicacion.pk %}"
-                                   class="btn btn-sm btn-outline-primary">
-                                    <i class="bi bi-pencil"></i> Editar
+                                   class="btn-pastel btn-pastel--lila btn-pastel--icon" title="Editar">
+                                    <i class="bi bi-pencil"></i>
+                                    <span class="visually-hidden">Editar {{ ubicacion.nombre }}</span>
                                 </a>
-                                <a href="{% url 'activos:ubicacion-delete' ubicacion.pk %}"
-                                   class="btn btn-sm btn-outline-danger">
-                                    <i class="bi bi-trash"></i> Eliminar
+                                <a href="{% url 'activos:ubicacion-list' %}"
+                                   class="btn-pastel btn-pastel--rosa btn-pastel--icon"
+                                   title="{% if ubicacion.num_activos %}Tiene activos asociados{% else %}Eliminar{% endif %}"
+                                   data-ax-eliminar
+                                   data-url="{% url 'activos:ubicacion-delete' ubicacion.pk %}"
+                                   data-icono="bi-geo-alt"
+                                   data-titulo="¿Eliminar la ubicación «{{ ubicacion.nombre }}»?"
+                                   data-ficha="{{ ubicacion.num_activos }} activo(s) en esta ubicación"
+                                   {% if ubicacion.num_activos %}
+                                   data-bloqueado="No se puede eliminar: hay {{ ubicacion.num_activos }} activo(s) aquí. Reubícalos primero."
+                                   {% else %}
+                                   data-impacto="La ubicación está vacía y se eliminará de forma permanente."
+                                   {% endif %}>
+                                    <i class="bi bi-trash"></i>
+                                    <span class="visually-hidden">Eliminar {{ ubicacion.nombre }}</span>
                                 </a>
                             </div>
                         </td>
@@ -54,45 +95,24 @@
                 </tbody>
             </table>
         </div>
-    </div>
-</div>
-
-{% if is_paginated %}
-<nav aria-label="Page navigation" class="mt-3">
-    <ul class="pagination justify-content-center">
-        {% if page_obj.has_previous %}
-        <li class="page-item">
-            <a class="page-link" href="?page=1">&laquo; Primera</a>
-        </li>
-        <li class="page-item">
-            <a class="page-link" href="?page={{ page_obj.previous_page_number }}">Anterior</a>
-        </li>
+        {% else %}
+        <div class="ax-empty">
+            <div class="ax-empty-icon"><i class="bi bi-geo"></i></div>
+            <h3>Aún no hay ubicaciones</h3>
+            <p>Todo activo necesita una ubicación: crea al menos una para poder registrar equipos.</p>
+            <a href="{% url 'activos:ubicacion-create' %}" class="btn-pastel btn-pastel--cta">
+                <i class="bi bi-plus-lg"></i> Crear la primera ubicación
+            </a>
+        </div>
         {% endif %}
+    </section>
 
-        <li class="page-item active">
-            <span class="page-link">
-                Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
-            </span>
-        </li>
-
-        {% if page_obj.has_next %}
-        <li class="page-item">
-            <a class="page-link" href="?page={{ page_obj.next_page_number }}">Siguiente</a>
-        </li>
-        <li class="page-item">
-            <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}">Última &raquo;</a>
-        </li>
-        {% endif %}
-    </ul>
-</nav>
-{% endif %}
-
-{% else %}
-<div class="alert alert-info">
-    <i class="bi bi-info-circle"></i> No hay ubicaciones registradas.
-    <a href="{% url 'activos:ubicacion-create' %}">Crear la primera ubicación</a>
+    {% include 'activos/includes/_paginacion.html' %}
 </div>
-{% endif %}
-    </div>
-</div>
+
+{% include 'activos/includes/_modal_eliminar.html' %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/activos-ui.js' %}"></script>
 {% endblock %}

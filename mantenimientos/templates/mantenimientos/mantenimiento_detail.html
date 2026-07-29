@@ -1,115 +1,166 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load activo_filters %}
 
-{% block title %}Detalle de Mantenimiento - {{ block.super }}{% endblock %}
+{% block title %}Mantenimiento {{ mantenimiento.activo.codigo_inventario }} - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/activos-ui.css' %}">
+{% endblock %}
 
 {% block content %}
-<div class="px-5 py-4">
-    <div class="form-container">
-        <h2 class="form-title">
-            <img src="{% static 'core/img/Iconos/Mantenimiento.svg' %}" alt="Icono Mantenimiento" style="width: 40px; height: 40px; margin-right: 15px;">
-            Detalle del Mantenimiento
-        </h2>
-        <hr class="linea" style="border-color: #32407b;">
+<div class="ax-page ax-page--narrow">
 
-        <div class="row g-4">
-            <!-- Información del Mantenimiento -->
-            <div class="col-md-8">
-                <div class="info-card">
-                    <h5 class="mb-3" style="color: #32407b;">
-                        <i class="bi bi-info-circle"></i> Información del Mantenimiento
-                    </h5>
-                    
-                    <div class="row mb-2">
-                        <div class="col-md-4"><strong>Fecha:</strong></div>
-                        <div class="col-md-8">{{ mantenimiento.fecha|date:"d/m/Y" }}</div>
-                    </div>
-                    
-                    <div class="row mb-2">
-                        <div class="col-md-4"><strong>Técnico:</strong></div>
-                        <div class="col-md-8">{{ mantenimiento.tecnico }}</div>
-                    </div>
-                    
-                    <div class="row mb-2">
-                        <div class="col-md-4"><strong>Teléfono:</strong></div>
-                        <div class="col-md-8">{{ mantenimiento.telefono }}</div>
-                    </div>
-                    
-                    <div class="row mb-2">
-                        <div class="col-md-4"><strong>Costo:</strong></div>
-                        <div class="col-md-8">${{ mantenimiento.costo|floatformat:2 }}</div>
-                    </div>
-                    
-                    <div class="row mb-2">
-                        <div class="col-md-4"><strong>Estado:</strong></div>
-                        <div class="col-md-8">
-                            {% if mantenimiento.estado == 'EP' %}
-                                <span class="badge bg-warning text-dark">
-                                    <i class="bi bi-hourglass-split"></i> En Proceso
-                                </span>
-                            {% else %}
-                                <span class="badge bg-success">
-                                    <i class="bi bi-check-circle"></i> Finalizado
-                                </span>
-                            {% endif %}
-                        </div>
-                    </div>
-                    
-                    <hr>
-                    
-                    <div class="row mb-2">
-                        <div class="col-md-12">
-                            <strong>Descripción:</strong>
-                            <p class="mt-2 text-muted">{{ mantenimiento.descripcion }}</p>
-                        </div>
-                    </div>
+    <nav class="ax-crumbs" aria-label="Ruta de navegación">
+        <a href="{% url 'mantenimientos:mantenimiento-list' %}">Mantenimientos</a>
+        <span class="sep">/</span>
+        <span aria-current="page">{{ mantenimiento.activo.codigo_inventario }}</span>
+    </nav>
+
+    <header class="ax-hero">
+        <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
+            <div class="ax-min0">
+                <span class="ax-hero-eyebrow">
+                    {{ mantenimiento.activo.marca }} {{ mantenimiento.activo.modelo }}
+                </span>
+                <h1 class="ax-hero-title">{{ mantenimiento.activo.codigo_inventario }}</h1>
+                <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
+                    {% if mantenimiento.estado == 'EP' %}
+                    <span class="ax-estado ax-estado--onhero ax-estado--lg">
+                        <span class="ax-estado-dot"></span> En proceso
+                    </span>
+                    {% else %}
+                    <span class="ax-estado ax-estado--onhero ax-estado--lg">
+                        <span class="ax-estado-dot"></span> Finalizado
+                    </span>
+                    {% endif %}
+                    <span class="ax-estado ax-estado--onhero">{{ mantenimiento.fecha|date:"d/m/Y" }}</span>
                 </div>
             </div>
-
-            <!-- Información del Activo -->
-            <div class="col-md-4">
-                <div class="info-card">
-                    <h5 class="mb-3" style="color: var(--e-global-color-moradopaldaca);">
-                        <i class="bi bi-box"></i> Activo Asociado
-                    </h5>
-                    <p><strong style="color: black;">Código:</strong> {{ mantenimiento.activo.codigo_inventario }}</p>
-                    <p><strong style="color: black;">Marca:</strong> {{ mantenimiento.activo.marca }}</p>
-                    <p><strong style="color: black;">Modelo:</strong> {{ mantenimiento.activo.modelo }}</p>
-                    <p><strong style="color: black;">Estado:</strong> 
-                        <span class="badge bg-primary">
-                            {{ mantenimiento.activo.get_estado_display }}
-                        </span>
-                    </p>
-                    <a href="{% url 'activos:activo-detail' mantenimiento.activo.pk %}" class="btn btn-custom w-100 mt-2">
-                        <i class="bi bi-arrow-right-circle"></i> Ver Activo Completo
-                    </a>
-                </div>
+            <div class="ax-hero-actions">
+                <a href="{% url 'activos:activo-detail' mantenimiento.activo.pk %}"
+                   class="btn-pastel btn-pastel--glass">Ficha del activo</a>
+                <a href="{% url 'mantenimientos:mantenimiento-update' mantenimiento.pk %}"
+                   class="btn-pastel btn-pastel--cta">Editar</a>
             </div>
         </div>
+    </header>
 
-        <hr class="linea" style="border-color: #32407b;">
+    {% if mantenimiento.estado == 'EP' %}
+    <div class="ax-card mb-3">
+        <div class="ax-card-body d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div class="ax-callout ax-callout--warn mb-0 flex-grow-1">
+                <i class="bi bi-hourglass-split"></i>
+                <span>
+                    Este mantenimiento está abierto, así que
+                    <strong>{{ mantenimiento.activo.codigo_inventario }}</strong> figura como
+                    <em>En Mantenimiento</em> y no debería reasignarse.
+                </span>
+            </div>
+            <form method="post" action="{% url 'mantenimientos:mantenimiento-finalizar' mantenimiento.pk %}">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                <button type="submit" class="btn-pastel btn-pastel--menta btn-pastel--lg">
+                    <i class="bi bi-check2-circle"></i> Finalizar y devolver a servicio
+                </button>
+            </form>
+        </div>
+    </div>
+    {% endif %}
 
-        <!-- Botones de Acción -->
-        <div class="d-flex justify-content-between">
-            <a href="{% url 'mantenimientos:mantenimiento-list' %}" class="btn btn-secondary">
-                <i class="bi bi-arrow-left"></i> Volver a la Lista
-            </a>
-            <div>
-                <a href="{% url 'activos:activo-detail' mantenimiento.activo.pk %}" class="btn btn-outline-primary btn-space">
-                    <i class="bi bi-box"></i> Ver Activo
-                </a>
-                {% if mantenimiento.estado == 'EP' %}
-                <a href="{% url 'mantenimientos:mantenimiento-finalizar' mantenimiento.pk %}" 
-                   class="btn btn-success btn-space"
-                   onclick="return confirm('¿Finalizar este mantenimiento? Se aplicará el costo de ${{ mantenimiento.costo|floatformat:2 }}');">
-                    <i class="bi bi-check-circle"></i> Finalizar Mantenimiento
-                </a>
-                {% endif %}
-                <a href="{% url 'mantenimientos:mantenimiento-update' mantenimiento.pk %}" class="btn btn-custom">
-                    <i class="bi bi-pencil"></i> Editar
-                </a>
+    <div class="row g-3">
+        <div class="col-lg-7">
+            <section class="ax-card h-100">
+                <div class="ax-card-head"><h2 class="ax-card-title">Trabajo realizado</h2></div>
+                <div class="ax-card-body">
+                    <p class="ax-spec-value fw-normal">{{ mantenimiento.descripcion|linebreaksbr }}</p>
+
+                    <hr class="ax-divider">
+
+                    <div class="ax-spec" data-ax-stagger="6">
+                        <div class="ax-spec-item">
+                            <div class="ax-spec-label">Técnico responsable</div>
+                            <div class="ax-spec-value">{{ mantenimiento.tecnico }}</div>
+                        </div>
+                        <div class="ax-spec-item">
+                            <div class="ax-spec-label">Teléfono de contacto</div>
+                            <div class="ax-spec-value">{{ mantenimiento.telefono }}</div>
+                        </div>
+                        <div class="ax-spec-item">
+                            <div class="ax-spec-label">Fecha de registro</div>
+                            <div class="ax-spec-value">{{ mantenimiento.fecha|date:"d/m/Y" }}</div>
+                        </div>
+                        <div class="ax-spec-item">
+                            <div class="ax-spec-label">Última actualización</div>
+                            <div class="ax-spec-value">{{ mantenimiento.fecha_actualizacion|date:"d/m/Y H:i" }}</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <div class="col-lg-5">
+            <div class="d-flex flex-column gap-3">
+
+                <section class="ax-kpis mb-0" style="grid-template-columns: 1fr;">
+                    <div class="ax-kpi {% if mantenimiento.estado == 'EP' %}ax-kpi--mantenimiento{% else %}ax-kpi--disponible{% endif %}">
+                        <span class="ax-kpi-head">
+                            <span class="ax-kpi-label">Costo del servicio</span>
+                            <span class="ax-kpi-icon"><i class="bi bi-cash-stack"></i></span>
+                        </span>
+                        <span class="ax-kpi-value">
+                            <span class="ax-kpi-unit">$</span>{{ mantenimiento.costo|floatformat:2 }}
+                        </span>
+                        <span class="ax-kpi-meter"><span style="width:100%"></span></span>
+                        <span class="ax-kpi-foot">
+                            <span>
+                                {% if mantenimiento.estado == 'EP' %}
+                                Comprometido, aún no imputado
+                                {% else %}
+                                Imputado al gasto
+                                {% endif %}
+                            </span>
+                        </span>
+                    </div>
+                </section>
+
+                <section class="ax-card">
+                    <div class="ax-card-head"><h2 class="ax-card-title">Equipo intervenido</h2></div>
+                    <div class="ax-card-body">
+                        <div class="ax-drawer-asset mb-3">
+                            <span class="ax-type" aria-hidden="true">
+                                <i class="bi {{ mantenimiento.activo|icono_activo }}"></i>
+                            </span>
+                            <div class="ax-min0">
+                                <a href="{% url 'activos:activo-detail' mantenimiento.activo.pk %}" class="ax-code">
+                                    {{ mantenimiento.activo.codigo_inventario }}
+                                </a>
+                                <div class="ax-equipo-main mt-1">
+                                    {{ mantenimiento.activo.marca }} {{ mantenimiento.activo.modelo }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="ax-spec">
+                            <div class="ax-spec-item">
+                                <div class="ax-spec-label">Ubicación</div>
+                                <div class="ax-spec-value">{{ mantenimiento.activo.ubicacion.nombre }}</div>
+                            </div>
+                            <div class="ax-spec-item">
+                                <div class="ax-spec-label">Responsable</div>
+                                <div class="ax-spec-value">
+                                    {% include 'activos/includes/_persona.html' with persona=mantenimiento.activo.usuario_asignado %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
             </div>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/activos-ui.js' %}"></script>
 {% endblock %}

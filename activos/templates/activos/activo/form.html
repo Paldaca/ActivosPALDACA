@@ -1,169 +1,289 @@
 {% extends 'base.html' %}
 {% load static %}
-{% block title %}{{ object|yesno:"Editar,Crear" }} Activo - {{ block.super }}{% endblock %}
+{% load activo_filters %}
+
+{% block title %}{% if object %}Editar{% else %}Nuevo{% endif %} Activo - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/activos-ui.css' %}">
+{% endblock %}
 
 {% block content %}
-<div class="px-5 py-4 mt-2">
-    <div class="form-container">
-        <h2 class="form-title">
-            <img src="{% static 'core/img/Iconos/activos.svg' %}" alt="Icono" style="width: 40px; height: 40px; margin-right: 15px;">
-            {% if object %}Editar Activo{% else %}Crear Nuevo Activo{% endif %}
-        </h2>
-        <hr class="linea" style="border-color: #32407b;">
-        <form method="post">
-            {% csrf_token %}
+<div class="ax-page ax-page--form">
 
-            <h5 class="mb-3"><i class="bi bi-info-circle"></i> Información Básica</h5>
+    <nav class="ax-crumbs" aria-label="Ruta de navegación">
+        <a href="{% url 'activos:activo-list' %}"><i class="bi bi-boxes"></i> Activos</a>
+        <span class="sep">/</span>
+        {% if object %}
+        <a href="{% url 'activos:activo-detail' object.pk %}">{{ object.codigo_inventario }}</a>
+        <span class="sep">/</span>
+        <span aria-current="page">Editar</span>
+        {% else %}
+        <span aria-current="page">Nuevo activo</span>
+        {% endif %}
+    </nav>
 
+    <header class="ax-hero">
+        <span class="ax-hero-eyebrow">
+            <i class="bi bi-{% if object %}pencil-square{% else %}plus-circle{% endif %}"></i>
+            {% if object %}Edición{% else %}Alta de inventario{% endif %}
+        </span>
+        <h1 class="ax-hero-title">
+            <img src="{% static 'core/img/Iconos/activos.svg' %}" alt="" aria-hidden="true">
+            {% if object %}Editar {{ object.codigo_inventario }}{% else %}Registrar nuevo activo{% endif %}
+        </h1>
+        <p class="ax-hero-sub">
             {% if object %}
-            <div class="alert alert-light border mb-3">
-                <i class="bi bi-upc-scan me-1"></i>
-                <strong>Código de Inventario:</strong> {{ object.codigo_inventario }}
-            </div>
+            Los cambios de responsable y de ubicación quedan registrados automáticamente
+            en el historial del activo.
             {% else %}
-            <div class="mb-3 p-3 border rounded bg-light-subtle">
-                <label class="form-label fw-semibold">
-                    <i class="bi bi-upc-scan me-1"></i> Código de Inventario
-                </label>
-                <input type="text" class="form-control" placeholder="el codigo se genera de forma automatica" readonly>
-                <small class="text-muted">El sistema genera el código al crear el activo de forma automática.</small>
-            </div>
+            Dos pasos: primero qué equipo es, después dónde está y quién responde por él.
             {% endif %}
+        </p>
+    </header>
 
-            <div class="row">
-                <div class="col-md-12 mb-3">
-                    <label for="{{ form.subcategoria.id_for_label }}" class="form-label">
-                        Subcategoría <span class="text-danger">*</span>
+    {# Sin JavaScript no hay pasos: se muestra el formulario completo de una vez.
+       El stepper es una capa de comodidad, nunca un requisito para guardar. #}
+    <noscript>
+        <style>
+            [data-ax-panel][hidden],
+            [data-ax-step-submit][hidden] { display: block !important; }
+            [data-ax-step-next],
+            [data-ax-stepper] { display: none !important; }
+        </style>
+    </noscript>
+
+    {# ===================================================================== #}
+    {#  INDICADOR DE PASOS                                                   #}
+    {# ===================================================================== #}
+    <nav class="ax-stepper" data-ax-stepper aria-label="Progreso del formulario">
+        <button type="button" class="ax-step is-active">
+            <span class="ax-step-num">1</span> Equipo
+        </button>
+        <span class="ax-step-line"></span>
+        <button type="button" class="ax-step">
+            <span class="ax-step-num">2</span> Asignación
+        </button>
+    </nav>
+
+    <form method="post" id="axFormActivo" class="ax-form" novalidate>
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+        <div class="ax-callout ax-callout--danger mb-3">
+            <i class="bi bi-exclamation-octagon"></i>
+            <div>{{ form.non_field_errors }}</div>
+        </div>
+        {% endif %}
+
+        {# ================================================================= #}
+        {#  PASO 1 · IDENTIFICACIÓN DEL EQUIPO                               #}
+        {# ================================================================= #}
+        <section class="ax-panel" data-ax-panel aria-label="Paso 1: datos del equipo">
+            <div class="ax-fieldset">
+                <h2 class="ax-fieldset-legend">
+                    <span class="num">1</span> ¿Qué equipo es?
+                </h2>
+
+                {# El código de inventario es el identificador: se muestra siempre,
+                   pero nunca se escribe a mano — lo genera el sistema. #}
+                <div class="ax-callout mb-3">
+                    <i class="bi bi-upc-scan"></i>
+                    <div>
+                        <strong>Código de inventario</strong><br>
+                        {% if object %}
+                        <span class="ax-code ax-code--plain ax-code--lg mt-1">{{ object.codigo_inventario }}</span>
+                        <span class="ax-hint">Es el identificador permanente del activo y no se modifica.</span>
+                        {% else %}
+                        <span class="ax-hint mt-1">
+                            Se genera automáticamente al guardar, con el formato
+                            <strong class="ax-mono">PAL-&lt;prefijo&gt;-000</strong>
+                            según la subcategoría que elijas.
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="ax-field mb-3" style="--i:0">
+                    <label class="form-label" for="{{ form.subcategoria.id_for_label }}">
+                        Subcategoría <span class="ax-req">*</span>
                     </label>
                     <div class="input-group">
                         {{ form.subcategoria }}
-                        <button type="button" class="btn btn-outline-secondary" onclick="window.open('{% url 'activos:subcategoria-create' %}', '_blank')">
-                            <i class="bi bi-plus"></i>
+                        <button type="button" class="btn-pastel btn-pastel--lila"
+                                style="border-radius: 0 var(--ax-r) var(--ax-r) 0;"
+                                data-ax-crear-abrir
+                                data-tipo="subcategoria"
+                                data-url="{% url 'activos:crear-rapido' 'subcategoria' %}"
+                                data-target="#id_subcategoria"
+                                data-titulo="Nueva subcategoría"
+                                title="Crear una subcategoría aquí mismo, sin salir del formulario">
+                            <i class="bi bi-plus-lg"></i>
                         </button>
                     </div>
                     {% if form.subcategoria.errors %}
-                    <div class="invalid-feedback d-block">
-                        {{ form.subcategoria.errors }}
-                    </div>
+                    <div class="ax-error"><i class="bi bi-exclamation-circle"></i> {{ form.subcategoria.errors }}</div>
                     {% endif %}
-                    <small class="form-text text-muted">
-                        <a href="{% url 'activos:categoria-create' %}" target="_blank" class="text-decoration-none">
-                            <i class="bi bi-plus-circle"></i> Crear nueva categoría
-                        </a>
+                    <small class="ax-hint">
+                        Define el prefijo del código y el icono del equipo.
+                        ¿No está en la lista? Créala con <strong>+</strong> sin perder lo que ya escribiste.
+                    </small>
+                </div>
+
+                <div class="row g-3">
+                    <div class="col-md-6 ax-field" style="--i:1">
+                        <label class="form-label" for="{{ form.marca.id_for_label }}">
+                            Marca <span class="ax-req">*</span>
+                        </label>
+                        {{ form.marca }}
+                        {% if form.marca.errors %}
+                        <div class="ax-error"><i class="bi bi-exclamation-circle"></i> {{ form.marca.errors }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-6 ax-field" style="--i:2">
+                        <label class="form-label" for="{{ form.modelo.id_for_label }}">
+                            Modelo <span class="ax-req">*</span>
+                        </label>
+                        {{ form.modelo }}
+                        {% if form.modelo.errors %}
+                        <div class="ax-error"><i class="bi bi-exclamation-circle"></i> {{ form.modelo.errors }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="ax-field mt-3" style="--i:3">
+                    <label class="form-label" for="{{ form.numero_serial.id_for_label }}">
+                        Número de serie
+                    </label>
+                    {{ form.numero_serial }}
+                    {% if form.numero_serial.errors %}
+                    <div class="ax-error"><i class="bi bi-exclamation-circle"></i> {{ form.numero_serial.errors }}</div>
+                    {% endif %}
+                    <small class="ax-hint">
+                        <i class="bi bi-lightbulb"></i>
+                        Opcional, pero es lo que permite identificar el equipo físico ante el proveedor.
                     </small>
                 </div>
             </div>
+        </section>
 
-            <div class="row">
-                <div class="col-md-6 mb-3">
-                    <label for="{{ form.marca.id_for_label }}" class="form-label">
-                        Marca <span class="text-danger">*</span>
-                    </label>
-                    {{ form.marca }}
-                    {% if form.marca.errors %}
-                    <div class="invalid-feedback d-block">
-                        {{ form.marca.errors }}
+        {# ================================================================= #}
+        {#  PASO 2 · UBICACIÓN, RESPONSABLE Y ESTADO                         #}
+        {# ================================================================= #}
+        <section class="ax-panel" data-ax-panel aria-label="Paso 2: asignación" hidden>
+            <div class="ax-fieldset">
+                <h2 class="ax-fieldset-legend">
+                    <span class="num">2</span> ¿Dónde está y quién responde?
+                </h2>
+
+                <div class="row g-3">
+                    <div class="col-md-6 ax-field" style="--i:0">
+                        <label class="form-label" for="{{ form.ubicacion.id_for_label }}">
+                            Ubicación <span class="ax-req">*</span>
+                        </label>
+                        <div class="input-group">
+                            {{ form.ubicacion }}
+                            <button type="button" class="btn-pastel btn-pastel--cielo"
+                                    style="border-radius: 0 var(--ax-r) var(--ax-r) 0;"
+                                    data-ax-crear-abrir
+                                    data-tipo="ubicacion"
+                                    data-url="{% url 'activos:crear-rapido' 'ubicacion' %}"
+                                    data-target="#id_ubicacion"
+                                    data-titulo="Nueva ubicación"
+                                    title="Crear una ubicación aquí mismo, sin salir del formulario">
+                                <i class="bi bi-plus-lg"></i>
+                            </button>
+                        </div>
+                        {% if form.ubicacion.errors %}
+                        <div class="ax-error"><i class="bi bi-exclamation-circle"></i> {{ form.ubicacion.errors }}</div>
+                        {% endif %}
                     </div>
-                    {% endif %}
+
+                    <div class="col-md-6 ax-field" style="--i:1">
+                        <label class="form-label" for="{{ form.estado.id_for_label }}">
+                            Estado <span class="ax-req">*</span>
+                        </label>
+                        {{ form.estado }}
+                        {% if form.estado.errors %}
+                        <div class="ax-error"><i class="bi bi-exclamation-circle"></i> {{ form.estado.errors }}</div>
+                        {% endif %}
+                    </div>
                 </div>
 
-                <div class="col-md-6 mb-3">
-                    <label for="{{ form.modelo.id_for_label }}" class="form-label">
-                        Modelo <span class="text-danger">*</span>
+                <div class="ax-field mt-3" style="--i:2">
+                    <label class="form-label" for="{{ form.usuario_asignado.id_for_label }}">
+                        Responsable
                     </label>
-                    {{ form.modelo }}
-                    {% if form.modelo.errors %}
-                    <div class="invalid-feedback d-block">
-                        {{ form.modelo.errors }}
+                    <div class="ax-combo"
+                         data-combo-placeholder="Escribe un nombre o apellido…"
+                         data-combo-empty-label="Sin asignar · queda disponible">
+                        {{ form.usuario_asignado }}
                     </div>
-                    {% endif %}
-                </div>
-            </div>
-
-            <div class="mb-3">
-                <label for="{{ form.numero_serial.id_for_label }}" class="form-label">
-                    Número de Serie
-                </label>
-                {{ form.numero_serial }}
-                {% if form.numero_serial.errors %}
-                <div class="invalid-feedback d-block">
-                    {{ form.numero_serial.errors }}
-                </div>
-                {% endif %}
-            </div>
-
-            <hr>
-            <h5 class="mb-3"><i class="bi bi-geo-alt"></i> Ubicación y Asignación</h5>
-
-            <div class="row">
-                <div class="col-md-6 mb-3">
-                    <label for="{{ form.ubicacion.id_for_label }}" class="form-label">
-                        Ubicación <span class="text-danger">*</span>
-                    </label>
-                    <div class="input-group">
-                        {{ form.ubicacion }}
-                        <button type="button" class="btn btn-outline-secondary" onclick="window.open('{% url 'activos:ubicacion-create' %}', '_blank')">
-                            <i class="bi bi-plus"></i>
-                        </button>
-                    </div>
-                    {% if form.ubicacion.errors %}
-                    <div class="invalid-feedback d-block">
-                        {{ form.ubicacion.errors }}
-                    </div>
-                    {% endif %}
-                </div>
-
-                <div class="col-md-6 mb-3">
-                    <label for="{{ form.usuario_asignado.id_for_label }}" class="form-label">
-                        Usuario Asignado
-                    </label>
-                    {{ form.usuario_asignado }}
                     {% if form.usuario_asignado.errors %}
-                    <div class="invalid-feedback d-block">
-                        {{ form.usuario_asignado.errors }}
-                    </div>
+                    <div class="ax-error"><i class="bi bi-exclamation-circle"></i> {{ form.usuario_asignado.errors }}</div>
                     {% endif %}
-                    <small class="form-text text-muted">Opcional</small>
+                    <small class="ax-hint">
+                        <i class="bi bi-info-circle"></i>
+                        Si lo dejas vacío, el activo aparecerá como
+                        <span class="ax-estado ax-estado--disponible"><span class="ax-estado-dot"></span>Disponible</span>
+                        en el inventario.
+                    </small>
+                </div>
+
+                <div class="ax-field mt-3" style="--i:3">
+                    <label class="form-label" for="{{ form.observaciones.id_for_label }}">
+                        Observaciones
+                    </label>
+                    {{ form.observaciones }}
+                    {% if form.observaciones.errors %}
+                    <div class="ax-error"><i class="bi bi-exclamation-circle"></i> {{ form.observaciones.errors }}</div>
+                    {% endif %}
+                    <small class="ax-hint">Accesorios incluidos, defectos conocidos, condiciones de garantía…</small>
                 </div>
             </div>
+        </section>
 
-            <div class="mb-3">
-                <label for="{{ form.estado.id_for_label }}" class="form-label">
-                    Estado <span class="text-danger">*</span>
-                </label>
-                {{ form.estado }}
-                {% if form.estado.errors %}
-                <div class="invalid-feedback d-block">
-                    {{ form.estado.errors }}
-                </div>
-                {% endif %}
-            </div>
+        {# ================================================================= #}
+        {#  BARRA DE ACCIONES                                                #}
+        {# ================================================================= #}
+        <div class="ax-formbar">
+            <span class="ax-formbar-info">
+                <i class="bi bi-shield-check"></i>
+                Nada se guarda hasta que confirmes.
+            </span>
 
-            <hr>
-            <h5 class="mb-3"><i class="bi bi-file-text"></i> Detalles Adicionales</h5>
+            <a href="{% if object %}{% url 'activos:activo-detail' object.pk %}{% else %}{% url 'activos:activo-list' %}{% endif %}"
+               class="btn-pastel btn-pastel--neutro">
+                <i class="bi bi-x-lg"></i> Cancelar
+            </a>
 
-            <div class="mb-3">
-                <label for="{{ form.observaciones.id_for_label }}" class="form-label">
-                    Observaciones
-                </label>
-                {{ form.observaciones }}
-                {% if form.observaciones.errors %}
-                <div class="invalid-feedback d-block">
-                    {{ form.observaciones.errors }}
-                </div>
-                {% endif %}
-            </div>
+            <button type="button" class="btn-pastel btn-pastel--neutro" data-ax-step-prev hidden>
+                <i class="bi bi-arrow-left"></i> Atrás
+            </button>
 
-            <hr>
-            <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                <a href="{% url 'activos:activo-list' %}" class="btn btn-secondary">
-                    <i class="bi bi-x-circle"></i> Cancelar
-                </a>
-                <button type="submit" class="btn btn-primary">
-                    <i class="bi bi-save"></i> Guardar
-                </button>
-            </div>
-        </form>
-    </div>
+            <button type="button" class="btn-pastel btn-pastel--lila" data-ax-step-next>
+                Continuar <i class="bi bi-arrow-right"></i>
+            </button>
+
+            {% if not object %}
+            <button type="submit" name="guardar_y_nuevo" value="1"
+                    class="btn-pastel btn-pastel--lavanda" data-ax-step-submit hidden
+                    title="Guarda este activo y abre un formulario en blanco">
+                <i class="bi bi-plus-square"></i> Guardar y registrar otro
+            </button>
+            {% endif %}
+
+            <button type="submit" class="btn-pastel btn-pastel--menta" data-ax-step-submit hidden>
+                <i class="bi bi-check2-circle"></i>
+                {% if object %}Guardar cambios{% else %}Registrar activo{% endif %}
+            </button>
+        </div>
+    </form>
 </div>
+
+{% include 'activos/includes/_modal_crear_rapido.html' %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/activos-ui.js' %}"></script>
 {% endblock %}

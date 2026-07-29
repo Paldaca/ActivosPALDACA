@@ -804,19 +804,34 @@ body.app-layout.sidebar-drawer-open .app-sidebar-backdrop {
     background-color: #eef1f6;
 }
 
-/* Paldaca nav embebido: el offset lo gestiona paldaca-nav.css */
+/* Paldaca nav embebido: desplaza el contenido al abrir/cerrar el sidebar */
 body.paldaca-nav-mounted.app-layout {
     display: block;
 }
 
 body.paldaca-nav-mounted .app-content-wrap {
-    margin-left: 0;
-    width: 100%;
+    --_nav-w: var(--paldaca-nav-w-expanded, 280px);
+    margin-left: var(--_nav-w) !important;
+    width: calc(100% - var(--_nav-w)) !important;
+    max-width: calc(100% - var(--_nav-w));
+    padding-top: var(--paldaca-nav-topbar-h, 52px);
+    transition:
+        margin-left 0.38s cubic-bezier(0.33, 1, 0.68, 1),
+        width 0.38s cubic-bezier(0.33, 1, 0.68, 1),
+        max-width 0.38s cubic-bezier(0.33, 1, 0.68, 1);
+    box-sizing: border-box;
 }
 
+body.paldaca-nav-mounted.paldaca-nav-collapsed .app-content-wrap {
+    --_nav-w: var(--paldaca-nav-w-collapsed, 86px);
+}
+
+/* Evita doble offset si paldaca-nav.css también empuja .main-content */
 body.paldaca-nav-mounted .app-content-wrap .main-content {
-    margin-left: 0;
-    width: 100%;
+    margin-left: 0 !important;
+    width: 100% !important;
+    max-width: 100%;
+    padding-top: 0;
 }
 
 .app-topbar {
@@ -962,6 +977,16 @@ body.app-layout .main-content {
     .app-content-wrap {
         margin-left: 0 !important;
         width: 100% !important;
+    }
+
+    /* Con nav Paldaca el drawer es overlay: el contenido ocupa todo el ancho */
+    body.paldaca-nav-mounted .app-content-wrap,
+    body.paldaca-nav-mounted.paldaca-nav-collapsed .app-content-wrap {
+        --_nav-w: 0px;
+        margin-left: 0 !important;
+        width: 100% !important;
+        max-width: 100%;
+        padding-top: var(--paldaca-nav-topbar-h, 52px);
     }
 
     .app-sidebar-collapse-btn {

@@ -9,9 +9,11 @@ class MantenimientoForm(forms.ModelForm):
         model = Mantenimiento
         fields = ['activo', 'tecnico', 'telefono', 'descripcion', 'costo', 'estado']
         widgets = {
+            # `readonly` no existe para <select>: era un atributo inerte que daba
+            # falsa sensación de bloqueo. Se sustituye por el buscador del kit,
+            # que además hace manejable una lista de cientos de activos.
             'activo': forms.Select(attrs={
-                'class': 'form-select',
-                'readonly': True  # Se pasará desde la vista
+                'class': 'form-select ax-combo-native',
             }),
             'tecnico': forms.TextInput(attrs={
                 'class': 'form-control',
@@ -85,7 +87,9 @@ class MantenimientoFilterForm(forms.Form):
         from activos.models import Activo
         from datetime import datetime
         super().__init__(*args, **kwargs)
-        self.fields['activo'].queryset = Activo.objects.all().order_by('codigo_inventario')
+        self.fields['activo'].queryset = (
+            Activo.objects.select_related('subcategoria').order_by('codigo_inventario')
+        )
         
         # Generar años disponibles (del año actual hacia atrás 5 años)
         current_year = datetime.now().year

@@ -1,61 +1,113 @@
 {% extends 'base.html' %}
 {% load static %}
-{% block title %}Reubicar Activo - {{ block.super }}{% endblock %}
+{% load activo_filters %}
+
+{% block title %}Reubicar {{ activo.codigo_inventario }} - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/activos-ui.css' %}">
+{% endblock %}
+
+{% comment %}
+Página completa de reubicación: respaldo del drawer lateral del listado.
+{% endcomment %}
 
 {% block content %}
-<div class="px-5 py-4 mt-2">
-    <div class="row justify-content-center">
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h4 class="mb-0">
-                        <i class="bi bi-geo"></i> Reubicar Activo
-                    </h4>
-                </div>
-                <div class="card-body">
-                    <div class="alert alert-info">
-                        <strong>Activo:</strong> {{ activo.codigo_inventario }} - {{ activo.marca }} {{ activo.modelo }}
+<div class="ax-page ax-page--form">
+
+    <nav class="ax-crumbs" aria-label="Ruta de navegación">
+        <a href="{% url 'activos:activo-list' %}"><i class="bi bi-boxes"></i> Activos</a>
+        <span class="sep">/</span>
+        <a href="{% url 'activos:activo-detail' activo.pk %}">{{ activo.codigo_inventario }}</a>
+        <span class="sep">/</span>
+        <span aria-current="page">Reubicar</span>
+    </nav>
+
+    <header class="ax-hero">
+        <span class="ax-hero-eyebrow"><i class="bi bi-geo-alt"></i> Cambio de ubicación</span>
+        <h1 class="ax-hero-title">Reubicar activo</h1>
+        <p class="ax-hero-sub">
+            El movimiento queda registrado en el historial con fecha, autor y
+            ubicación anterior y nueva.
+        </p>
+    </header>
+
+    <section class="ax-card">
+        <div class="ax-card-body ax-form">
+
+            <div class="ax-drawer-asset mb-3">
+                <span class="ax-type" aria-hidden="true"><i class="bi {{ activo|icono_activo }}"></i></span>
+                <div class="ax-min0">
+                    <span class="ax-code ax-code--plain ax-code--lg">{{ activo.codigo_inventario }}</span>
+                    <div class="ax-equipo-main mt-1">{{ activo.marca }} {{ activo.modelo }}</div>
+                    <div class="ax-equipo-sub">
+                        <i class="bi bi-person"></i>
+                        <span>{{ activo.usuario_asignado|nombre_completo }}</span>
                     </div>
-
-                    <div class="mb-3">
-                        <strong>Ubicación Actual:</strong>
-                        <p class="mb-0">{{ activo.ubicacion.nombre }}</p>
-                    </div>
-
-                    <hr>
-
-                    <form method="post">
-                        {% csrf_token %}
-
-                        <div class="mb-3">
-                            <label for="{{ form.ubicacion.id_for_label }}" class="form-label">
-                                Nueva Ubicación <span class="text-danger">*</span>
-                            </label>
-                            <div class="input-group">
-                                {{ form.ubicacion }}
-                                <button type="button" class="btn btn-outline-secondary" onclick="window.open('{% url 'activos:ubicacion-create' %}', '_blank')">
-                                    <i class="bi bi-plus"></i>
-                                </button>
-                            </div>
-                            {% if form.ubicacion.errors %}
-                            <div class="invalid-feedback d-block">
-                                {{ form.ubicacion.errors }}
-                            </div>
-                            {% endif %}
-                        </div>
-
-                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                            <a href="{% url 'activos:activo-detail' activo.pk %}" class="btn btn-secondary">
-                                <i class="bi bi-x-circle"></i> Cancelar
-                            </a>
-                            <button type="submit" class="btn btn-primary">
-                                <i class="bi bi-check-circle"></i> Reubicar
-                            </button>
-                        </div>
-                    </form>
                 </div>
+                <span class="ms-auto">{% badge_estado activo %}</span>
             </div>
+
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ next }}">
+
+                <div class="ax-transfer mb-3">
+                    <div class="ax-transfer-side">
+                        <div class="ax-transfer-label">Ubicación actual</div>
+                        <span class="ax-person">
+                            <span class="ax-avatar ax-avatar--c4" aria-hidden="true"><i class="bi bi-geo-alt"></i></span>
+                            <span class="ax-person-name">{{ activo.ubicacion.nombre }}</span>
+                        </span>
+                    </div>
+                    <div class="ax-transfer-arrow" aria-hidden="true"><i class="bi bi-arrow-right"></i></div>
+                    <div class="ax-transfer-side">
+                        <div class="ax-transfer-label">Nueva ubicación</div>
+                        <span class="ax-person ax-person--empty">
+                            <span class="ax-avatar" aria-hidden="true"><i class="bi bi-three-dots"></i></span>
+                            <span class="ax-person-name">Elige abajo</span>
+                        </span>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label" for="{{ form.ubicacion.id_for_label }}">
+                        Nueva ubicación <span class="ax-req">*</span>
+                    </label>
+                    <div class="input-group">
+                        {{ form.ubicacion }}
+                        <button type="button" class="btn-pastel btn-pastel--cielo"
+                                style="border-radius: 0 var(--ax-r) var(--ax-r) 0;"
+                                data-ax-crear-abrir
+                                data-tipo="ubicacion"
+                                data-url="{% url 'activos:crear-rapido' 'ubicacion' %}"
+                                data-target="#id_ubicacion"
+                                data-titulo="Nueva ubicación"
+                                title="Crear una ubicación aquí mismo">
+                            <i class="bi bi-plus-lg"></i>
+                        </button>
+                    </div>
+                    {% if form.ubicacion.errors %}
+                    <div class="ax-error"><i class="bi bi-exclamation-circle"></i> {{ form.ubicacion.errors }}</div>
+                    {% endif %}
+                </div>
+
+                <div class="ax-formbar">
+                    <a href="{% url 'activos:activo-detail' activo.pk %}" class="btn-pastel btn-pastel--neutro">
+                        <i class="bi bi-x-lg"></i> Cancelar
+                    </a>
+                    <button type="submit" class="btn-pastel btn-pastel--cielo">
+                        <i class="bi bi-check2-circle"></i> Confirmar reubicación
+                    </button>
+                </div>
+            </form>
         </div>
-    </div>
+    </section>
 </div>
+
+{% include 'activos/includes/_modal_crear_rapido.html' %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/activos-ui.js' %}"></script>
 {% endblock %}

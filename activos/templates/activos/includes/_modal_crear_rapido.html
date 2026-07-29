@@ -1,0 +1,132 @@
+{% comment %}
+Alta express de catálogo, sin salir del formulario de activos.
+
+Un solo modal sirve a los tres tipos; el disparador decide cuál se muestra:
+
+  <button type="button" data-ax-crear-abrir
+          data-tipo="subcategoria"
+          data-url="{% url 'activos:crear-rapido' 'subcategoria' %}"
+          data-target="#id_subcategoria"
+          data-titulo="Nueva subcategoría">
+
+Al guardar, la opción creada se añade al <select> indicado y queda
+seleccionada: cero recargas, cero pestañas nuevas.
+{% endcomment %}
+<div class="modal fade" id="modalCrearRapido" tabindex="-1"
+     aria-labelledby="modalCrearRapidoTitulo" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form class="modal-content ax-form" data-ax-crear method="post" action="">
+            {% csrf_token %}
+
+            <div class="modal-header">
+                <h5 class="modal-title ax-card-title" id="modalCrearRapidoTitulo">
+                    <i class="bi bi-lightning-charge"></i>
+                    <span data-ax-fill="titulo">Alta rápida</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+
+            <div class="modal-body">
+
+                {# ---------- CATEGORÍA ---------- #}
+                <div data-pane="categoria" hidden>
+                    <label class="form-label" for="axRapidoCategoriaNombre">
+                        Nombre de la categoría <span class="ax-req">*</span>
+                    </label>
+                    <input type="text" name="nombre" id="axRapidoCategoriaNombre"
+                           class="form-control" autocomplete="off"
+                           placeholder="Ej: Equipos de cómputo">
+                    <small class="ax-hint">Primer nivel de clasificación del inventario.</small>
+                </div>
+
+                {# ---------- UBICACIÓN ---------- #}
+                <div data-pane="ubicacion" hidden>
+                    <label class="form-label" for="axRapidoUbicacionNombre">
+                        Nombre de la ubicación <span class="ax-req">*</span>
+                    </label>
+                    <input type="text" name="nombre" id="axRapidoUbicacionNombre"
+                           class="form-control" autocomplete="off"
+                           placeholder="Ej: Sede Principal · Piso 2">
+                    <small class="ax-hint">Si ya existe una con ese nombre, se reutiliza.</small>
+                </div>
+
+                {# ---------- SUBCATEGORÍA (guiada en 2 tramos) ---------- #}
+                <div data-pane="subcategoria" hidden>
+                    <div class="ax-fieldset mb-3">
+                        <h3 class="ax-fieldset-legend">
+                            <span class="num">1</span> ¿A qué categoría pertenece?
+                        </h3>
+
+                        <div class="btn-group w-100 mb-2" role="group" aria-label="Origen de la categoría">
+                            <input type="radio" class="btn-check" name="axModoCategoria"
+                                   id="axModoCatExistente" value="existente" checked>
+                            <label class="btn btn-outline-secondary btn-sm" for="axModoCatExistente">
+                                <i class="bi bi-folder2"></i> Usar una existente
+                            </label>
+
+                            <input type="radio" class="btn-check" name="axModoCategoria"
+                                   id="axModoCatNueva" value="nueva">
+                            <label class="btn btn-outline-secondary btn-sm" for="axModoCatNueva">
+                                <i class="bi bi-plus-lg"></i> Crear una nueva
+                            </label>
+                        </div>
+
+                        <div data-modo="existente">
+                            <select name="categoria" id="axRapidoCategoria" class="form-select">
+                                <option value="">Elige una categoría…</option>
+                                {% for categoria in categorias_catalogo %}
+                                <option value="{{ categoria.pk }}">{{ categoria.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div data-modo="nueva" hidden>
+                            <input type="text" name="categoria_nueva" id="axRapidoCategoriaNueva"
+                                   class="form-control" autocomplete="off"
+                                   placeholder="Nombre de la categoría nueva">
+                        </div>
+                    </div>
+
+                    <div class="ax-fieldset">
+                        <h3 class="ax-fieldset-legend">
+                            <span class="num">2</span> ¿Qué tipo de equipo es?
+                        </h3>
+
+                        <div class="mb-3">
+                            <label class="form-label" for="axRapidoSubNombre">
+                                Nombre <span class="ax-req">*</span>
+                            </label>
+                            <input type="text" name="nombre" id="axRapidoSubNombre"
+                                   class="form-control" autocomplete="off"
+                                   placeholder="Ej: Laptop" data-ax-sugiere-prefijo="#axRapidoPrefijo">
+                        </div>
+
+                        <div>
+                            <label class="form-label" for="axRapidoPrefijo">
+                                Prefijo de inventario <span class="ax-req">*</span>
+                            </label>
+                            <input type="text" name="prefijo" id="axRapidoPrefijo"
+                                   class="form-control ax-mono text-uppercase" maxlength="5"
+                                   autocomplete="off" placeholder="LAP">
+                            <small class="ax-hint">
+                                Genera códigos como
+                                <span class="ax-code ax-code--plain">PAL-<span data-ax-fill="preview-prefijo">LAP</span>-001</span>
+                            </small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="ax-callout ax-callout--danger mt-3" data-ax-fill="errores" hidden></div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn-pastel btn-pastel--neutro" data-bs-dismiss="modal">
+                    <i class="bi bi-x-lg"></i> Cancelar
+                </button>
+                <button type="submit" class="btn-pastel btn-pastel--menta" data-ax-crear-submit>
+                    <i class="bi bi-check2-circle"></i> Crear y usar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>

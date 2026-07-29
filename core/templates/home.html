@@ -1,109 +1,265 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load activo_filters %}
 
-{% block title %}Dashboard - {{ block.super }}{% endblock %}
+{% block title %}Panel - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/activos-ui.css' %}">
+{% endblock %}
 
 {% block content %}
-<div class="px-5 py-4">
-    <div class="form-container">
-        <h2 class="form-title">
-            <img src="{% static 'core/img/Iconos/activos.svg' %}" alt="Icono" style="width: 40px; height: 40px; margin-right: 15px;"> 
-            Dashboard de Activos
-        </h2>
-        <hr class="linea" style="border-color: #32407b;">
+<div class="ax-page">
 
-        <!-- Resumen Principal -->
-        <div class="row mb-4">
-            <div class="col-md-6 mb-3">
-                <div class="stat-item bgcolorazul p-4 text-center">
-                    <div class="stat-icon">
-                        <i class="bi bi-database"></i>
-                    </div>
-                    <p class="stat-label">Total de Activos</p>
-                    <p class="stat-number">{{ total_activos }}</p>
-                </div>
+    {# ===================================================================== #}
+    {#  Encabezado sobrio: sin adornos, solo contexto                        #}
+    {# ===================================================================== #}
+    <header class="ax-hero">
+        <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-end gap-3">
+            <div>
+                <span class="ax-hero-eyebrow">Consorcio Paldaca · Gestión de Activos</span>
+                <h1 class="ax-hero-title">
+                    Hola, {{ user.first_name|default:user.get_username }}
+                </h1>
+                <p class="ax-hero-sub">
+                    {% if total_mantenimientos_abiertos %}
+                    Hay <strong>{{ total_mantenimientos_abiertos }}</strong> mantenimiento(s) abierto(s)
+                    y <strong>{{ resumen.disponibles }}</strong> equipo(s) disponibles para entregar.
+                    {% else %}
+                    Todo el inventario está en servicio: <strong>{{ resumen.disponibles }}</strong>
+                    equipo(s) disponibles para entregar.
+                    {% endif %}
+                </p>
             </div>
-            <div class="col-md-6 mb-3">
-                <div class="stat-item bgcolorazul p-4 text-center">
-                    <div class="stat-icon">
-                        <i class="bi bi-wrench"></i>
-                    </div>
-                    <p class="stat-label">En Mantenimiento</p>
-                    <p class="stat-number">{{ activos_mantenimiento }}</p>
-                </div>
+            <div class="ax-hero-actions">
+                <a href="{% url 'activos:activo-list' %}" class="btn-pastel btn-pastel--glass">
+                    Ver inventario
+                </a>
+                <a href="{% url 'activos:activo-create' %}" class="btn-pastel btn-pastel--cta">
+                    Registrar activo
+                </a>
             </div>
         </div>
+    </header>
 
-        <!-- Activos por Categoría -->
-        <div class="row mb-4">
-            <div class="col-md-6">
-                <h5 class="mb-3" style="color: #32407b;"><i class="bi bi-folder"></i> Activos por Categoría</h5>
-                <div class="info-card">
-                    {% if activos_por_categoria %}
-                    <ul class="list-group list-group-flush">
-                        {% for cat in activos_por_categoria %}
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            {{ cat.nombre }}
-                            <span class="badge bg-primary rounded-pill">{{ cat.total }}</span>
-                        </li>
-                        {% endfor %}
-                    </ul>
+    {# ===================================================================== #}
+    {#  Indicadores                                                          #}
+    {# ===================================================================== #}
+    <section class="ax-kpis" aria-label="Estado del inventario" data-ax-stagger="5">
+        <a href="{% url 'activos:activo-list' %}" class="ax-kpi ax-kpi--total">
+            <span class="ax-kpi-head">
+                <span class="ax-kpi-label">Total de activos</span>
+                <span class="ax-kpi-icon"><i class="bi bi-boxes"></i></span>
+            </span>
+            <span class="ax-kpi-value"><span class="ax-count" data-value="{{ resumen.total }}">0</span></span>
+            <span class="ax-kpi-meter"><span style="width:100%"></span></span>
+            <span class="ax-kpi-foot">
+                <span>Inventario completo</span>
+                <span class="ax-kpi-share">100%</span>
+            </span>
+        </a>
+
+        <a href="{% url 'activos:activo-list' %}?estado=AC&amp;asignacion=libre" class="ax-kpi ax-kpi--disponible">
+            <span class="ax-kpi-head">
+                <span class="ax-kpi-label">Disponibles</span>
+                <span class="ax-kpi-icon"><i class="bi bi-box-seam"></i></span>
+            </span>
+            <span class="ax-kpi-value"><span class="ax-count" data-value="{{ resumen.disponibles }}">0</span></span>
+            <span class="ax-kpi-meter"><span style="width:{{ resumen.disponibles|porcentaje_css:resumen.total }}%"></span></span>
+            <span class="ax-kpi-foot">
+                <span>Listos para entregar</span>
+                <span class="ax-kpi-share">{{ resumen.disponibles|porcentaje:resumen.total }}%</span>
+            </span>
+        </a>
+
+        <a href="{% url 'activos:activo-list' %}?estado=AC&amp;asignacion=asignado" class="ax-kpi ax-kpi--asignado">
+            <span class="ax-kpi-head">
+                <span class="ax-kpi-label">Asignados</span>
+                <span class="ax-kpi-icon"><i class="bi bi-person-check"></i></span>
+            </span>
+            <span class="ax-kpi-value"><span class="ax-count" data-value="{{ resumen.asignados }}">0</span></span>
+            <span class="ax-kpi-meter"><span style="width:{{ resumen.asignados|porcentaje_css:resumen.total }}%"></span></span>
+            <span class="ax-kpi-foot">
+                <span>Con responsable</span>
+                <span class="ax-kpi-share">{{ resumen.asignados|porcentaje:resumen.total }}%</span>
+            </span>
+        </a>
+
+        <a href="{% url 'activos:activo-list' %}?estado=EM" class="ax-kpi ax-kpi--mantenimiento">
+            <span class="ax-kpi-head">
+                <span class="ax-kpi-label">En mantenimiento</span>
+                <span class="ax-kpi-icon"><i class="bi bi-tools"></i></span>
+            </span>
+            <span class="ax-kpi-value"><span class="ax-count" data-value="{{ resumen.mantenimiento }}">0</span></span>
+            <span class="ax-kpi-meter"><span style="width:{{ resumen.mantenimiento|porcentaje_css:resumen.total }}%"></span></span>
+            <span class="ax-kpi-foot">
+                <span>Fuera de servicio</span>
+                <span class="ax-kpi-share">{{ resumen.mantenimiento|porcentaje:resumen.total }}%</span>
+            </span>
+        </a>
+    </section>
+
+    <div class="row g-3">
+
+        {# ================================================================= #}
+        {#  Requiere atención                                                #}
+        {# ================================================================= #}
+        <div class="col-lg-7">
+            <section class="ax-card h-100">
+                <div class="ax-card-head">
+                    <h2 class="ax-card-title">Requiere atención</h2>
+                    <a href="{% url 'mantenimientos:mantenimiento-list' %}"
+                       class="btn-pastel btn-pastel--neutro btn-pastel--sm">Mantenimientos</a>
+                </div>
+                <div class="ax-card-body">
+                    {% if mantenimientos_abiertos %}
+                    <div class="ax-table-wrap">
+                        <table class="ax-table">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Activo</th>
+                                    <th scope="col">Técnico</th>
+                                    <th scope="col">Desde</th>
+                                    <th scope="col" class="text-end">Costo</th>
+                                </tr>
+                            </thead>
+                            <tbody data-ax-stagger="6">
+                                {% for m in mantenimientos_abiertos %}
+                                <tr>
+                                    <td data-label="Activo">
+                                        <a href="{% url 'activos:activo-detail' m.activo.pk %}" class="ax-code">
+                                            {{ m.activo.codigo_inventario }}
+                                        </a>
+                                    </td>
+                                    <td data-label="Técnico">{{ m.tecnico }}</td>
+                                    <td data-label="Desde">{{ m.fecha|date:"d/m/Y" }}</td>
+                                    <td data-label="Costo" class="text-end ax-mono">${{ m.costo|floatformat:2 }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% if total_mantenimientos_abiertos > 5 %}
+                    <p class="ax-hint mt-3 mb-0">
+                        Se muestran 5 de {{ total_mantenimientos_abiertos }} mantenimientos abiertos.
+                    </p>
+                    {% endif %}
                     {% else %}
-                    <p class="text-muted">No hay categorías registradas</p>
+                    <div class="ax-callout ax-callout--ok">
+                        <i class="bi bi-check2-circle"></i>
+                        <span>No hay mantenimientos abiertos. Todo el equipamiento está en servicio.</span>
+                    </div>
+                    {% endif %}
+
+                    {% if sin_serial %}
+                    <div class="ax-callout ax-callout--warn mt-3">
+                        <i class="bi bi-upc-scan"></i>
+                        <span>
+                            <strong>{{ sin_serial }}</strong> activo(s) sin número de serie registrado.
+                            Sin ese dato no se puede identificar el equipo físico ante el proveedor.
+                        </span>
+                    </div>
                     {% endif %}
                 </div>
-            </div>
-
-            <!-- Activos por Ubicación -->
-            <div class="col-md-6">
-                <h5 class="mb-3" style="color: #32407b;"><i class="bi bi-geo-alt"></i> Activos por Ubicación</h5>
-                <div class="info-card">
-                    {% if activos_por_ubicacion %}
-                    <ul class="list-group list-group-flush">
-                        {% for ubi in activos_por_ubicacion %}
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            {{ ubi.nombre }}
-                            <span class="badge bg-primary rounded-pill">{{ ubi.total }}</span>
-                        </li>
-                        {% endfor %}
-                    </ul>
-                    {% else %}
-                    <p class="text-muted">No hay ubicaciones registradas</p>
-                    {% endif %}
-                </div>
-            </div>
+            </section>
         </div>
 
-        <!-- Acciones Rápidas -->
-        <hr class="linea" style="border-color: #32407b;">
-        <h5 class="mb-3" style="color: #32407b;"><i class="bi bi-lightning"></i> Acciones Rápidas</h5>
-        <div class="row text-center">
-            <div class="col-md-4 mb-3">
-                <div class="action-item p-4">
-                    <i class="bi bi-person-plus" style="font-size: 2rem; color: #32407b;"></i>
-                    <h5 class="mt-3">Gestionar usuarios</h5>
-                    <p class="text-muted">Buscar, crear y asignar responsables de activos</p>
-                    <a href="{% url 'usuarios:usuario-search' %}" class="Btn">USUARIOS</a>
+        {# ================================================================= #}
+        {#  Actividad reciente                                               #}
+        {# ================================================================= #}
+        <div class="col-lg-5">
+            <section class="ax-card h-100">
+                <div class="ax-card-head">
+                    <h2 class="ax-card-title">Actividad reciente</h2>
                 </div>
-            </div>
-            <div class="col-md-4 mb-3">
-                <div class="action-item p-4">
-                    <i class="bi bi-list-ul" style="font-size: 2rem; color: #32407b;"></i>
-                    <h5 class="mt-3">Ver Inventario</h5>
-                    <p class="text-muted">Lista completa de activos</p>
-                    <a href="{% url 'activos:activo-list' %}" class="Btn">VER LISTA</a>
+                <div class="ax-card-body">
+                    {% if movimientos_recientes %}
+                    <ol class="ax-timeline list-unstyled" data-ax-stagger="8">
+                        {% for movimiento in movimientos_recientes %}
+                        {% include 'activos/includes/_movimiento.html' %}
+                        {% endfor %}
+                    </ol>
+                    {% else %}
+                    <p class="ax-hint text-center py-4 mb-0">
+                        Todavía no hay movimientos registrados en el inventario.
+                    </p>
+                    {% endif %}
                 </div>
-            </div>
-            <div class="col-md-4 mb-3">
-                <div class="action-item p-4">
-                    <i class="bi bi-plus-circle" style="font-size: 2rem; color: #32407b;"></i>
-                    <h5 class="mt-3">Nuevo Activo</h5>
-                    <p class="text-muted">Registra un nuevo activo</p>
-                    <a href="{% url 'activos:activo-create' %}" class="Btn">AGREGAR</a>
-                </div>
-            </div>
+            </section>
         </div>
     </div>
+
+    {# ===================================================================== #}
+    {#  Distribución                                                         #}
+    {# ===================================================================== #}
+    <div class="row g-3 mt-1">
+        <div class="col-lg-6">
+            <section class="ax-card h-100">
+                <div class="ax-card-head">
+                    <h2 class="ax-card-title">Por categoría</h2>
+                    <a href="{% url 'activos:categoria-list' %}"
+                       class="btn-pastel btn-pastel--neutro btn-pastel--sm">Gestionar</a>
+                </div>
+                <div class="ax-card-body" data-ax-stagger="6">
+                    {% for cat in activos_por_categoria %}
+                    <a class="ax-bar-row" href="{% url 'activos:activo-list' %}?categoria={{ cat.pk }}">
+                        <span class="ax-bar-name">{{ cat.nombre }}</span>
+                        <span class="ax-bar-value">{{ cat.total }}</span>
+                        <span class="ax-bar-track">
+                            <span class="ax-bar-fill" style="width:{{ cat.total|porcentaje_css:resumen.total }}%"></span>
+                        </span>
+                    </a>
+                    {% empty %}
+                    <p class="ax-hint text-center mb-0 py-3">Aún no hay categorías con activos.</p>
+                    {% endfor %}
+                </div>
+            </section>
+        </div>
+
+        <div class="col-lg-6">
+            <section class="ax-card h-100">
+                <div class="ax-card-head">
+                    <h2 class="ax-card-title">Por ubicación</h2>
+                    <a href="{% url 'activos:ubicacion-list' %}"
+                       class="btn-pastel btn-pastel--neutro btn-pastel--sm">Gestionar</a>
+                </div>
+                <div class="ax-card-body" data-ax-stagger="6">
+                    {% for ubi in activos_por_ubicacion %}
+                    <a class="ax-bar-row" href="{% url 'activos:activo-list' %}?ubicacion={{ ubi.pk }}">
+                        <span class="ax-bar-name">{{ ubi.nombre }}</span>
+                        <span class="ax-bar-value">{{ ubi.total }}</span>
+                        <span class="ax-bar-track">
+                            <span class="ax-bar-fill ax-bar-fill--alt" style="width:{{ ubi.total|porcentaje_css:resumen.total }}%"></span>
+                        </span>
+                    </a>
+                    {% empty %}
+                    <p class="ax-hint text-center mb-0 py-3">Aún no hay ubicaciones con activos.</p>
+                    {% endfor %}
+                </div>
+            </section>
+        </div>
+    </div>
+
+    {# ===================================================================== #}
+    {#  Accesos directos, en texto                                           #}
+    {# ===================================================================== #}
+    <section class="ax-card mt-3">
+        <div class="ax-card-head">
+            <h2 class="ax-card-title">Accesos directos</h2>
+        </div>
+        <div class="ax-card-body d-flex flex-wrap gap-2">
+            <a href="{% url 'activos:activo-list' %}?estado=AC&amp;asignacion=libre"
+               class="btn-pastel btn-pastel--menta">Equipos disponibles</a>
+            <a href="{% url 'usuarios:usuario-search' %}" class="btn-pastel btn-pastel--lila">Personas</a>
+            <a href="{% url 'mantenimientos:mantenimiento-list' %}" class="btn-pastel btn-pastel--durazno">Mantenimientos</a>
+            <a href="{% url 'activos:categoria-list' %}" class="btn-pastel btn-pastel--neutro">Categorías</a>
+            <a href="{% url 'activos:ubicacion-list' %}" class="btn-pastel btn-pastel--neutro">Ubicaciones</a>
+            <a href="{% url 'reportes:reporte-activos' %}" class="btn-pastel btn-pastel--cielo">Reporte PDF</a>
+        </div>
+    </section>
 </div>
 {% endblock %}
 
+{% block extra_js %}
+<script src="{% static 'js/activos-ui.js' %}"></script>
+{% endblock %}

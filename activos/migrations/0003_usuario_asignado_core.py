@@ -42,7 +42,7 @@ def migrate_usuario_asignado_to_core(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("activos", "0002_historialmovimiento"),
+        ("activos", "0003_subcategoria_prefijo"),
         ("usuarios", "0001_initial"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]

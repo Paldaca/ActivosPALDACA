@@ -1,0 +1,18 @@
+{% load activo_filters %}{% comment %}
+Persona con avatar de iniciales. REGLA: siempre "Nombre Apellido", nunca username.
+Uso:  {% include 'activos/includes/_persona.html' with persona=activo.usuario_asignado %}
+Opcional: tamano='lg'|'xl', meta='texto secundario'
+{% endcomment %}{% if persona %}
+<span class="ax-person">
+    <span class="ax-avatar ax-avatar--c{{ persona|tono_avatar }}{% if tamano %} ax-avatar--{{ tamano }}{% endif %}" aria-hidden="true">{{ persona|iniciales }}</span>
+    <span class="min-w-0">
+        <span class="ax-person-name d-block" title="{{ persona|nombre_completo }}">{{ persona|nombre_completo }}</span>
+        {% if meta %}<span class="ax-person-meta">{{ meta }}</span>{% endif %}
+    </span>
+</span>
+{% else %}
+<span class="ax-person ax-person--empty">
+    <span class="ax-avatar{% if tamano %} ax-avatar--{{ tamano }}{% endif %}" aria-hidden="true"><i class="bi bi-person-dash"></i></span>
+    <span class="ax-person-name">{{ vacio|default:"Sin asignar" }}</span>
+</span>
+{% endif %}

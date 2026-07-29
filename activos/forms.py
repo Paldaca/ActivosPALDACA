@@ -1,19 +1,43 @@
 from django import forms
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 
 from .models import Activo, Categoria, SubCategoria, Ubicacion
 
 
-def _usuarios_asignables_queryset():
-    return get_user_model().objects.filter(is_active=True).order_by(
-        "last_name", "first_name", "username"
-    )
+def usuarios_asignables():
+    """Personas que pueden ser responsables de un activo, en orden alfabético.
+
+    Los superusuarios del ecosistema (SSO/admin global) no reciben activos:
+    no aparecen en selectores ni en la gestión de personas del módulo.
+    """
+    return get_user_model().objects.filter(
+        is_active=True,
+        is_superuser=False,
+    ).order_by("last_name", "first_name", "username")
+
+
+#: Alias interno histórico.
+_usuarios_asignables_queryset = usuarios_asignables
 
 
 def _label_usuario(user):
     nombre = user.get_full_name().strip()
     return nombre or user.username
 
+
+def _validar_usuario_asignable(usuario):
+    """Rechaza superusuarios (y cuentas inactivas) como responsables."""
+    if usuario is None:
+        return
+    if getattr(usuario, "is_superuser", False):
+        raise ValidationError(
+            "Los superusuarios no pueden tener activos asignados."
+        )
+    if not getattr(usuario, "is_active", True):
+        raise ValidationError(
+            "No se puede asignar un activo a un usuario inactivo."
+        )
 
 class CategoriaForm(forms.ModelForm):
     """Formulario para Categoría"""
@@ -76,6 +100,11 @@ class ActivoForm(forms.ModelForm):
         field.required = False
         field.label_from_instance = _label_usuario
 
+    def clean_usuario_asignado(self):
+        usuario = self.cleaned_data.get("usuario_asignado")
+        _validar_usuario_asignable(usuario)
+        return usuario
+
     class Meta:
         model = Activo
         fields = [
@@ -100,8 +129,9 @@ class ActivoForm(forms.ModelForm):
                 'class': 'form-control',
                 'placeholder': 'Número de serie (opcional)'
             }),
+            # `ax-combo-native` activa el buscador de personas de activos-ui.js.
             'usuario_asignado': forms.Select(attrs={
-                'class': 'form-select'
+                'class': 'form-select ax-combo-native'
             }),
             'ubicacion': forms.Select(attrs={
                 'class': 'form-select'
@@ -161,12 +191,17 @@ class ReasignarActivoForm(forms.ModelForm):
         field.required = False
         field.label_from_instance = _label_usuario
 
+    def clean_usuario_asignado(self):
+        usuario = self.cleaned_data.get("usuario_asignado")
+        _validar_usuario_asignable(usuario)
+        return usuario
+
     class Meta:
         model = Activo
         fields = ['usuario_asignado']
         widgets = {
             'usuario_asignado': forms.Select(attrs={
-                'class': 'form-select'
+                'class': 'form-select ax-combo-native'
             })
         }
 

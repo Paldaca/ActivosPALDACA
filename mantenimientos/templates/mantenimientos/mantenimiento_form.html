@@ -1,163 +1,196 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load activo_filters %}
 
-{% block title %}{% if object %}Editar{% else %}Nuevo{% endif %} Mantenimiento - {{ block.super }}{% endblock %}
+{% block title %}{% if object %}Editar{% else %}Registrar{% endif %} mantenimiento - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/activos-ui.css' %}">
+{% endblock %}
 
 {% block content %}
-<div class="px-5 py-4">
-    <div class="form-container">
-        <h2 class="form-title">
-            <img src="{% static 'core/img/Iconos/Mantenimiento.svg' %}" alt="Icono Mantenimiento" style="width: 40px; height: 40px; margin-right: 15px;">
-            {% if object %}Editar{% else %}Nuevo{% endif %} Mantenimiento
-        </h2>
-        <hr class="linea" style="border-color: #32407b;">
+<div class="ax-page ax-page--form">
 
-        <!-- Información del Activo si está preseleccionado -->
-        {% if activo %}
-        <div class="alert alert-info d-flex align-items-center mb-4" role="alert">
-            <i class="bi bi-info-circle me-2" style="font-size: 1.5rem;"></i>
-            <div>
-                <strong>Activo seleccionado:</strong>
-                <a href="{% url 'activos:activo-detail' activo.pk %}" class="alert-link">
-                    {{ activo.codigo_inventario }} - {{ activo.marca }} {{ activo.modelo }}
-                </a>
-            </div>
+    <nav class="ax-crumbs" aria-label="Ruta de navegación">
+        <a href="{% url 'mantenimientos:mantenimiento-list' %}">Mantenimientos</a>
+        <span class="sep">/</span>
+        <span aria-current="page">{% if object %}Editar{% else %}Registrar{% endif %}</span>
+    </nav>
+
+    <header class="ax-hero">
+        <span class="ax-hero-eyebrow">Servicio técnico</span>
+        <h1 class="ax-hero-title">
+            {% if object %}Editar mantenimiento{% else %}Registrar mantenimiento{% endif %}
+        </h1>
+        <p class="ax-hero-sub">
+            Mientras esté <strong>en proceso</strong>, el equipo aparecerá como
+            <em>En Mantenimiento</em> en todo el inventario y no debería reasignarse.
+        </p>
+    </header>
+
+    {# Sin JavaScript no hay pasos: se muestra todo el formulario de una vez. #}
+    <noscript>
+        <style>
+            [data-ax-panel][hidden],
+            [data-ax-step-submit][hidden] { display: block !important; }
+            [data-ax-step-next],
+            [data-ax-stepper] { display: none !important; }
+        </style>
+    </noscript>
+
+    <nav class="ax-stepper" data-ax-stepper aria-label="Progreso del formulario">
+        <button type="button" class="ax-step is-active">
+            <span class="ax-step-num">1</span> Equipo y técnico
+        </button>
+        <span class="ax-step-line"></span>
+        <button type="button" class="ax-step">
+            <span class="ax-step-num">2</span> Trabajo y costo
+        </button>
+    </nav>
+
+    <form method="post" id="axFormActivo" class="ax-form" novalidate>
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+        <div class="ax-callout ax-callout--danger mb-3">
+            <i class="bi bi-exclamation-octagon"></i>
+            <div>{{ form.non_field_errors }}</div>
         </div>
         {% endif %}
 
-        <form method="post" class="needs-validation" novalidate>
-            {% csrf_token %}
-            
-            {% if form.non_field_errors %}
-            <div class="alert alert-danger" role="alert">
-                {{ form.non_field_errors }}
-            </div>
-            {% endif %}
+        {# ================================================================= #}
+        {#  PASO 1 · Qué equipo y quién lo atiende                           #}
+        {# ================================================================= #}
+        <section class="ax-panel" data-ax-panel aria-label="Paso 1: equipo y técnico">
+            <div class="ax-fieldset">
+                <h2 class="ax-fieldset-legend"><span class="num">1</span> ¿Qué equipo y quién lo atiende?</h2>
 
-            <div class="row g-3">
-                <!-- Activo -->
-                <div class="col-md-12">
-                    <label for="{{ form.activo.id_for_label }}" class="form-label">
-                        <i class="bi bi-box"></i> {{ form.activo.label }}
-                    </label>
-                    {{ form.activo }}
-                    {% if form.activo.errors %}
-                    <div class="invalid-feedback d-block">
-                        {{ form.activo.errors }}
+                {% if activo %}
+                {# Se llegó desde la ficha del activo: se confirma cuál es #}
+                <div class="ax-drawer-asset mb-3">
+                    <span class="ax-type" aria-hidden="true"><i class="bi {{ activo|icono_activo }}"></i></span>
+                    <div class="ax-min0">
+                        <span class="ax-code ax-code--plain ax-code--lg">{{ activo.codigo_inventario }}</span>
+                        <div class="ax-equipo-main mt-1">{{ activo.marca }} {{ activo.modelo }}</div>
+                        <div class="ax-equipo-sub">
+                            <i class="bi bi-geo-alt"></i> {{ activo.ubicacion.nombre }}
+                        </div>
                     </div>
+                    <span class="ms-auto">{% badge_estado activo %}</span>
+                </div>
+                {% endif %}
+
+                <div class="ax-field mb-3" style="--i:0">
+                    <label class="form-label" for="{{ form.activo.id_for_label }}">
+                        {{ form.activo.label }} <span class="ax-req">*</span>
+                    </label>
+                    <div class="ax-combo" data-combo-placeholder="Escribe un código de inventario…">
+                        {{ form.activo }}
+                    </div>
+                    {% if form.activo.errors %}
+                    <div class="ax-error"><i class="bi bi-exclamation-circle"></i> {{ form.activo.errors }}</div>
                     {% endif %}
-                    <small class="form-text text-muted">
-                        Selecciona el activo que recibirá mantenimiento.
+                    <small class="ax-hint">
+                        Busca por código, marca o modelo. Verifica que sea el equipo correcto:
+                        al guardar cambiará su estado.
                     </small>
                 </div>
 
-                <!-- Técnico -->
-                <div class="col-md-6">
-                    <label for="{{ form.tecnico.id_for_label }}" class="form-label">
-                        <i class="bi bi-person-gear"></i> {{ form.tecnico.label }} <span class="text-danger">*</span>
-                    </label>
-                    {{ form.tecnico }}
-                    {% if form.tecnico.errors %}
-                    <div class="invalid-feedback d-block">
-                        {{ form.tecnico.errors }}
+                <div class="row g-3">
+                    <div class="col-md-7 ax-field" style="--i:1">
+                        <label class="form-label" for="{{ form.tecnico.id_for_label }}">
+                            {{ form.tecnico.label }} <span class="ax-req">*</span>
+                        </label>
+                        {{ form.tecnico }}
+                        {% if form.tecnico.errors %}
+                        <div class="ax-error"><i class="bi bi-exclamation-circle"></i> {{ form.tecnico.errors }}</div>
+                        {% endif %}
                     </div>
-                    {% endif %}
-                </div>
-
-                <!-- Teléfono -->
-                <div class="col-md-6">
-                    <label for="{{ form.telefono.id_for_label }}" class="form-label">
-                        <i class="bi bi-telephone"></i> {{ form.telefono.label }} <span class="text-danger">*</span>
-                    </label>
-                    {{ form.telefono }}
-                    {% if form.telefono.errors %}
-                    <div class="invalid-feedback d-block">
-                        {{ form.telefono.errors }}
+                    <div class="col-md-5 ax-field" style="--i:2">
+                        <label class="form-label" for="{{ form.telefono.id_for_label }}">
+                            {{ form.telefono.label }} <span class="ax-req">*</span>
+                        </label>
+                        {{ form.telefono }}
+                        {% if form.telefono.errors %}
+                        <div class="ax-error"><i class="bi bi-exclamation-circle"></i> {{ form.telefono.errors }}</div>
+                        {% endif %}
                     </div>
-                    {% endif %}
                 </div>
+            </div>
+        </section>
 
-                <!-- Descripción -->
-                <div class="col-md-12">
-                    <label for="{{ form.descripcion.id_for_label }}" class="form-label">
-                        <i class="bi bi-card-text"></i> {{ form.descripcion.label }} <span class="text-danger">*</span>
+        {# ================================================================= #}
+        {#  PASO 2 · Trabajo, costo y estado                                 #}
+        {# ================================================================= #}
+        <section class="ax-panel" data-ax-panel aria-label="Paso 2: trabajo y costo" hidden>
+            <div class="ax-fieldset">
+                <h2 class="ax-fieldset-legend"><span class="num">2</span> ¿Qué se hace y cuánto cuesta?</h2>
+
+                <div class="ax-field mb-3" style="--i:0">
+                    <label class="form-label" for="{{ form.descripcion.id_for_label }}">
+                        {{ form.descripcion.label }} <span class="ax-req">*</span>
                     </label>
                     {{ form.descripcion }}
                     {% if form.descripcion.errors %}
-                    <div class="invalid-feedback d-block">
-                        {{ form.descripcion.errors }}
-                    </div>
+                    <div class="ax-error"><i class="bi bi-exclamation-circle"></i> {{ form.descripcion.errors }}</div>
                     {% endif %}
                 </div>
 
-                <!-- Costo -->
-                <div class="col-md-6">
-                    <label for="{{ form.costo.id_for_label }}" class="form-label">
-                        <i class="bi bi-currency-dollar"></i> {{ form.costo.label }} <span class="text-danger">*</span>
-                    </label>
-                    <div class="input-group">
-                        <span class="input-group-text">$</span>
+                <div class="row g-3">
+                    <div class="col-md-6 ax-field" style="--i:1">
+                        <label class="form-label" for="{{ form.costo.id_for_label }}">
+                            {{ form.costo.label }} <span class="ax-req">*</span>
+                        </label>
                         {{ form.costo }}
+                        {% if form.costo.errors %}
+                        <div class="ax-error"><i class="bi bi-exclamation-circle"></i> {{ form.costo.errors }}</div>
+                        {% endif %}
+                        <small class="ax-hint">Solo suma al gasto cuando el mantenimiento se finaliza.</small>
                     </div>
-                    {% if form.costo.errors %}
-                    <div class="invalid-feedback d-block">
-                        {{ form.costo.errors }}
+                    <div class="col-md-6 ax-field" style="--i:2">
+                        <label class="form-label" for="{{ form.estado.id_for_label }}">
+                            {{ form.estado.label }} <span class="ax-req">*</span>
+                        </label>
+                        {{ form.estado }}
+                        {% if form.estado.errors %}
+                        <div class="ax-error"><i class="bi bi-exclamation-circle"></i> {{ form.estado.errors }}</div>
+                        {% endif %}
                     </div>
-                    {% endif %}
                 </div>
 
-                <!-- Estado -->
-                <div class="col-md-6">
-                    <label for="{{ form.estado.id_for_label }}" class="form-label">
-                        <i class="bi bi-flag"></i> {{ form.estado.label }} <span class="text-danger">*</span>
-                    </label>
-                    {{ form.estado }}
-                    {% if form.estado.errors %}
-                    <div class="invalid-feedback d-block">
-                        {{ form.estado.errors }}
-                    </div>
-                    {% endif %}
-                    <small class="form-text text-muted">
-                        ⚠️ Al marcar "En proceso", el activo cambiará a estado "En Mantenimiento".
-                    </small>
+                <div class="ax-callout ax-callout--warn mt-3">
+                    <i class="bi bi-arrow-repeat"></i>
+                    <span>
+                        <strong>En proceso</strong> marca el equipo como
+                        <em>En Mantenimiento</em>. <strong>Finalizado</strong> lo devuelve
+                        a servicio, siempre que no le quede otro mantenimiento abierto.
+                    </span>
                 </div>
             </div>
+        </section>
 
-            <hr class="linea" style="border-color: #32407b;">
+        <div class="ax-formbar">
+            <span class="ax-formbar-info">
+                <i class="bi bi-shield-check"></i> Nada se guarda hasta que confirmes.
+            </span>
 
-            <!-- Botones -->
-            <div class="d-flex justify-content-between align-items-center">
-                <a href="{% if activo %}{% url 'activos:activo-detail' activo.pk %}{% else %}{% url 'mantenimientos:mantenimiento-list' %}{% endif %}" 
-                   class="btn btn-secondary">
-                    <i class="bi bi-arrow-left"></i> Cancelar
-                </a>
-                <button type="submit" class="btn btn-custom">
-                    <i class="bi bi-save"></i> {% if object %}Actualizar{% else %}Guardar{% endif %}
-                </button>
-            </div>
-        </form>
-    </div>
+            <a href="{% if object %}{% url 'mantenimientos:mantenimiento-detail' object.pk %}{% else %}{% url 'mantenimientos:mantenimiento-list' %}{% endif %}"
+               class="btn-pastel btn-pastel--neutro">Cancelar</a>
+
+            <button type="button" class="btn-pastel btn-pastel--neutro" data-ax-step-prev hidden>
+                <i class="bi bi-arrow-left"></i> Atrás
+            </button>
+            <button type="button" class="btn-pastel btn-pastel--lila" data-ax-step-next>
+                Continuar <i class="bi bi-arrow-right"></i>
+            </button>
+            <button type="submit" class="btn-pastel btn-pastel--menta" data-ax-step-submit hidden>
+                {% if object %}Guardar cambios{% else %}Registrar mantenimiento{% endif %}
+            </button>
+        </div>
+    </form>
 </div>
-
 {% endblock %}
 
 {% block extra_js %}
-<script>
-    // Deshabilitar el campo activo si viene preseleccionado
-    document.addEventListener('DOMContentLoaded', function() {
-        const activoSelect = document.getElementById('id_activo');
-        const urlParams = new URLSearchParams(window.location.search);
-        
-        if (urlParams.has('activo_id')) {
-            activoSelect.disabled = true;
-            // Crear un campo hidden para enviar el valor
-            const hiddenInput = document.createElement('input');
-            hiddenInput.type = 'hidden';
-            hiddenInput.name = 'activo';
-            hiddenInput.value = activoSelect.value;
-            activoSelect.parentNode.appendChild(hiddenInput);
-        }
-    });
-</script>
+<script src="{% static 'js/activos-ui.js' %}"></script>
 {% endblock %}
-

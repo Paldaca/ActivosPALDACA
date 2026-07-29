@@ -1,8 +1,9 @@
 from django.shortcuts import render
 from django.views.generic import TemplateView
 from django.conf import settings
-from activos.models import Activo, Categoria, Ubicacion
-from django.db.models import Count
+from activos.models import Activo, Categoria, HistorialMovimiento, Ubicacion
+from mantenimientos.models import Mantenimiento
+from django.db.models import Count, Q
 from django.shortcuts import redirect
 from django.http import HttpResponseNotFound
 import logging
@@ -13,24 +14,49 @@ logger = logging.getLogger(__name__)
 
 class HomeView(ModuloActivoRequiredMixin, TemplateView):
     template_name = 'home.html'
-    
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        
-        # Estadísticas generales
-        context['total_activos'] = Activo.objects.count()
-        context['activos_mantenimiento'] = Activo.objects.filter(estado='EM').count()
-        
-        # Activos por categoría
-        context['activos_por_categoria'] = Categoria.objects.annotate(
-            total=Count('subcategorias__activos')
-        ).order_by('-total')[:5]
-        
-        # Activos por ubicación
-        context['activos_por_ubicacion'] = Ubicacion.objects.annotate(
-            total=Count('activos')
-        ).order_by('-total')[:5]
-        
+
+        # Mismo criterio de estado derivado que el listado de activos:
+        # el modelo guarda AC/IN/EM y la persona asignada define el resto.
+        context['resumen'] = Activo.objects.aggregate(
+            total=Count('id'),
+            disponibles=Count('id', filter=Q(estado='AC', usuario_asignado__isnull=True)),
+            asignados=Count('id', filter=Q(estado='AC', usuario_asignado__isnull=False)),
+            mantenimiento=Count('id', filter=Q(estado='EM')),
+            baja=Count('id', filter=Q(estado='IN')),
+        )
+
+        # Lo que de verdad requiere atención hoy
+        context['mantenimientos_abiertos'] = (
+            Mantenimiento.objects.filter(estado='EP')
+            .select_related('activo')
+            .order_by('-fecha')[:5]
+        )
+        context['total_mantenimientos_abiertos'] = Mantenimiento.objects.filter(estado='EP').count()
+        context['sin_serial'] = Activo.objects.filter(
+            Q(numero_serial__isnull=True) | Q(numero_serial='')
+        ).count()
+
+        context['movimientos_recientes'] = (
+            HistorialMovimiento.objects.select_related('activo', 'usuario')
+            .order_by('-fecha_movimiento')[:6]
+        )
+
+        # Distribución: solo lo que tiene contenido
+        context['activos_por_categoria'] = (
+            Categoria.objects.annotate(total=Count('subcategorias__activos'))
+            .filter(total__gt=0).order_by('-total')[:5]
+        )
+        context['activos_por_ubicacion'] = (
+            Ubicacion.objects.annotate(total=Count('activos'))
+            .filter(total__gt=0).order_by('-total')[:5]
+        )
+
+        # Compatibilidad con nombres antiguos
+        context['total_activos'] = context['resumen']['total']
+        context['activos_mantenimiento'] = context['resumen']['mantenimiento']
         return context
 
 

@@ -1,45 +1,74 @@
 {% extends 'base.html' %}
 {% load static %}
-{% block title %}{{ object|yesno:"Editar,Crear" }} Categoría - {{ block.super }}{% endblock %}
+
+{% block title %}{% if object %}Editar{% else %}Nueva{% endif %} Categoría - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/activos-ui.css' %}">
+{% endblock %}
 
 {% block content %}
-<div class="px-5 py-4 mt-2">
-    <div class="row justify-content-center">
-        <div class="col-md-8">
-            <div class="form-container">
-                <h2 class="form-title">
-                    <img src="{% static 'core/img/Iconos/nueva-categoria.svg' %}" alt="Icono" style="width: 40px; height: 40px; margin-right: 15px;">
-                    {% if object %}Editar Categoría{% else %}Nueva Categoría{% endif %}
-                </h2>
-                <hr class="linea" style="border-color: #32407b;">
+<div class="ax-page ax-page--form">
 
-                <form method="post">
-                    {% csrf_token %}
+    <nav class="ax-crumbs" aria-label="Ruta de navegación">
+        <a href="{% url 'activos:activo-list' %}"><i class="bi bi-boxes"></i> Activos</a>
+        <span class="sep">/</span>
+        <a href="{% url 'activos:categoria-list' %}">Categorías</a>
+        <span class="sep">/</span>
+        <span aria-current="page">{% if object %}Editar{% else %}Nueva{% endif %}</span>
+    </nav>
 
-                    <div class="mb-3">
-                        <label for="{{ form.nombre.id_for_label }}" class="form-label">
-                            Nombre <span class="text-danger">*</span>
-                        </label>
-                        {{ form.nombre }}
-                        {% if form.nombre.errors %}
-                        <div class="invalid-feedback d-block">
-                            {{ form.nombre.errors }}
-                        </div>
-                        {% endif %}
-                    </div>
+    <header class="ax-hero">
+        <span class="ax-hero-eyebrow"><i class="bi bi-folder2"></i> Catálogo</span>
+        <h1 class="ax-hero-title">
+            <img src="{% static 'core/img/Iconos/nueva-categoria.svg' %}" alt="" aria-hidden="true">
+            {% if object %}Editar categoría{% else %}Nueva categoría{% endif %}
+        </h1>
+    </header>
 
-                    <hr>
-                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                        <a href="{% url 'activos:categoria-list' %}" class="btn btn-secondary">
-                            <i class="bi bi-x-circle"></i> Cancelar
-                        </a>
-                        <button type="submit" class="btn btn-primary">
-                            <i class="bi bi-save"></i> Guardar
-                        </button>
-                    </div>
-                </form>
-            </div>
+    <section class="ax-card">
+        <div class="ax-card-body ax-form">
+            <form method="post">
+                {% csrf_token %}
+
+                <div class="ax-field mb-3">
+                    <label class="form-label" for="{{ form.nombre.id_for_label }}">
+                        Nombre <span class="ax-req">*</span>
+                    </label>
+                    {{ form.nombre }}
+                    {% if form.nombre.errors %}
+                    <div class="ax-error"><i class="bi bi-exclamation-circle"></i> {{ form.nombre.errors }}</div>
+                    {% endif %}
+                    <small class="ax-hint">
+                        Ejemplos: <em>Equipos de cómputo</em>, <em>Mobiliario</em>, <em>Vehículos</em>.
+                    </small>
+                </div>
+
+                {% if object %}
+                <div class="ax-callout">
+                    <i class="bi bi-diagram-3"></i>
+                    <span>
+                        Esta categoría agrupa
+                        <strong>{{ object.subcategorias.count }}</strong> subcategoría(s).
+                        <a href="{% url 'activos:subcategoria-list' %}?categoria={{ object.pk }}">Verlas</a>.
+                    </span>
+                </div>
+                {% endif %}
+
+                <div class="ax-formbar">
+                    <a href="{% url 'activos:categoria-list' %}" class="btn-pastel btn-pastel--neutro">
+                        <i class="bi bi-x-lg"></i> Cancelar
+                    </a>
+                    <button type="submit" class="btn-pastel btn-pastel--menta">
+                        <i class="bi bi-check2-circle"></i> Guardar
+                    </button>
+                </div>
+            </form>
         </div>
-    </div>
+    </section>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/activos-ui.js' %}"></script>
 {% endblock %}

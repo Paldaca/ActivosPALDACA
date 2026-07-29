@@ -1,0 +1,64 @@
+{% comment %}
+Modal de eliminación reutilizable. Sustituye a las páginas confirm_delete:
+confirmar no debería costar una navegación.
+
+Se renderiza UNA vez por página y lo alimenta cualquier disparador
+[data-ax-eliminar] mediante data-attributes:
+
+  data-url        (obligatorio) endpoint POST de borrado
+  data-titulo     qué se elimina, en una frase
+  data-ficha      línea secundaria (marca/modelo, categoría…)
+  data-codigo     identificador destacado; si existe, se muestra como código
+  data-impacto    consecuencia real del borrado
+  data-aviso      advertencia adicional (opcional)
+  data-confirmar  texto que hay que escribir para habilitar el botón (opcional)
+  data-bloqueado  motivo por el que NO se puede eliminar (opcional)
+{% endcomment %}
+<div class="modal fade" id="modalEliminar" tabindex="-1" aria-labelledby="modalEliminarTitulo" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form method="post" action="" class="modal-content ax-form">
+            {% csrf_token %}
+
+            <div class="ax-danger-head">
+                <i class="bi bi-exclamation-triangle"></i>
+                <span id="modalEliminarTitulo">Confirmar eliminación</span>
+                <button type="button" class="btn-close ms-auto" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+
+            <div class="modal-body">
+                <p class="ax-spec-value mb-3" data-ax-fill="titulo"></p>
+
+                <div class="ax-drawer-asset mb-3" data-ax-fill="ficha-wrap">
+                    <span class="ax-type" aria-hidden="true"><i class="bi bi-trash3" data-ax-fill="icono"></i></span>
+                    <div class="ax-min0">
+                        <span class="ax-code ax-code--plain" data-ax-fill="codigo" hidden></span>
+                        <div class="ax-equipo-sub mt-1" data-ax-fill="ficha"></div>
+                    </div>
+                </div>
+
+                <div class="ax-callout ax-callout--warn mb-3" data-ax-fill="aviso" hidden></div>
+                <div class="ax-callout ax-callout--danger mb-3" data-ax-fill="impacto" hidden></div>
+                <div class="ax-callout ax-callout--warn mb-3" data-ax-fill="bloqueado" hidden></div>
+
+                {# Confirmación por escritura: solo para lo verdaderamente irreversible #}
+                <div data-ax-fill="confirmar-wrap" hidden>
+                    <label class="form-label" for="axModalConfirmar">
+                        Escribe <strong class="ax-mono" data-ax-fill="confirmar-texto"></strong>
+                        para habilitar la eliminación
+                    </label>
+                    <input type="text" id="axModalConfirmar" class="form-control ax-mono"
+                           data-ax-confirm-field autocomplete="off" spellcheck="false">
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn-pastel btn-pastel--neutro" data-bs-dismiss="modal">
+                    <i class="bi bi-arrow-left"></i> Cancelar
+                </button>
+                <button type="submit" class="btn-pastel btn-pastel--rosa" data-ax-confirm-submit>
+                    <i class="bi bi-trash"></i> Eliminar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>

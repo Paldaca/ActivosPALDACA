@@ -1,63 +1,118 @@
 {% extends 'base.html' %}
 {% load static %}
-{% block title %}Reasignar Activo - {{ block.super }}{% endblock %}
+{% load activo_filters %}
+
+{% block title %}Reasignar {{ activo.codigo_inventario }} - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/activos-ui.css' %}">
+{% endblock %}
+
+{% comment %}
+Página completa de reasignación. En el uso diario esta acción ocurre en el
+drawer lateral del listado; esta vista existe como respaldo accesible, enlace
+directo compartible y camino sin JavaScript.
+{% endcomment %}
 
 {% block content %}
-<div class="px-5 py-4 mt-2">
-    <div class="row justify-content-center">
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h4 class="mb-0">
-                        <i class="bi bi-person-gear"></i> Reasignar Activo
-                    </h4>
-                </div>
-                <div class="card-body">
-                    <div class="alert alert-info">
-                        <strong>Activo:</strong> {{ activo.codigo_inventario }} - {{ activo.marca }} {{ activo.modelo }}
+<div class="ax-page ax-page--form">
+
+    <nav class="ax-crumbs" aria-label="Ruta de navegación">
+        <a href="{% url 'activos:activo-list' %}"><i class="bi bi-boxes"></i> Activos</a>
+        <span class="sep">/</span>
+        <a href="{% url 'activos:activo-detail' activo.pk %}">{{ activo.codigo_inventario }}</a>
+        <span class="sep">/</span>
+        <span aria-current="page">Reasignar</span>
+    </nav>
+
+    <header class="ax-hero">
+        <span class="ax-hero-eyebrow"><i class="bi bi-person-gear"></i> Cambio de responsable</span>
+        <h1 class="ax-hero-title">Reasignar activo</h1>
+        <p class="ax-hero-sub">
+            El cambio queda registrado en el historial del activo con fecha, autor
+            y valores anterior y nuevo.
+        </p>
+    </header>
+
+    <section class="ax-card">
+        <div class="ax-card-body ax-form">
+
+            {# 1 · Qué activo #}
+            <div class="ax-drawer-asset mb-3">
+                <span class="ax-type" aria-hidden="true"><i class="bi {{ activo|icono_activo }}"></i></span>
+                <div class="ax-min0">
+                    <span class="ax-code ax-code--plain ax-code--lg">{{ activo.codigo_inventario }}</span>
+                    <div class="ax-equipo-main mt-1">{{ activo.marca }} {{ activo.modelo }}</div>
+                    <div class="ax-equipo-sub">
+                        <i class="bi bi-upc-scan"></i>
+                        <span class="ax-serial">{{ activo.numero_serial|default:"Sin número de serie" }}</span>
                     </div>
-
-                    <div class="mb-3">
-                        <strong>Usuario Actual:</strong>
-                        <p class="mb-0">
-                            {% if activo.usuario_asignado %}
-                            {{ activo.usuario_asignado }}
-                            {% else %}
-                            <span class="text-muted">Sin asignar</span>
-                            {% endif %}
-                        </p>
-                    </div>
-
-                    <hr>
-
-                    <form method="post">
-                        {% csrf_token %}
-
-                        <div class="mb-3">
-                            <label for="{{ form.usuario_asignado.id_for_label }}" class="form-label">
-                                Nuevo Usuario Asignado
-                            </label>
-                            {{ form.usuario_asignado }}
-                            {% if form.usuario_asignado.errors %}
-                            <div class="invalid-feedback d-block">
-                                {{ form.usuario_asignado.errors }}
-                            </div>
-                            {% endif %}
-                            <small class="form-text text-muted">Seleccione un usuario o deje vacío para desasignar</small>
-                        </div>
-
-                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                            <a href="{% url 'activos:activo-detail' activo.pk %}" class="btn btn-secondary">
-                                <i class="bi bi-x-circle"></i> Cancelar
-                            </a>
-                            <button type="submit" class="btn btn-primary">
-                                <i class="bi bi-check-circle"></i> Reasignar
-                            </button>
-                        </div>
-                    </form>
                 </div>
+                <span class="ms-auto">{% badge_estado activo %}</span>
             </div>
+
+            {% if activo.estado == 'EM' %}
+            <div class="ax-callout ax-callout--warn mb-3">
+                <i class="bi bi-tools"></i>
+                <span>
+                    Este equipo está <strong>En Mantenimiento</strong>. Confirma que ya
+                    volvió a servicio antes de entregarlo a otra persona.
+                </span>
+            </div>
+            {% endif %}
+
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ next }}">
+
+                {# 2 · De quién a quién #}
+                <div class="ax-transfer mb-3">
+                    <div class="ax-transfer-side">
+                        <div class="ax-transfer-label">Responsable actual</div>
+                        {% include 'activos/includes/_persona.html' with persona=activo.usuario_asignado %}
+                    </div>
+                    <div class="ax-transfer-arrow" aria-hidden="true"><i class="bi bi-arrow-right"></i></div>
+                    <div class="ax-transfer-side">
+                        <div class="ax-transfer-label">Nuevo responsable</div>
+                        <span class="ax-person ax-person--empty">
+                            <span class="ax-avatar" aria-hidden="true"><i class="bi bi-three-dots"></i></span>
+                            <span class="ax-person-name">Elige abajo</span>
+                        </span>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label" for="{{ form.usuario_asignado.id_for_label }}">
+                        <i class="bi bi-search me-1"></i> Buscar persona
+                    </label>
+                    <div class="ax-combo"
+                         data-combo-placeholder="Escribe un nombre o apellido…"
+                         data-combo-empty-label="Sin asignar · liberar equipo">
+                        {{ form.usuario_asignado }}
+                    </div>
+                    {% if form.usuario_asignado.errors %}
+                    <div class="ax-error"><i class="bi bi-exclamation-circle"></i> {{ form.usuario_asignado.errors }}</div>
+                    {% endif %}
+                    <small class="ax-hint">
+                        <i class="bi bi-info-circle"></i>
+                        Déjalo sin asignar para devolver el equipo al inventario disponible.
+                    </small>
+                </div>
+
+                <div class="ax-formbar">
+                    <a href="{% url 'activos:activo-detail' activo.pk %}" class="btn-pastel btn-pastel--neutro">
+                        <i class="bi bi-x-lg"></i> Cancelar
+                    </a>
+                    <button type="submit" class="btn-pastel btn-pastel--menta">
+                        <i class="bi bi-check2-circle"></i> Confirmar reasignación
+                    </button>
+                </div>
+            </form>
         </div>
-    </div>
+    </section>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/activos-ui.js' %}"></script>
 {% endblock %}

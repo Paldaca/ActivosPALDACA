@@ -1,0 +1,35 @@
+{% load activo_filters %}{% comment %}
+Un movimiento de la línea de tiempo. Espera `movimiento` en el contexto.
+{% endcomment %}
+{% if movimiento.tipo_movimiento == 'CR' %}{% firstof 'creacion' as tono %}{% firstof 'bi-plus-lg' as icono %}
+{% elif movimiento.tipo_movimiento == 'AC' %}{% firstof 'actualizacion' as tono %}{% firstof 'bi-pencil' as icono %}
+{% elif movimiento.tipo_movimiento == 'RE' %}{% firstof 'reasignacion' as tono %}{% firstof 'bi-person-gear' as icono %}
+{% elif movimiento.tipo_movimiento == 'RU' %}{% firstof 'reubicacion' as tono %}{% firstof 'bi-geo-alt' as icono %}
+{% elif movimiento.tipo_movimiento == 'CE' %}{% firstof 'estado' as tono %}{% firstof 'bi-arrow-repeat' as icono %}
+{% else %}{% firstof 'eliminacion' as tono %}{% firstof 'bi-trash' as icono %}{% endif %}
+<li class="ax-tl-item ax-tl--{{ tono }}">
+    <span class="ax-tl-dot" aria-hidden="true"><i class="bi {{ icono }}"></i></span>
+    <div class="ax-tl-card">
+        <p class="ax-tl-title">{{ movimiento.get_tipo_movimiento_display }}</p>
+        <div class="ax-tl-meta">
+            <span><i class="bi bi-calendar3"></i> {{ movimiento.fecha_movimiento|date:"d/m/Y H:i" }}</span>
+            {% if movimiento.usuario %}
+            <span><i class="bi bi-person"></i> {{ movimiento.usuario|nombre_completo }}</span>
+            {% endif %}
+        </div>
+
+        {# El cambio, de un vistazo… #}
+        {% if movimiento.valor_anterior and movimiento.valor_nuevo %}
+        <div class="ax-tl-diff">
+            <span class="ax-tl-from">{{ movimiento.valor_anterior }}</span>
+            <i class="bi bi-arrow-right text-muted" aria-hidden="true"></i>
+            <span class="ax-tl-to">{{ movimiento.valor_nuevo }}</span>
+        </div>
+        {% endif %}
+
+        {# …y la descripción registrada, que puede llevar contexto propio. #}
+        {% if movimiento.descripcion %}
+        <p class="ax-hint mt-2 mb-0">{{ movimiento.descripcion }}</p>
+        {% endif %}
+    </div>
+</li>

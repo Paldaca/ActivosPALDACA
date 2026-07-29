@@ -3,7 +3,7 @@ from django.conf import settings
 
 def _nav_asset_base():
     if settings.DEBUG:
-        return "http://127.0.0.1:8000"
+        return "http://localhost:8000"
     return "https://cpaldaca.com"
 
 
@@ -11,7 +11,7 @@ def paldaca_urls(request):
     asset_base = _nav_asset_base()
     portal_url = "http://localhost:5173" if settings.DEBUG else "https://cpaldaca.com"
     api_base = (
-        "http://127.0.0.1:8000/api"
+        "http://localhost:8000/api"
         if settings.DEBUG
         else "https://api.cpaldaca.com/api"
     )

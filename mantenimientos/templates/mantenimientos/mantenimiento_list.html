@@ -1,249 +1,301 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load activo_filters %}
 
 {% block title %}Mantenimientos - {{ block.super }}{% endblock %}
 
-{% block content %}
-<div class="px-5 py-4">
-    <div class="form-container">
-        <h2 class="form-title mb-0">
-            <img src="{% static 'core/img/Iconos/Mantenimiento.svg' %}" alt="Icono Mantenimiento" style="width: 40px; height: 40px; margin-right: 15px;">
-            Gestión de Mantenimientos
-        </h2>
-        <hr class="linea" style="border-color: #32407b;">
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/activos-ui.css' %}">
+{% endblock %}
 
-        <!-- Dashboard de Estadísticas -->
-        <div class="mb-4">
-            <h5 class="mb-3" style="color: #32407b;"><i class="bi bi-bar-chart"></i> Resumen</h5>
-            <div class="row g-3">
-                <div class="col-md-3">
-                    <div class="stat-item bgcolorazul p-3 text-center">
-                        <div class="stat-icon"><i class="bi bi-tools"></i></div>
-                        <p class="stat-label mb-1">Total Mantenimientos</p>
-                        <p class="stat-number mb-0">{{ total_mantenimientos }}</p>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="stat-item bgcolorazul p-3 text-center">
-                        <div class="stat-icon"><i class="bi bi-hourglass-split"></i></div>
-                        <p class="stat-label mb-1">En Proceso</p>
-                        <p class="stat-number mb-0">{{ mantenimientos_en_proceso }}</p>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="stat-item bgcolorazul p-3 text-center">
-                        <div class="stat-icon"><i class="bi bi-check-circle"></i></div>
-                        <p class="stat-label mb-1">Finalizados</p>
-                        <p class="stat-number mb-0">{{ mantenimientos_finalizados }}</p>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="stat-item bgcolorazul p-3 text-center">
-                        <div class="stat-icon"><i class="bi bi-currency-dollar"></i></div>
-                        <p class="stat-label mb-1">Costo Total</p>
-                        <p class="stat-number mb-0">${{ costo_total|floatformat:2 }}</p>
-                    </div>
-                </div>
+{% block content %}
+<div class="ax-page">
+
+    <nav class="ax-crumbs" aria-label="Ruta de navegación">
+        <a href="{% url 'core:home' %}">Inicio</a>
+        <span class="sep">/</span>
+        <span aria-current="page">Mantenimientos</span>
+    </nav>
+
+    <header class="ax-hero">
+        <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
+            <div>
+                <span class="ax-hero-eyebrow">Servicio técnico</span>
+                <h1 class="ax-hero-title">Mantenimientos</h1>
+                <p class="ax-hero-sub">
+                    Un equipo con mantenimiento abierto queda automáticamente
+                    <strong>En Mantenimiento</strong>; al cerrar el último vuelve a servicio.
+                </p>
+            </div>
+            <div class="ax-hero-actions">
+                <a href="{% url 'activos:activo-list' %}?estado=EM" class="btn-pastel btn-pastel--glass">
+                    Equipos fuera de servicio
+                </a>
+                <a href="{% url 'mantenimientos:mantenimiento-create' %}" class="btn-pastel btn-pastel--cta">
+                    Registrar mantenimiento
+                </a>
             </div>
         </div>
+    </header>
 
-        <hr class="linea" style="border-color: #32407b;">
+    {# ===================================================================== #}
+    {#  Indicadores                                                          #}
+    {# ===================================================================== #}
+    <section class="ax-kpis" aria-label="Resumen de mantenimientos" data-ax-stagger="4">
+        <div class="ax-kpi ax-kpi--mantenimiento">
+            <span class="ax-kpi-head">
+                <span class="ax-kpi-label">Abiertos</span>
+                <span class="ax-kpi-icon"><i class="bi bi-hourglass-split"></i></span>
+            </span>
+            <span class="ax-kpi-value"><span class="ax-count" data-value="{{ resumen.en_proceso }}">0</span></span>
+            <span class="ax-kpi-meter"><span style="width:{{ resumen.en_proceso|porcentaje_css:resumen.total }}%"></span></span>
+            <span class="ax-kpi-foot">
+                <span>Equipos fuera de servicio</span>
+                <span class="ax-kpi-share">{{ resumen.en_proceso|porcentaje:resumen.total }}%</span>
+            </span>
+        </div>
 
-        <!-- Filtros -->
-        <div class="filter-container mb-4">
-            <form method="get" id="filterForm" class="row g-3">
-                <div class="col-md-3">
-                    <label for="id_estado" class="form-label"><i class="bi bi-flag"></i> Estado</label>
-                    {{ filter_form.estado }}
+        <div class="ax-kpi ax-kpi--disponible">
+            <span class="ax-kpi-head">
+                <span class="ax-kpi-label">Finalizados</span>
+                <span class="ax-kpi-icon"><i class="bi bi-check2-circle"></i></span>
+            </span>
+            <span class="ax-kpi-value"><span class="ax-count" data-value="{{ resumen.finalizados }}">0</span></span>
+            <span class="ax-kpi-meter"><span style="width:{{ resumen.finalizados|porcentaje_css:resumen.total }}%"></span></span>
+            <span class="ax-kpi-foot">
+                <span>Cerrados</span>
+                <span class="ax-kpi-share">{{ resumen.finalizados|porcentaje:resumen.total }}%</span>
+            </span>
+        </div>
+
+        <div class="ax-kpi ax-kpi--asignado">
+            <span class="ax-kpi-head">
+                <span class="ax-kpi-label">Gasto del período</span>
+                <span class="ax-kpi-icon"><i class="bi bi-cash-stack"></i></span>
+            </span>
+            <span class="ax-kpi-value">
+                <span class="ax-kpi-unit">$</span>{{ costo_finalizado|floatformat:2 }}
+            </span>
+            <span class="ax-kpi-meter"><span style="width:100%"></span></span>
+            <span class="ax-kpi-foot"><span>Solo mantenimientos finalizados</span></span>
+        </div>
+
+        <div class="ax-kpi ax-kpi--total">
+            <span class="ax-kpi-head">
+                <span class="ax-kpi-label">Comprometido</span>
+                <span class="ax-kpi-icon"><i class="bi bi-hourglass"></i></span>
+            </span>
+            <span class="ax-kpi-value">
+                <span class="ax-kpi-unit">$</span>{{ costo_en_proceso|floatformat:2 }}
+            </span>
+            <span class="ax-kpi-meter"><span style="width:{{ costo_en_proceso|porcentaje_css:costo_total }}%"></span></span>
+            <span class="ax-kpi-foot"><span>Aún sin cerrar</span></span>
+        </div>
+    </section>
+
+    {# ===================================================================== #}
+    {#  Búsqueda y filtros                                                   #}
+    {# ===================================================================== #}
+    <section class="ax-card mb-3">
+        <div class="ax-card-body">
+            <form method="get" role="search">
+                <div class="ax-searchbar mb-3">
+                    <i class="bi bi-search" aria-hidden="true"></i>
+                    <input type="search" name="buscar" data-ax-buscar
+                           value="{{ request.GET.buscar|default:'' }}"
+                           placeholder="Técnico, descripción o código de inventario…"
+                           aria-label="Buscar mantenimientos">
+                    <kbd class="ax-kbd d-none d-md-inline">/</kbd>
+                    <button type="submit" class="btn-pastel btn-pastel--lila btn-pastel--sm">Buscar</button>
                 </div>
-                <div class="col-md-3">
-                    <label for="id_activo" class="form-label"><i class="bi bi-box"></i> Activo</label>
-                    {{ filter_form.activo }}
-                </div>
-                <div class="col-md-2">
-                    <label for="id_mes" class="form-label"><i class="bi bi-calendar-month"></i> Mes</label>
-                    {{ filter_form.mes }}
-                </div>
-                <div class="col-md-2">
-                    <label for="id_año" class="form-label"><i class="bi bi-calendar"></i> Año</label>
-                    {{ filter_form.año }}
-                </div>
-                <div class="col-md-2">
-                    <label for="id_buscar" class="form-label"><i class="bi bi-search"></i> Buscar</label>
-                    {{ filter_form.buscar }}
-                </div>
-                <div class="col-md-12 d-flex gap-2">
-                    <button type="submit" class="btn btn-custom">
-                        <i class="bi bi-funnel"></i> Filtrar
-                    </button>
-                    <a href="{% url 'mantenimientos:mantenimiento-list' %}" class="btn btn-secondary">
-                        <i class="bi bi-x-circle"></i> Limpiar
+
+                <div class="ax-chips mb-3" role="group" aria-label="Filtrar por estado">
+                    <a href="{% query_params estado='' %}" class="ax-chip ax-chip--todos {% filtro_activo 'estado' '' %}">
+                        Todos <span class="ax-chip-count">{{ resumen.total }}</span>
                     </a>
-                    <a href="{% url 'mantenimientos:mantenimiento-create' %}" class="btn btn-custom ms-auto">
-                        <i class="bi bi-plus-circle"></i> Nuevo Mantenimiento
+                    <a href="{% query_params estado='EP' %}" class="ax-chip ax-chip--mantenimiento {% filtro_activo 'estado' 'EP' %}">
+                        <i class="bi bi-hourglass-split"></i> En proceso
+                        <span class="ax-chip-count">{{ resumen.en_proceso }}</span>
                     </a>
+                    <a href="{% query_params estado='FI' %}" class="ax-chip ax-chip--disponible {% filtro_activo 'estado' 'FI' %}">
+                        <i class="bi bi-check2-circle"></i> Finalizados
+                        <span class="ax-chip-count">{{ resumen.finalizados }}</span>
+                    </a>
+                </div>
+
+                <div class="row g-3 ax-form">
+                    <div class="col-md-5">
+                        <label class="form-label" for="{{ filter_form.activo.id_for_label }}">Activo</label>
+                        {{ filter_form.activo }}
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" for="{{ filter_form.mes.id_for_label }}">Mes</label>
+                        {{ filter_form.mes }}
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label" for="{{ filter_form.año.id_for_label }}">Año</label>
+                        {{ filter_form.año }}
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end gap-2">
+                        <button type="submit" class="btn-pastel btn-pastel--lila btn-pastel--sm flex-grow-1">
+                            Aplicar
+                        </button>
+                        <a href="{% url 'mantenimientos:mantenimiento-list' %}"
+                           class="btn-pastel btn-pastel--neutro btn-pastel--icon" title="Limpiar filtros">
+                            <i class="bi bi-arrow-counterclockwise"></i>
+                        </a>
+                    </div>
                 </div>
             </form>
         </div>
+    </section>
 
-        <!-- Tabla de Mantenimientos -->
-        <div class="table-responsive">
-            <table class="table table-hover table-striped">
-                <thead class="bgcolor text-white">
+    {# ===================================================================== #}
+    {#  Listado                                                              #}
+    {# ===================================================================== #}
+    <section class="ax-card">
+        <div class="ax-card-head">
+            <h2 class="ax-card-title">
+                Resultados
+                <span class="ax-tag ms-1">{{ resumen.total }}</span>
+            </h2>
+            <span class="ax-kpi-label mb-0">
+                Gasto acumulado del filtro: <strong>${{ costo_total|floatformat:2 }}</strong>
+            </span>
+        </div>
+
+        {% if mantenimientos %}
+        <div class="ax-table-wrap">
+            <table class="ax-table">
+                <thead>
                     <tr>
-                        <th>Fecha</th>
-                        <th>Activo</th>
-                        <th>Técnico</th>
-                        <th>Teléfono</th>
-                        <th>Descripción</th>
-                        <th>Costo</th>
-                        <th>Estado</th>
-                        <th>Acciones</th>
+                        <th scope="col">Activo</th>
+                        <th scope="col">Técnico</th>
+                        <th scope="col">Fecha</th>
+                        <th scope="col" class="text-end">Costo</th>
+                        <th scope="col">Estado</th>
+                        <th scope="col" class="ax-col-tight text-end">
+                            <span class="visually-hidden">Acciones</span>
+                        </th>
                     </tr>
                 </thead>
-                <tbody>
-                    {% for mantenimiento in mantenimientos %}
+                <tbody data-ax-stagger="30">
+                    {% for m in mantenimientos %}
                     <tr>
-                        <td>{{ mantenimiento.fecha|date:"d/m/Y" }}</td>
-                        <td>
-                            <a href="{% url 'activos:activo-detail' mantenimiento.activo.pk %}" class="link-info">
-                                {{ mantenimiento.activo.codigo_inventario }}
-                            </a>
-                        </td>
-                        <td>{{ mantenimiento.tecnico }}</td>
-                        <td>{{ mantenimiento.telefono }}</td>
-                        <td>{{ mantenimiento.descripcion|truncatewords:10 }}</td>
-                        <td>${{ mantenimiento.costo|floatformat:2 }}</td>
-                        <td>
-                            {% if mantenimiento.estado == 'EP' %}
-                                <span class="badge bg-warning text-dark">
-                                    <i class="bi bi-hourglass-split"></i> En Proceso
+                        <td data-label="Activo">
+                            <div class="ax-equipo">
+                                <span class="ax-type" aria-hidden="true">
+                                    <i class="bi {{ m.activo|icono_activo }}"></i>
                                 </span>
-                            {% else %}
-                                <span class="badge bg-success">
-                                    <i class="bi bi-check-circle"></i> Finalizado
-                                </span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            <div class="btn-group btn-group-sm" role="group">
-                                <a href="{% url 'mantenimientos:mantenimiento-detail' mantenimiento.pk %}" 
-                                   class="btn btn-outline-primary" title="Ver detalle">
-                                    <i class="bi bi-eye"></i>
-                                </a>
-                                {% if mantenimiento.estado == 'EP' %}
-                                <a href="{% url 'mantenimientos:mantenimiento-finalizar' mantenimiento.pk %}" 
-                                   class="btn btn-outline-success" 
-                                   title="Finalizar mantenimiento"
-                                   onclick="return confirm('¿Finalizar este mantenimiento? Se aplicará el costo de ${{ mantenimiento.costo|floatformat:2 }}');">
-                                    <i class="bi bi-check-circle"></i>
-                                </a>
-                                {% endif %}
-                                <a href="{% url 'mantenimientos:mantenimiento-update' mantenimiento.pk %}" 
-                                   class="btn btn-outline-secondary" title="Editar">
-                                    <i class="bi bi-pencil"></i>
-                                </a>
+                                <div class="ax-min0">
+                                    <a href="{% url 'activos:activo-detail' m.activo.pk %}" class="ax-code">
+                                        {{ m.activo.codigo_inventario }}
+                                    </a>
+                                    <div class="ax-equipo-sub">{{ m.activo.marca }} {{ m.activo.modelo }}</div>
+                                </div>
                             </div>
                         </td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="8" class="text-center text-muted py-4">
-                            <i class="bi bi-inbox" style="font-size: 3rem;"></i>
-                            <p class="mt-2">No se encontraron mantenimientos.</p>
-                            <a href="{% url 'mantenimientos:mantenimiento-create' %}" class="btn btn-custom">
-                                <i class="bi bi-plus-circle"></i> Crear Primer Mantenimiento
-                            </a>
+                        <td data-label="Técnico">
+                            <div class="ax-equipo-main">{{ m.tecnico }}</div>
+                            {% if m.telefono %}
+                            <div class="ax-equipo-sub">{{ m.telefono }}</div>
+                            {% endif %}
+                        </td>
+                        <td data-label="Fecha">{{ m.fecha|date:"d/m/Y" }}</td>
+                        <td data-label="Costo" class="text-end ax-mono">${{ m.costo|floatformat:2 }}</td>
+                        <td data-label="Estado">
+                            {% if m.estado == 'EP' %}
+                            <span class="ax-estado ax-estado--mantenimiento">
+                                <span class="ax-estado-dot"></span>
+                                <i class="bi bi-hourglass-split"></i> En proceso
+                            </span>
+                            {% else %}
+                            <span class="ax-estado ax-estado--disponible">
+                                <span class="ax-estado-dot"></span>
+                                <i class="bi bi-check-circle"></i> Finalizado
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end ax-col-tight" data-label="Acciones">
+                            <div class="ax-row-actions justify-content-end">
+                                {% if m.estado == 'EP' %}
+                                {# POST: cambia el estado del mantenimiento y devuelve el activo a servicio #}
+                                <form method="post" action="{% url 'mantenimientos:mantenimiento-finalizar' m.pk %}"
+                                      class="d-inline">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                    <button type="submit" class="btn-pastel btn-pastel--menta btn-pastel--icon"
+                                            title="Finalizar y devolver el equipo a servicio">
+                                        <i class="bi bi-check2"></i>
+                                        <span class="visually-hidden">Finalizar mantenimiento</span>
+                                    </button>
+                                </form>
+                                {% endif %}
+                                <a href="{% url 'mantenimientos:mantenimiento-detail' m.pk %}"
+                                   class="btn-pastel btn-pastel--cielo btn-pastel--icon" title="Ver detalle">
+                                    <i class="bi bi-eye"></i>
+                                    <span class="visually-hidden">Ver detalle</span>
+                                </a>
+                                <a href="{% url 'mantenimientos:mantenimiento-update' m.pk %}"
+                                   class="btn-pastel btn-pastel--lila btn-pastel--icon" title="Editar">
+                                    <i class="bi bi-pencil"></i>
+                                    <span class="visually-hidden">Editar</span>
+                                </a>
+                            </div>
                         </td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
+        {% else %}
+        <div class="ax-empty">
+            <div class="ax-empty-icon"><i class="bi bi-tools"></i></div>
+            {% if hay_filtros %}
+            <h3>Ningún mantenimiento coincide con estos filtros</h3>
+            <p>Prueba con otro término o vuelve a ver el historial completo.</p>
+            <a href="{% url 'mantenimientos:mantenimiento-list' %}" class="btn-pastel btn-pastel--lila">
+                Limpiar filtros
+            </a>
+            {% else %}
+            <h3>Todavía no hay mantenimientos registrados</h3>
+            <p>Al registrar uno, el equipo pasa automáticamente a <em>En Mantenimiento</em>.</p>
+            <a href="{% url 'mantenimientos:mantenimiento-create' %}" class="btn-pastel btn-pastel--cta">
+                Registrar el primero
+            </a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </section>
 
-        <!-- Dashboard de Costos -->
-        <div class="mt-4 mb-4">
-            <h5 class="mb-3" style="color: #32407b;"><i class="bi bi-cash-stack"></i> Resumen de Costos</h5>
-            
-            <div class="row g-3 mb-3">
-                <!-- Costos del período filtrado -->
-                <div class="col-md-6">
-                    <div class="info-card">
-                        <h6 style="color: var(--e-global-color-moradopaldaca);">
-                            <i class="bi bi-funnel"></i> Costos del Filtro Actual
-                        </h6>
-                        <hr>
-                        <div class="d-flex justify-content-between mb-2">
-                            <span><i class="bi bi-hourglass-split text-warning"></i> En Proceso:</span>
-                            <strong>${{ costo_en_proceso|floatformat:2 }}</strong>
-                        </div>
-                        <div class="d-flex justify-content-between mb-2">
-                            <span><i class="bi bi-check-circle text-success"></i> Finalizados:</span>
-                            <strong>${{ costo_finalizado|floatformat:2 }}</strong>
-                        </div>
-                        <hr>
-                        <div class="d-flex justify-content-between">
-                            <strong>Total Filtrado:</strong>
-                            <strong class="text-primary">${{ costo_total|floatformat:2 }}</strong>
-                        </div>
-                    </div>
+    {% include 'activos/includes/_paginacion.html' %}
+
+    {# ===================================================================== #}
+    {#  Gasto global                                                         #}
+    {# ===================================================================== #}
+    <section class="ax-card mt-3">
+        <div class="ax-card-head"><h2 class="ax-card-title">Gasto histórico</h2></div>
+        <div class="ax-card-body">
+            <div class="ax-spec" data-ax-stagger="4">
+                <div class="ax-spec-item">
+                    <div class="ax-spec-label">Mes en curso</div>
+                    <div class="ax-spec-value ax-mono">${{ gastos_mes_actual|floatformat:2 }}</div>
                 </div>
-
-                <!-- Estadísticas temporales -->
-                <div class="col-md-6">
-                    <div class="info-card">
-                        <h6 style="color: var(--e-global-color-moradopaldaca);">
-                            <i class="bi bi-calendar-check"></i> Gastos Reales (Solo Finalizados)
-                        </h6>
-                        <hr>
-                        <div class="d-flex justify-content-between mb-2">
-                            <span><i class="bi bi-calendar-month text-info"></i> Gastos este mes:</span>
-                            <strong class="text-info">${{ gastos_mes_actual|floatformat:2 }}</strong>
-                        </div>
-                        <div class="d-flex justify-content-between mb-2">
-                            <span><i class="bi bi-calendar text-primary"></i> Total anual:</span>
-                            <strong class="text-primary">${{ gastos_año_actual|floatformat:2 }}</strong>
-                        </div>
-                        <hr>
-                        <p class="mb-0 text-muted small">
-                            <i class="bi bi-info-circle"></i> Solo se cuentan mantenimientos finalizados. 
-                            Los costos "En Proceso" son estimaciones.
-                        </p>
-                    </div>
+                <div class="ax-spec-item">
+                    <div class="ax-spec-label">Año en curso</div>
+                    <div class="ax-spec-value ax-mono">${{ gastos_año_actual|floatformat:2 }}</div>
                 </div>
             </div>
+            <small class="ax-hint">
+                <i class="bi bi-info-circle"></i>
+                Solo cuentan los mantenimientos finalizados: lo que está en proceso
+                todavía puede cambiar de costo.
+            </small>
         </div>
-
-        <hr class="linea" style="border-color: #32407b;">
-
-        <!-- Paginación -->
-        {% if is_paginated %}
-        <nav aria-label="Paginación" class="pagination-container">
-            <ul class="pagination justify-content-center">
-                {% if page_obj.has_previous %}
-                <li class="page-item">
-                    <a class="page-link" href="?page=1{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">Primera</a>
-                </li>
-                <li class="page-item">
-                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">Anterior</a>
-                </li>
-                {% endif %}
-                
-                <li class="page-item active">
-                    <span class="page-link">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
-                </li>
-                
-                {% if page_obj.has_next %}
-                <li class="page-item">
-                    <a class="page-link" href="?page={{ page_obj.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">Siguiente</a>
-                </li>
-                <li class="page-item">
-                    <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">Última</a>
-                </li>
-                {% endif %}
-            </ul>
-        </nav>
-        {% endif %}
-    </div>
+    </section>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/activos-ui.js' %}"></script>
 {% endblock %}
