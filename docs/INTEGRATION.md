@@ -303,7 +303,45 @@ Según `docs/guia-integracion-programas-satelite.md` y seeds:
 | Codigos | `codigos` | `codigos_` |
 | **Activos** | **`activos`** | **`activos_`** |
 
-Puerto dev sugerido Activos: **8004** (guía interna; no enforced en código).
+Puerto oficial Activos (Suite): **8001** — fuente: `Portal-Paldaca/frontend/.env.development`
+(`VITE_SATELLITE_ACTIVOS_URL`). README local puede usar `8000` por defecto de Django;
+para SSO multi-app usar **8001**.
+
+---
+
+## Gaps de sincronización `core` (verificado 2026-08-03)
+
+| Ítem | Estado en Activos |
+|------|-------------------|
+| Migraciones `core` presentes | `0001` … `0010` únicamente |
+| Migración `0011` (`calidad_*`) | **Ausente** |
+| Migración `0013` (campos timesheet HDT) | **Ausente** |
+| Modelos `Role` / `UserRole` / `GoogleDriveToken` | **Ausentes** en `core/models.py` |
+| Campos timesheet en `UsuarioPaldaca` | **Ausentes** |
+
+**Implicación:** la copia de `core` en Activos **diverge** del Portal/HDT/Códigos/Calidad.
+Si Activos ejecuta `migrate` contra la BD compartida donde Portal ya aplicó `0011`/`0013`,
+Django reportará historial inconsistente o no aplicará cambios; si Portal aún no migró
+esas revisiones y Activos no las tiene, Activos no puede crear esas tablas.
+**Acción requerida:** sincronizar `core/migrations/` y `core/models.py` desde Portal.
+
+### Ciclo de vida de sesión (Activos)
+
+`SSAPI/settings.py` **no define** `SESSION_COOKIE_AGE`, `SESSION_EXPIRE_AT_BROWSER_CLOSE`
+ni `SESSION_SAVE_EVERY_REQUEST` → aplica defaults Django (**2 semanas**, cookie sobrevive
+al cierre del navegador). Sobre la misma cookie/`django_session` que el Portal (8 h,
+expira al cerrar), esto **diverge** y puede alargar sesiones emitidas/renovadas desde Activos.
+
+### Locale
+
+`LANGUAGE_CODE = es-es`, `TIME_ZONE = America/Caracas` (`SSAPI/settings.py`).
+
+### Colisión potencial `django_migrations`
+
+Apps `usuarios` y `reportes` usan labels por defecto `usuarios` / `reportes` (igual que HDT).
+En una BD compartida, `django_migrations.app` no distingue repositorio: migraciones de
+ambas apps pueden colisionar por nombre. **Riesgo verificado a nivel de labels; no se
+inspeccionó el contenido de `django_migrations` en producción.**
 
 ---
 
@@ -311,10 +349,11 @@ Puerto dev sugerido Activos: **8004** (guía interna; no enforced en código).
 
 1. Copiar/sincronizar `key.env` desde Portal-Paldaca.
 2. Verificar `MYSQL_*` apunta a la misma BD.
-3. Ejecutar `migrate` (aplica `core` + `activos_*`).
-4. Asignar módulo `activos` al usuario en admin (`core_usuario_modulo`).
-5. Login en Portal → abrir Activos sin re-autenticación.
-6. Confirmar nav carga desde Portal (`paldaca-nav.js` sin errores de red).
+3. **Sincronizar `core/` con Portal** (incluir migraciones hasta la última del Portal).
+4. Ejecutar `migrate` (aplica `core` + `activos_*`).
+5. Asignar módulo `activos` al usuario en admin (`core_usuario_modulo`).
+6. Login en Portal → abrir Activos en `:8001` sin re-autenticación.
+7. Confirmar nav carga desde Portal (`/static/paldaca-nav.js` sin errores de red).
 
 ---
 

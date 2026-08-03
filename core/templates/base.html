@@ -11,10 +11,17 @@
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{% static 'core/css/core.css' %}">
 
+    {# Dentro del shell del Portal: neutraliza el hueco del sidebar propio y
+       abre el canal postMessage. Va en <head> para que se aplique antes del
+       primer paint y el contenido no parpadee desplazado. #}
+    {% if paldaca_embedded %}{% include "includes/paldaca_embed.html" %}{% endif %}
+
     {% block extra_css %}{% endblock %}
 </head>
 <body class="app-layout {% block body_extra_class %}{% endblock %}">
-    {% if user.is_authenticated %}
+    {# Embebido, el sidebar y la topbar los pone el shell: montar el nav aqui
+       duplicaria la navegacion dentro del area de trabajo. #}
+    {% if user.is_authenticated and not paldaca_embedded %}
     {% include "includes/paldaca_nav.html" %}
     {% endif %}
 

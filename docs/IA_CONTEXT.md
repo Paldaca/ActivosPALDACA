@@ -142,9 +142,11 @@ key.env.example            # Plantilla env SSO
 3. Rol administrador no enforced en vistas Activos
 4. `ReporteGenerado` no persistido al generar PDF
 5. Alta usuario en Activos no crea `UsuarioModulo` → puede quedar sin acceso
-6. Migraciones `core` deben stay synced con Portal-Paldaca
+6. Migraciones `core` deben stay synced con Portal-Paldaca (**hoy Activos solo tiene hasta `0010`; faltan `0011`/`0013`**)
 7. `base.js` referencia `/ia/chat/api/` inexistente en urls
 8. `seed_core_modulos` vs migración `0006` — catálogo módulos puede diferir
+9. Sesión: configurar AGE/EXPIRE/SAVE alineados al Portal (hoy defaults Django)
+10. Puerto oficial Suite: **8001** (no 8004)
 
 ---
 
@@ -155,7 +157,7 @@ python manage.py migrate
 python manage.py seed_core_modulos
 python manage.py seed_activos_pal          # datos demo
 pytest                                      # SSAPI/settings_test
-python manage.py runserver 8004            # puerto dev sugerido
+python manage.py runserver 8001            # puerto oficial Suite (Portal .env.development)
 ```
 
 ---

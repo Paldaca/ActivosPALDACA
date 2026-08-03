@@ -3,6 +3,7 @@ from django.contrib.auth import get_user_model
 from django.http import HttpResponseServerError, JsonResponse
 from django.shortcuts import redirect
 
+from .embed import embed_signal_response, is_embedded
 from .session_logout import apply_paldaca_cookie_clearance, close_paldaca_session
 from django.template.loader import render_to_string
 from django.utils.deprecation import MiddlewareMixin
@@ -80,6 +81,15 @@ class PaldacaSessionMiddleware:
                 status=401,
             )
             return apply_paldaca_cookie_clearance(response)
+
+        # Dentro del shell, un redirect al login navegaria el propio iframe y el
+        # usuario veria el formulario de login incrustado en el area de trabajo,
+        # con el sidebar del Portal alrededor y sin forma de completar el flujo.
+        # Se avisa al shell y que sea el quien saque al usuario.
+        if is_embedded(request):
+            response = embed_signal_response(request, "session-expired")
+            return apply_paldaca_cookie_clearance(response)
+
         response = redirect(login_url)
         return apply_paldaca_cookie_clearance(response)
 
@@ -158,9 +168,12 @@ class SecurityHeadersMiddleware(MiddlewareMixin):
     """
     
     def process_response(self, request, response):
-        # Prevenir clickjacking
-        response['X-Frame-Options'] = 'DENY'
-        
+        # X-Frame-Options ya no se fija aqui. Este modulo se embebe en el shell
+        # del Portal (cpaldaca.com/activos), y 'DENY' lo impedia; ademas la
+        # cabecera no admite lista de origenes. El control de framing lo hace
+        # core.embed.PaldacaEmbedMiddleware con CSP frame-ancestors, que
+        # restringe el enmarcado al Portal y es mas estricto que no tener nada.
+
         # Prevenir MIME type sniffing
         response['X-Content-Type-Options'] = 'nosniff'
         

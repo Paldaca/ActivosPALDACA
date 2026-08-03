@@ -35,7 +35,7 @@ No es el portal de login ni la API central de autenticación. Depende de **Porta
 ┌──────────────────────────────────────────────────────────────────┐
 │                    ActivosPALDACA (SSAPI)                         │
 │  Django 5.2.7 · Server-rendered (CBV + templates Bootstrap 5)    │
-│  Puerto dev sugerido: 8004 (según guía interna)                │
+│  Puerto oficial Suite: 8001 (Portal .env.development)          │
 ├──────────────────────────────────────────────────────────────────┤
 │  Middleware: PaldacaSessionMiddleware · ErrorHandling · Security │
 │  AUTH_USER_MODEL = core.UsuarioPaldaca                           │

@@ -70,9 +70,17 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    # Despues de Authentication (necesita request.user) y ANTES de
+    # PaldacaSessionMiddleware (que puede cortocircuitar y necesita saber si la
+    # peticion viene embebida). Su fase de respuesta corre despues de todos los
+    # de abajo, asi que tiene la ultima palabra sobre las cabeceras de framing.
+    'core.embed.PaldacaEmbedMiddleware',
     'core.middleware.PaldacaSessionMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    # XFrameOptionsMiddleware retirado: emitia X-Frame-Options: DENY (default de
+    # Django al no definir X_FRAME_OPTIONS), lo que impide embeber el modulo en
+    # el shell del Portal. El control de framing lo hace ahora PaldacaEmbedMiddleware
+    # con CSP frame-ancestors, que si admite lista de origenes.
     'core.middleware.ErrorHandlingMiddleware',
     'core.middleware.SecurityHeadersMiddleware',
 ]
@@ -144,6 +152,42 @@ PALDACA_STRICT_SESSION_CONSISTENCY = os.getenv(
     "PALDACA_STRICT_SESSION_CONSISTENCY",
     "true",
 )
+
+# --- Portal unificado: este modulo embebido en el shell ---------------------
+# Codigo de modulo de la Suite. Lo lee core/embed.py para que ese fichero sea
+# copiable sin cambios a Calidad, Codigos y HojadeTiempo.
+PALDACA_MODULO_CODIGO = "activos"
+
+# Origen del shell. Debe coincidir EXACTAMENTE con el origen desde el que se
+# sirve el SPA: es el targetOrigin de postMessage y el que valida el Portal.
+PALDACA_PORTAL_URL = (
+    (os.getenv("PALDACA_PORTAL_URL") or "").strip().rstrip("/")
+    or ("http://localhost:5173" if _dev_env.exists() else "https://cpaldaca.com")
+)
+
+# Ruta del modulo dentro del shell: cpaldaca.com/activos/<ruta del satelite>.
+PALDACA_SHELL_PATH = os.getenv("PALDACA_SHELL_PATH", "/activos")
+
+# Quien puede enmarcar este satelite. Sustituye a X-Frame-Options, que no
+# admite lista de origenes (SAMEORIGIN no vale: son origenes distintos).
+_frame_ancestors = ["'self'", PALDACA_PORTAL_URL]
+if _dev_env.exists():
+    _frame_ancestors += ["http://localhost:5173", "http://127.0.0.1:5173"]
+else:
+    _frame_ancestors += ["https://cpaldaca.com", "https://www.cpaldaca.com"]
+PALDACA_FRAME_ANCESTORS = os.getenv(
+    "PALDACA_FRAME_ANCESTORS",
+    " ".join(dict.fromkeys(a for a in _frame_ancestors if a)),
+)
+
+# Redirige activos.cpaldaca.com/<ruta> -> cpaldaca.com/activos/<ruta> cuando la
+# navegacion es top-level. Refuerza la percepcion de aplicacion unica y hace que
+# los marcadores antiguos sigan funcionando. Valvula de escape para depurar el
+# satelite suelto: ?paldaca_standalone=1
+PALDACA_EMBED_REDIRECT_TO_SHELL = os.getenv(
+    "PALDACA_EMBED_REDIRECT_TO_SHELL",
+    "false",
+).lower() == "true"
 SESSION_COOKIE_NAME = os.getenv("SESSION_COOKIE_NAME", "paldaca_sessionid")
 _raw_cookie_domain = (os.getenv("SESSION_COOKIE_DOMAIN") or "").strip()
 SESSION_COOKIE_DOMAIN = (

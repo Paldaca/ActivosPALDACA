@@ -1,0 +1,120 @@
+{# ==========================================================================
+   paldaca_embed.html — emisor del contrato `paldaca-embed` v1.
+
+   Se incluye SOLO cuando el satelite se sirve dentro del shell del Portal
+   (`paldaca_embedded`, ver core/embed.py). En ese caso NO se incluye
+   paldaca_nav.html: el sidebar y la topbar los pone el shell.
+
+   Va en el <head> a proposito: la clase del <html> y la hoja de estilos deben
+   aplicarse antes del primer paint, o el contenido parpadearia desplazado por
+   los margenes que este satelite reserva para su sidebar propio.
+
+   Contraparte en el Portal:
+   frontend/src/components/module-frame/protocol.ts
+   ========================================================================== #}
+<link rel="stylesheet" href="{{ paldaca_embed_css }}">
+<script>
+  (function () {
+    "use strict";
+
+    var PORTAL_ORIGIN = "{{ paldaca_nav_portal_url|escapejs }}";
+    var APP = "{{ paldaca_nav_current_app|escapejs }}";
+
+    // Red de seguridad puramente visual: si por lo que sea el servidor nos
+    // marco como embebidos pero no lo estamos, no tocamos nada.
+    if (window.self === window.top) return;
+    document.documentElement.classList.add("paldaca-embedded");
+
+    function send(payload) {
+      try {
+        window.parent.postMessage(
+          Object.assign({ v: 1, source: "paldaca-embed", app: APP }, payload),
+          PORTAL_ORIGIN
+        );
+      } catch (e) {
+        /* El shell no esta alcanzable: nada que avisar. */
+      }
+    }
+
+    function currentPath() {
+      return window.location.pathname + window.location.search + window.location.hash;
+    }
+
+    // El shell trata `ready` como "documento listo" y ademas sincroniza la URL
+    // con `path`. En una app Django clasica cada navegacion es un documento
+    // nuevo, asi que `ready` cubre tambien lo que en una SPA seria `navigate`.
+    function sendReady() {
+      send({ type: "ready", path: currentPath(), title: document.title });
+    }
+
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", sendReady, { once: true });
+    } else {
+      sendReady();
+    }
+
+    // --- Aviso anticipado de navegacion ------------------------------------
+    // Sin esto el overlay solo aparece cuando el shell detecta el documento
+    // nuevo, es decir despues de que el servidor responda: el usuario ve la
+    // pagina vieja congelada. Avisando en el clic, el spinner sale al instante
+    // y la navegacion dentro del modulo se siente como una SPA.
+    // Si tras avisar no llega a haber navegacion, hay que desdecirse: una
+    // descarga (los PDF de reportes y la nota de entrega salen con
+    // Content-Disposition) NO reemplaza el documento, asi que el shell nunca
+    // recibiria el `ready` del documento nuevo y dejaria el overlay colgado
+    // hasta el timeout, mostrando un error que no existe. Si la navegacion si
+    // ocurre, este temporizador muere con el documento.
+    var CANCEL_LOADING_MS = 8000;
+    var notified = false;
+    function notifyLoading() {
+      if (notified) return;
+      notified = true;
+      send({ type: "loading" });
+      window.setTimeout(function () {
+        notified = false;
+        sendReady();
+      }, CANCEL_LOADING_MS);
+    }
+
+    document.addEventListener(
+      "click",
+      function (event) {
+        if (event.defaultPrevented) return;
+        // Clic con modificador o con boton central: abre en otra pestana.
+        if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+
+        var link = event.target && event.target.closest ? event.target.closest("a") : null;
+        if (!link || !link.href) return;
+        if (link.target && link.target !== "_self") return;
+        if (link.hasAttribute("download")) return;
+
+        var url;
+        try {
+          url = new URL(link.href, window.location.href);
+        } catch (e) {
+          return;
+        }
+        if (url.origin !== window.location.origin) return;
+        // Ancla dentro de la misma pagina: no hay carga que anunciar.
+        if (url.pathname === window.location.pathname && url.search === window.location.search && url.hash) return;
+        if (url.protocol !== "http:" && url.protocol !== "https:") return;
+
+        notifyLoading();
+      },
+      true
+    );
+
+    document.addEventListener(
+      "submit",
+      function (event) {
+        if (event.defaultPrevented) return;
+        notifyLoading();
+      },
+      true
+    );
+
+    // Respaldo: cubre navegaciones que no pasan por un clic ni un submit
+    // (redirects de JS, window.location.href = ...).
+    window.addEventListener("beforeunload", notifyLoading);
+  })();
+</script>
