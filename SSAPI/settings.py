@@ -39,7 +39,11 @@ if not SECRET_KEY:
     )
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv("DJANGO_DEBUG", "true").lower() == "true"
+# Sin DJANGO_DEBUG: true solo si hay dev.env (local); en servidor queda false.
+DEBUG = os.getenv(
+    "DJANGO_DEBUG",
+    "true" if _dev_env.exists() else "false",
+).lower() == "true"
 
 ALLOWED_HOSTS = ['activos.cpaldaca.com', 'www.activos.cpaldaca.com', 'localhost', '127.0.0.1']
 
