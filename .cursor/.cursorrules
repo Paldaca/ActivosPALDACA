@@ -1,0 +1,70 @@
+# ActivosPALDACA — reglas para Cursor
+
+## Obligatorio antes de escribir código
+
+1. Leer **`docs/IA_CONTEXT.md`**.
+2. Según la tarea, consultar:
+   - `docs/ARCHITECTURE.md`
+   - `docs/BUSINESS_RULES.md`
+   - `docs/INTEGRATION.md`
+3. Solo después, explorar el código afectado e implementar.
+
+### Orden de lectura por tipo de tarea
+
+| Tarea | Leer primero |
+|-------|----------------|
+| CRUD activos / historial | `IA_CONTEXT` → `BUSINESS_RULES` → `activos/` |
+| Mantenimientos | `IA_CONTEXT` → `BUSINESS_RULES` → `mantenimientos/` |
+| SSO / nav Portal | `INTEGRATION` → `core/middleware.py`, context processors |
+| Usuarios UI | `BUSINESS_RULES` → `usuarios/` |
+
+---
+
+## Qué es este repositorio
+
+Satélite **Gestión de Activos** de PALDACA Suite (`MODULO_CODIGO = activos`). Django server-rendered en `activos.cpaldaca.com`. Inventario, asignaciones, mantenimientos, PDFs. El login está en **Portal-Paldaca** (SSO).
+
+Proyecto Django: **`SSAPI/`**. Apps: `core`, `activos`, `mantenimientos`, `reportes`, `usuarios`.
+
+---
+
+## Reglas duras
+
+- No implementar login local; SSO con cookie `paldaca_sessionid`.
+- No duplicar ni alterar migraciones `core_*` sin alinear con Portal.
+- Tablas de negocio con prefijo **`activos_`**.
+- Misma `DJANGO_SECRET_KEY` y MySQL que Portal.
+- Respetar `docs/BUSINESS_RULES.md` (p. ej. superusuarios no reciben activos).
+- Gate: `tiene_acceso_modulo("activos")` / `@requiere_modulo_paldaca`.
+- No inventar APIs REST hacia otros satélites; integración por BD + SSO + nav.
+- Toda afirmación de negocio debe basarse en código o en `docs/BUSINESS_RULES.md`.
+
+---
+
+## Identidad Suite
+
+- `AUTH_USER_MODEL = "core.UsuarioPaldaca"`
+- `PaldacaSessionMiddleware` tras `AuthenticationMiddleware`
+- Nav embebible desde Portal (`paldaca-nav.js/css`)
+- FK a usuario: siempre `settings.AUTH_USER_MODEL`
+
+---
+
+## Documentación de referencia
+
+| Archivo | Contenido |
+|---------|-----------|
+| `docs/IA_CONTEXT.md` | Contexto condensado (leer primero) |
+| `docs/ARCHITECTURE.md` | Arquitectura |
+| `docs/BUSINESS_RULES.md` | Reglas de negocio |
+| `docs/INTEGRATION.md` | Integración Suite |
+| `.claude/claude.md` | Misma política para Claude Code |
+
+---
+
+## Prioridad al sugerir cambios
+
+1. ¿Respeta SSO y `core` compartido?
+2. ¿Usa prefijo `activos_*`?
+3. ¿Cumple reglas de `BUSINESS_RULES.md`?
+4. ¿Es el cambio más pequeño correcto?
