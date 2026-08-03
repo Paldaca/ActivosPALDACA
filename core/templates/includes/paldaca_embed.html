@@ -1,17 +1,3 @@
-{# ==========================================================================
-   paldaca_embed.html — emisor del contrato `paldaca-embed` v1.
-
-   Se incluye SOLO cuando el satelite se sirve dentro del shell del Portal
-   (`paldaca_embedded`, ver core/embed.py). En ese caso NO se incluye
-   paldaca_nav.html: el sidebar y la topbar los pone el shell.
-
-   Va en el <head> a proposito: la clase del <html> y la hoja de estilos deben
-   aplicarse antes del primer paint, o el contenido parpadearia desplazado por
-   los margenes que este satelite reserva para su sidebar propio.
-
-   Contraparte en el Portal:
-   frontend/src/components/module-frame/protocol.ts
-   ========================================================================== #}
 <link rel="stylesheet" href="{{ paldaca_embed_css }}">
 <script>
   (function () {
