@@ -254,6 +254,55 @@ html { scroll-padding-bottom: 6rem; }
     z-index: 1080;
 }
 
+/* Menú Exportar: PDF / Excel */
+.ax-export-menu {
+    min-width: 16.5rem;
+    padding: .4rem;
+    border: 1px solid var(--ax-neutro-bd);
+    border-radius: var(--ax-r-md);
+}
+.ax-export-item {
+    display: flex !important;
+    align-items: center;
+    gap: .75rem;
+    padding: .65rem .75rem !important;
+    border-radius: var(--ax-r-sm);
+    white-space: normal;
+}
+.ax-export-item:hover { background: var(--ax-cielo) !important; }
+.ax-export-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.15rem;
+    height: 2.15rem;
+    border-radius: .55rem;
+    font-size: 1.1rem;
+    flex-shrink: 0;
+}
+.ax-export-icon--pdf {
+    background: #fde8e8;
+    color: #b42318;
+}
+.ax-export-icon--xls {
+    background: #e3f5e8;
+    color: #067647;
+}
+.ax-export-copy {
+    display: flex;
+    flex-direction: column;
+    gap: .1rem;
+    line-height: 1.25;
+}
+.ax-export-copy strong {
+    font-size: .9rem;
+    color: var(--ax-ink);
+}
+.ax-export-copy small {
+    font-size: .72rem;
+    color: var(--ax-ink-3);
+}
+
 /* Migas de pan */
 .ax-crumbs {
     display: flex;

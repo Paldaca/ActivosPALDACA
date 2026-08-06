@@ -254,7 +254,9 @@
             <a href="{% url 'mantenimientos:mantenimiento-list' %}" class="btn-pastel btn-pastel--durazno">Mantenimientos</a>
             <a href="{% url 'activos:categoria-list' %}" class="btn-pastel btn-pastel--neutro">Categorías</a>
             <a href="{% url 'activos:ubicacion-list' %}" class="btn-pastel btn-pastel--neutro">Ubicaciones</a>
-            <a href="{% url 'reportes:reporte-activos' %}" class="btn-pastel btn-pastel--cielo">Reporte PDF</a>
+            <a href="{% url 'activos:activo-list' %}" class="btn-pastel btn-pastel--cielo">
+                <i class="bi bi-download me-1"></i>Exportar inventario
+            </a>
         </div>
     </section>
 </div>

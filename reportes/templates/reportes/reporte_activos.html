@@ -142,7 +142,7 @@
 
     <!-- Título del reporte -->
     <div class="report-title">
-        📄 Reporte de Activos
+        Reporte de Activos
     </div>
 
     <!-- Información del reporte -->
@@ -197,7 +197,13 @@
                             {{ activo.get_estado_display }}
                         </span>
                     </td>
-                    <td>{{ activo.usuario_asignado|default:"Sin asignar" }}</td>
+                    <td>
+                        {% if activo.usuario_asignado %}
+                            {{ activo.usuario_asignado.first_name }} {{ activo.usuario_asignado.last_name }}
+                        {% else %}
+                            Sin asignar
+                        {% endif %}
+                    </td>
                     <td>{{ activo.observaciones|default:"-"|truncatewords:10 }}</td>
                 </tr>
                 {% endfor %}

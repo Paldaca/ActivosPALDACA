@@ -49,15 +49,40 @@
                     </ul>
                 </div>
 
-                <form method="get" action="{% url 'reportes:reporte-activos' %}" class="d-inline">
-                    {% for clave, valor in request.GET.items %}
-                    <input type="hidden" name="{{ clave }}" value="{{ valor }}">
-                    {% endfor %}
-                    <button type="submit" class="btn-pastel btn-pastel--glass"
-                            title="Exportar en PDF exactamente lo que estás viendo">
-                        <i class="bi bi-file-earmark-pdf"></i> PDF
+                <div class="dropdown ax-export">
+                    <button class="btn-pastel btn-pastel--cielo dropdown-toggle" type="button"
+                            data-bs-toggle="dropdown" data-bs-display="static"
+                            aria-expanded="false" aria-haspopup="true"
+                            title="Exportar el inventario con los filtros actuales">
+                        <i class="bi bi-download"></i> Exportar
                     </button>
-                </form>
+                    <ul class="dropdown-menu dropdown-menu-end shadow ax-export-menu">
+                        <li>
+                            <a class="dropdown-item ax-export-item"
+                               href="{% url 'reportes:reporte-activos' %}{% if request.GET %}?{{ request.GET.urlencode }}{% endif %}">
+                                <span class="ax-export-icon ax-export-icon--pdf">
+                                    <i class="bi bi-file-earmark-pdf-fill"></i>
+                                </span>
+                                <span class="ax-export-copy">
+                                    <strong>PDF</strong>
+                                    <small>Reporte imprimible del listado</small>
+                                </span>
+                            </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item ax-export-item"
+                               href="{% url 'reportes:reporte-activos-excel' %}{% if request.GET %}?{{ request.GET.urlencode }}{% endif %}">
+                                <span class="ax-export-icon ax-export-icon--xls">
+                                    <i class="bi bi-file-earmark-excel-fill"></i>
+                                </span>
+                                <span class="ax-export-copy">
+                                    <strong>Excel</strong>
+                                    <small>Hoja de cálculo editable (.xlsx)</small>
+                                </span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
 
                 <a href="{% url 'activos:activo-create' %}" class="btn-pastel btn-pastel--cta">
                     <i class="bi bi-plus-lg"></i> Nuevo activo
