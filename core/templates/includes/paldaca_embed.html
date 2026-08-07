@@ -90,7 +90,6 @@
     document.addEventListener(
       "click",
       function (event) {
-        if (event.defaultPrevented) return;
         // Clic con modificador o con boton central: abre en otra pestana.
         if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
 
@@ -98,6 +97,8 @@
         if (!link || !link.href) return;
         if (link.target && link.target !== "_self") return;
         if (link.hasAttribute("download")) return;
+        // Drawers/modales Bootstrap o triggers JS: no hay navegacion real.
+        if (link.getAttribute("data-bs-toggle") || link.getAttribute("data-ax-reasignar") || link.getAttribute("data-ax-reubicar")) return;
 
         var url;
         try {
@@ -110,7 +111,14 @@
         if (url.pathname === window.location.pathname && url.search === window.location.search && url.hash) return;
         if (url.protocol !== "http:" && url.protocol !== "https:") return;
 
-        notifyLoading();
+        // Diferir al siguiente tick: handlers del satelite (p. ej. drawer con
+        // preventDefault) corren en bubble DESPUES de este capture. Si
+        // notificamos enseguida, el shell arma overlay+timeout aunque la
+        // pagina no navegue y el modulo queda "Cargando…".
+        window.setTimeout(function () {
+          if (event.defaultPrevented) return;
+          notifyLoading();
+        }, 0);
       },
       true
     );
@@ -118,8 +126,10 @@
     document.addEventListener(
       "submit",
       function (event) {
-        if (event.defaultPrevented) return;
-        notifyLoading();
+        window.setTimeout(function () {
+          if (event.defaultPrevented) return;
+          notifyLoading();
+        }, 0);
       },
       true
     );
