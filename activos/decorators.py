@@ -6,6 +6,8 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import HttpResponseForbidden
 from django.shortcuts import redirect
 
+from core.embed import embed_signal_response, is_embedded
+
 from .constants import MODULO_CODIGO
 
 
@@ -15,6 +17,15 @@ def _usuario_tiene_acceso(user):
         and hasattr(user, "tiene_acceso_modulo")
         and user.tiene_acceso_modulo(MODULO_CODIGO)
     )
+
+
+def _deny_unauthenticated(request):
+    # Dentro del iframe un redirect al login del Portal anida el shell
+    # (LoginPage hace frame-bust → deep link → otra vez iframe) y se percibe
+    # como bucle al abrir fichas. El protocolo deja que el shell revalide.
+    if is_embedded(request):
+        return embed_signal_response(request, "session-expired")
+    return redirect(settings.PALDACA_SSO_LOGIN_URL)
 
 
 def requiere_modulo_paldaca(view_func):
@@ -33,5 +44,7 @@ class ModuloActivoRequiredMixin(LoginRequiredMixin):
         if _usuario_tiene_acceso(request.user):
             return super().dispatch(request, *args, **kwargs)
         if not request.user.is_authenticated:
-            return redirect(settings.PALDACA_SSO_LOGIN_URL)
+            return _deny_unauthenticated(request)
+        if is_embedded(request):
+            return embed_signal_response(request, "forbidden")
         return HttpResponseForbidden("No tienes acceso a este programa.")

@@ -98,7 +98,12 @@
         if (link.target && link.target !== "_self") return;
         if (link.hasAttribute("download")) return;
         // Drawers/modales Bootstrap o triggers JS: no hay navegacion real.
-        if (link.getAttribute("data-bs-toggle") || link.getAttribute("data-ax-reasignar") || link.getAttribute("data-ax-reubicar")) return;
+        if (
+          link.getAttribute("data-bs-toggle") ||
+          link.getAttribute("data-ax-reasignar") ||
+          link.getAttribute("data-ax-reubicar") ||
+          link.getAttribute("data-ax-eliminar")
+        ) return;
 
         var url;
         try {
@@ -107,8 +112,9 @@
           return;
         }
         if (url.origin !== window.location.origin) return;
-        // Ancla dentro de la misma pagina: no hay carga que anunciar.
-        if (url.pathname === window.location.pathname && url.search === window.location.search && url.hash) return;
+        // Misma ruta (con o sin hash): no hay documento nuevo que cargar.
+        // Cubre anclas y triggers cuyo href apunta a la ficha actual.
+        if (url.pathname === window.location.pathname && url.search === window.location.search) return;
         if (url.protocol !== "http:" && url.protocol !== "https:") return;
 
         // Diferir al siguiente tick: handlers del satelite (p. ej. drawer con
