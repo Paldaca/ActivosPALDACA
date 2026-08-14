@@ -1,10 +1,10 @@
 openpyxl==3.1.5
 Django==5.2.7
-psycopg2-binary==2.9.10
 reportlab==4.0.4
 python-dotenv
 mysqlclient
+gunicorn==23.0.0
+whitenoise==6.9.0
+dj-database-url==2.3.0
 pytest>=8.0
 pytest-django>=4.8
-
-

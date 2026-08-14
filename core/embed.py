@@ -30,7 +30,7 @@ EMBED_QUERY_PARAM = "paldaca_embed"
 STANDALONE_COOKIE = "paldaca_standalone"
 STANDALONE_QUERY_PARAM = "paldaca_standalone"
 
-DEFAULT_EXCLUDED_PREFIXES = ("/admin/", "/static/", "/media/", "/logout/")
+DEFAULT_EXCLUDED_PREFIXES = ("/admin/", "/static/", "/media/", "/logout/", "/healthz/")
 
 
 def is_embedded(request) -> bool:

@@ -20,22 +20,32 @@ _key_env = BASE_DIR / "key.env"
 _dev_env = BASE_DIR / "dev.env"
 if _key_env.exists():
     load_dotenv(_key_env)
-else:
+elif (BASE_DIR / ".env" / "key.env").exists():
     load_dotenv(BASE_DIR / ".env" / "key.env")
 if _dev_env.exists():
     load_dotenv(_dev_env, override=True)
+else:
+    load_dotenv()
 
-from .db import DATABASEDES, DATABASEPROD
+from .db import get_databases
+
+
+def _csv_env(*names: str, default: str = "") -> list[str]:
+    for name in names:
+        raw = os.getenv(name)
+        if raw is not None and raw.strip():
+            return [item.strip() for item in raw.split(",") if item.strip()]
+    return [item.strip() for item in default.split(",") if item.strip()]
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # Debe coincidir con Portal-Paldaca/key.env para compartir sesion SSO.
-SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "").strip()
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", os.getenv("SECRET_KEY", "")).strip()
 if not SECRET_KEY:
     raise ValueError(
-        "DJANGO_SECRET_KEY no definida. Copia key.env desde Portal-Paldaca "
-        "(misma clave y MYSQL_*) a la raiz de ActivosPALDACA."
+        "DJANGO_SECRET_KEY no definida. En Coolify configúrala como variable "
+        "de entorno; en local copia key.env desde Portal-Paldaca."
     )
 
 # SECURITY WARNING: don't run with debug turned on in production!
@@ -45,7 +55,16 @@ DEBUG = os.getenv(
     "true" if _dev_env.exists() else "false",
 ).lower() == "true"
 
-ALLOWED_HOSTS = ['activos.cpaldaca.com', 'www.activos.cpaldaca.com', 'localhost', '127.0.0.1']
+_default_hosts = [
+    "127.0.0.1",
+    "localhost",
+    "activos.cpaldaca.com",
+    "www.activos.cpaldaca.com",
+]
+ALLOWED_HOSTS = _csv_env("DJANGO_ALLOWED_HOSTS", "ALLOWED_HOSTS") or _default_hosts
+_coolify_fqdn = os.getenv("COOLIFY_FQDN", "").strip()
+if _coolify_fqdn and _coolify_fqdn not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(_coolify_fqdn)
 
 
 # Application definition
@@ -66,6 +85,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -108,8 +128,8 @@ WSGI_APPLICATION = 'SSAPI.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
-# Local: existe dev.env → DATABASEDES. Producción (sin dev.env) → DATABASEPROD.
-DATABASES = DATABASEDES if _dev_env.exists() else DATABASEPROD
+# DATABASE_URL (MySQL compartida en Coolify) tiene prioridad; si no existe, MySQL local/Namecheap.
+DATABASES = get_databases()
 
 AUTH_USER_MODEL = "core.UsuarioPaldaca"
 
@@ -214,6 +234,8 @@ if DEBUG and not _raw_cookie_domain:
         "http://localhost:8000",
         "http://localhost:8001",
         "http://localhost:8002",
+        "http://localhost:8083",
+        "http://127.0.0.1:8083",
     ]
 elif SESSION_COOKIE_DOMAIN:
     CSRF_TRUSTED_ORIGINS = [
@@ -223,6 +245,22 @@ elif SESSION_COOKIE_DOMAIN:
         "https://activos.cpaldaca.com",
         "https://www.activos.cpaldaca.com",
     ]
+else:
+    CSRF_TRUSTED_ORIGINS = [
+        "https://cpaldaca.com",
+        "https://www.cpaldaca.com",
+        "https://api.cpaldaca.com",
+        "https://activos.cpaldaca.com",
+        "https://www.activos.cpaldaca.com",
+    ]
+
+_csrf_extra = _csv_env("CSRF_TRUSTED_ORIGINS")
+for origin in _csrf_extra:
+    if origin not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(origin)
+_coolify_url = (os.getenv("COOLIFY_URL") or "").strip().rstrip("/")
+if _coolify_url and _coolify_url not in CSRF_TRUSTED_ORIGINS:
+    CSRF_TRUSTED_ORIGINS.append(_coolify_url)
 
 LOGIN_URL = PALDACA_SSO_LOGIN_URL
 LOGIN_REDIRECT_URL = 'core:home'
@@ -237,10 +275,19 @@ handler400 = 'core.views.custom_400_view'
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
+    },
+}
 
 
 # Default primary key field type

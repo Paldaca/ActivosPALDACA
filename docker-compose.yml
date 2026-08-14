@@ -1,0 +1,38 @@
+services:
+  web:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8082}:8082"
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-false}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-activos.cpaldaca.com,www.activos.cpaldaca.com}
+      CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-https://activos.cpaldaca.com,https://www.activos.cpaldaca.com,https://cpaldaca.com,https://www.cpaldaca.com}
+      SESSION_COOKIE_DOMAIN: ${SESSION_COOKIE_DOMAIN:-.cpaldaca.com}
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-true}
+      SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-paldaca_sessionid}
+      PALDACA_SSO_LOGIN_URL: ${PALDACA_SSO_LOGIN_URL:-https://cpaldaca.com/login}
+      PALDACA_SSO_LOGOUT_URL: ${PALDACA_SSO_LOGOUT_URL:-https://cpaldaca.com/api/auth/sso/logout/}
+      PALDACA_PORTAL_URL: ${PALDACA_PORTAL_URL:-https://cpaldaca.com}
+      PALDACA_SHELL_PATH: ${PALDACA_SHELL_PATH:-/activos}
+      DJANGO_LOG_TO_STDOUT: "true"
+      PORT: "8082"
+    volumes:
+      - activos_media:/app/media
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8082/healthz/')",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+volumes:
+  activos_media:

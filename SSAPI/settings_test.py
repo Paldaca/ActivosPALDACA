@@ -1,6 +1,6 @@
 """
 Ajustes para pruebas automatizadas (pytest-django).
-Usa SQLite en memoria para no depender de PostgreSQL ni de SSAPI/db.py en CI/local.
+Usa SQLite en memoria para no depender de PostgreSQL/MySQL ni de SSAPI/db.py en CI/local.
 """
 from .settings import *  # noqa: F403, F401
 
