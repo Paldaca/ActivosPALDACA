@@ -70,8 +70,9 @@ class Command(BaseCommand):
             return
 
         ahora = timezone.now()
+        codigos = [activo.codigo_inventario for activo in activos]
         with transaction.atomic():
-            etiquetas = EtiquetaQR.objects.bulk_create([
+            EtiquetaQR.objects.bulk_create([
                 EtiquetaQR(
                     # Sin reservar nada: el código ya existe y es de este activo.
                     codigo_reservado=activo.codigo_inventario,
@@ -84,6 +85,13 @@ class Command(BaseCommand):
                 )
                 for activo in activos
             ])
+            # Relectura para obtener las claves primarias: MySQL no las
+            # devuelve en un bulk_create, y sin ellas el enlace de impresión
+            # que se imprime abajo saldría vacío.
+            etiquetas = list(
+                EtiquetaQR.objects.filter(codigo_reservado__in=codigos)
+                .order_by("codigo_reservado")
+            )
 
         self.stdout.write(
             self.style.SUCCESS(f"{len(etiquetas)} etiqueta(s) creada(s).")

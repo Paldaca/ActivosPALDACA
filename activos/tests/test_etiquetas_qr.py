@@ -513,3 +513,76 @@ def test_la_marca_existe_y_tiene_fondo_transparente():
     assert imagen.mode == "RGBA"
     # La esquina superior izquierda queda fuera del trazo de la marca.
     assert imagen.getpixel((0, 0))[3] == 0
+
+
+# =============================================================================
+# Enlace al PDF tras generar un lote
+# =============================================================================
+
+def _ids_del_enlace(respuesta):
+    from urllib.parse import parse_qs, urlparse
+
+    return parse_qs(urlparse(respuesta["Location"]).query).get("ids", [""])[0]
+
+
+@pytest.mark.django_db
+def test_generar_lote_enlaza_el_pdf_con_ids_reales(client_auth, subcategoria):
+    r = client_auth.post(reverse("activos:etiqueta-generar"), {
+        "subcategoria": subcategoria.pk, "cantidad": 3,
+    })
+
+    ids = _ids_del_enlace(r)
+    esperados = set(EtiquetaQR.objects.values_list("pk", flat=True))
+
+    assert ids, "el enlace al PDF llegó sin ids"
+    assert {int(i) for i in ids.split(",")} == esperados
+
+
+@pytest.mark.django_db
+def test_el_lote_no_depende_de_que_bulk_create_devuelva_las_claves(
+    client_auth, subcategoria, monkeypatch
+):
+    """Reproduce sobre SQLite el comportamiento real de MySQL.
+
+    `bulk_create` solo rellena las claves primarias en algunos backends.
+    SQLite —donde corren estos tests— sí lo hace; MySQL, que es la base de la
+    Suite, no. Por eso una versión anterior generaba el enlace como
+    `?ids=None,None,None` y solo fallaba en producción, con el mensaje
+    "No indicaste qué etiquetas imprimir".
+
+    Aquí se vacían las claves a propósito: si alguien vuelve a leer los `pk`
+    del resultado de `bulk_create`, este test cae.
+    """
+    original = EtiquetaQR.objects.bulk_create
+
+    def bulk_create_sin_claves(objetos, *args, **kwargs):
+        creados = original(objetos, *args, **kwargs)
+        for objeto in creados:
+            objeto.pk = None
+        return creados
+
+    monkeypatch.setattr(EtiquetaQR.objects, "bulk_create", bulk_create_sin_claves)
+
+    r = client_auth.post(reverse("activos:etiqueta-generar"), {
+        "subcategoria": subcategoria.pk, "cantidad": 3,
+    })
+
+    ids = _ids_del_enlace(r)
+    assert ids and "None" not in ids
+    assert {int(i) for i in ids.split(",")} == set(
+        EtiquetaQR.objects.values_list("pk", flat=True)
+    )
+
+
+@pytest.mark.django_db
+def test_el_pdf_del_lote_recien_generado_se_sirve(client_auth, subcategoria):
+    """Recorre el flujo completo: generar, seguir el enlace y recibir el PDF."""
+    r = client_auth.post(reverse("activos:etiqueta-generar"), {
+        "subcategoria": subcategoria.pk, "cantidad": 2,
+    })
+
+    pdf = client_auth.get(r["Location"])
+
+    assert pdf.status_code == 200
+    assert pdf["Content-Type"] == "application/pdf"
+    assert pdf.content.startswith(b"%PDF")

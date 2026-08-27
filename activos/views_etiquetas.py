@@ -74,17 +74,24 @@ def generar_etiquetas(request):
 
     with transaction.atomic():
         codigos = reservar_codigos(subcategoria, cantidad)
-        etiquetas = [
+        EtiquetaQR.objects.bulk_create([
             EtiquetaQR(
                 codigo_reservado=codigo,
                 subcategoria=subcategoria,
                 creada_por=request.user,
+                # `bulk_create` se salta save(), de ahí el token explícito.
                 token=EtiquetaQR.generar_token(),
             )
             for codigo in codigos
-        ]
-        # `bulk_create` se salta save(), de ahí el token explícito arriba.
-        EtiquetaQR.objects.bulk_create(etiquetas)
+        ])
+        # Se releen para obtener las claves primarias. MySQL —la base real de
+        # la Suite— NO las devuelve en un bulk_create; SQLite sí, así que sin
+        # esto el enlace al PDF sale con `ids=None,None,...` y solo falla en
+        # producción.
+        etiquetas = list(
+            EtiquetaQR.objects.filter(codigo_reservado__in=codigos)
+            .order_by("codigo_reservado")
+        )
 
     messages.success(
         request,

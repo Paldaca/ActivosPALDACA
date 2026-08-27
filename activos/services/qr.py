@@ -52,8 +52,8 @@ MARCA_EN_HUECO = 0.92
 #: hueco blanco, núcleo—, nunca como un anillo trazado. Trazar la línea
 #: deforma la proporción 1:1:3:1:1 que los lectores buscan para localizar el
 #: símbolo, y el código deja de leerse por muy correctos que sean los datos.
-OJO_RADIO_ANILLO = 1.5
-OJO_RADIO_NUCLEO = 1.5
+OJO_RADIO_ANILLO = 0.8
+OJO_RADIO_NUCLEO = 0.7
 
 #: Colores de la propia marca CP, muestreados del PNG.
 AZUL = "#313F7C"
