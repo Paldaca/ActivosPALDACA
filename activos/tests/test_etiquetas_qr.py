@@ -6,6 +6,7 @@ pública —la única vista anónima del proyecto— filtre algo que no debe.
 """
 
 import html
+import unittest.mock
 
 import pytest
 from django.urls import reverse
@@ -586,3 +587,90 @@ def test_el_pdf_del_lote_recien_generado_se_sirve(client_auth, subcategoria):
     assert pdf.status_code == 200
     assert pdf["Content-Type"] == "application/pdf"
     assert pdf.content.startswith(b"%PDF")
+
+
+# =============================================================================
+# Auditoría: transacción de creación de activo y anulación de etiquetas
+# =============================================================================
+
+@pytest.mark.django_db
+def test_generar_codigo_y_guardar_ocurren_en_la_misma_transaccion(catalogo, subcategoria):
+    """Regresión: el INSERT debe correr bajo el mismo bloqueo que calculó el código.
+
+    `reservar_codigos()` abre y cierra su PROPIO `transaction.atomic()`: el
+    `select_for_update()` que toma sobre la subcategoría solo protege mientras
+    dura ESE bloque. Si `Activo.save()` no envuelve la generación del código y
+    el `super().save()` en una transacción común, el bloqueo se libera justo
+    antes del INSERT y dos altas manuales simultáneas para la misma
+    subcategoría pueden volver a calcular el mismo siguiente número — la
+    misma carrera que el servicio de reserva existe para cerrar.
+
+    SQLite (donde corren estos tests) no implementa `SELECT ... FOR UPDATE`,
+    así que no se puede reproducir la colisión con hilos reales. Se verifica
+    en su lugar la propiedad que la hace imposible: que sigue abierta una
+    transacción de `Activo.save()` en el momento en que `reservar_codigos()`
+    hace su propia llamada interna a `transaction.atomic()` — es decir, que
+    esta anida como savepoint dentro de la de `save()`, y no al revés.
+    """
+    from django.db import connection
+
+    from activos.services import codigos as servicio_codigos
+
+    profundidades = []
+    original = servicio_codigos.reservar_codigos
+
+    def envoltura(*args, **kwargs):
+        profundidades.append(len(connection.savepoint_ids))
+        return original(*args, **kwargs)
+
+    with unittest.mock.patch.object(
+        servicio_codigos, "reservar_codigos", side_effect=envoltura
+    ):
+        # `Activo._generar_codigo_inventario` importa la función dentro del
+        # cuerpo del método, así que parchear el módulo del servicio basta.
+        Activo.objects.create(
+            subcategoria=subcategoria, marca="M", modelo="X",
+            ubicacion=catalogo["ubicacion_almacen"],
+        )
+
+    assert profundidades, "reservar_codigos() no se llamó — revisa el parche"
+    # >= 1 savepoint activo cuando entra reservar_codigos() prueba que YA
+    # había una transacción abierta por Activo.save() antes de que el
+    # servicio abriera la suya propia (que añadirá un segundo savepoint).
+    assert profundidades[0] >= 1
+
+
+@pytest.mark.django_db
+def test_anular_etiqueta_vinculada_deja_rastro_en_historial(
+    client_auth, etiqueta, catalogo, subcategoria
+):
+    """El listado permite anular directamente una etiqueta vinculada, sin
+    pasar primero por 'Desvincular'. Ese atajo no debe perder auditoría.
+    """
+    activo = Activo.objects.create(
+        subcategoria=subcategoria, marca="M", modelo="X",
+        ubicacion=catalogo["ubicacion_almacen"],
+    )
+    etiqueta.vincular(activo)
+
+    r = client_auth.post(reverse("activos:etiqueta-anular", args=[etiqueta.pk]))
+
+    assert r.status_code == 302
+    etiqueta.refresh_from_db()
+    assert etiqueta.estado == EtiquetaQR.EstadoEtiqueta.ANULADA
+    assert HistorialMovimiento.objects.filter(
+        activo=activo,
+        descripcion__icontains="anulada",
+    ).exists()
+
+
+@pytest.mark.django_db
+def test_anular_etiqueta_pendiente_no_falla_sin_activo(client_auth, etiqueta):
+    """Caso normal: anular una etiqueta que nunca se vinculó no debe reventar
+    por intentar registrar historial sin activo al que atárselo.
+    """
+    r = client_auth.post(reverse("activos:etiqueta-anular", args=[etiqueta.pk]))
+
+    assert r.status_code == 302
+    etiqueta.refresh_from_db()
+    assert etiqueta.estado == EtiquetaQR.EstadoEtiqueta.ANULADA

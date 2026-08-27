@@ -167,7 +167,11 @@ def etiqueta_alta(request, token):
             )
             destino = reverse("activos:activo-detail", kwargs={"pk": activo.pk})
             if activo.usuario_asignado_id:
-                # Entrega en campo: la constancia se ofrece al llegar a la ficha.
+                # Enganche para la constancia de asignación (fase pendiente,
+                # sin implementar todavía): hoy `?constancia=` no lo lee nadie,
+                # así que esto no ofrece nada en la ficha. Se deja el parámetro
+                # para no tener que volver a tocar este punto de disparo
+                # cuando se construya esa pieza.
                 return redirect(f"{destino}?constancia={activo.pk}")
             return redirect(destino)
     else:
@@ -182,9 +186,29 @@ def etiqueta_alta(request, token):
 @require_POST
 @requiere_modulo_paldaca
 def etiqueta_anular(request, pk):
-    """Retira una etiqueta de circulación (adhesivo perdido o ilegible)."""
-    etiqueta = get_object_or_404(EtiquetaQR, pk=pk)
-    etiqueta.anular()
+    """Retira una etiqueta de circulación (adhesivo perdido o ilegible).
+
+    El listado ofrece "Anular" incluso sobre una etiqueta todavía vinculada,
+    como atajo a no obligar a desvincular primero. Si se usa ese atajo, el
+    activo se queda sin rastro de que perdió su etiqueta vigente a menos que
+    se registre aquí — igual que hace `etiqueta_desvincular` en su propio caso.
+    """
+    etiqueta = get_object_or_404(EtiquetaQR.objects.select_related("activo"), pk=pk)
+    activo = etiqueta.activo
+
+    with transaction.atomic():
+        etiqueta.anular()
+        if activo is not None:
+            HistorialMovimiento.objects.create(
+                activo=activo,
+                tipo_movimiento=HistorialMovimiento.TipoMovimiento.ACTUALIZACION,
+                descripcion=(
+                    f"Etiqueta QR {etiqueta.codigo_reservado} anulada "
+                    "estando vinculada a este activo."
+                ),
+                usuario=request.user,
+            )
+
     messages.success(
         request,
         f"Etiqueta {etiqueta.codigo_reservado} anulada. Su código no se reutiliza.",

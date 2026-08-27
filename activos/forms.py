@@ -2,7 +2,7 @@ from django import forms
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 
-from .models import Activo, Categoria, EtiquetaQR, SubCategoria, Ubicacion
+from .models import Activo, Categoria, SubCategoria, Ubicacion
 
 
 def usuarios_asignables():

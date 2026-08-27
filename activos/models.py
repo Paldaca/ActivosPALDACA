@@ -3,7 +3,7 @@ import secrets
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.db import models
+from django.db import models, transaction
 from django.utils import timezone
 
 from .constants import TABLA
@@ -155,9 +155,6 @@ class Activo(models.Model):
     def save(self, *args, **kwargs):
         from django.core.exceptions import ValidationError
 
-        if not self.codigo_inventario:
-            self.codigo_inventario = self._generar_codigo_inventario()
-        self.codigo_inventario = self.codigo_inventario.upper().strip()
         if self.usuario_asignado_id:
             usuario = self.usuario_asignado
             if usuario is not None and usuario.is_superuser:
@@ -168,7 +165,22 @@ class Activo(models.Model):
                         )
                     }
                 )
-        super().save(*args, **kwargs)
+
+        # `reservar_codigos()` (dentro de `_generar_codigo_inventario`) suelta su
+        # bloqueo de la subcategoría en cuanto CALCULA el código: es la propia
+        # función la que abre y cierra su `transaction.atomic()`. Si el INSERT
+        # ocurriera fuera de ese envoltorio —como pasaba aquí antes—, el
+        # bloqueo ya estaría liberado cuando `super().save()` corre, y dos
+        # altas manuales simultáneas para la misma subcategoría podían volver
+        # a calcular el mismo siguiente número: justo la carrera que ese
+        # servicio existe para cerrar. Envolver aquí hace que el `atomic()`
+        # interno anide como savepoint y el bloqueo de fila persista hasta que
+        # ESTE bloque confirma, con el INSERT ya dentro.
+        with transaction.atomic():
+            if not self.codigo_inventario:
+                self.codigo_inventario = self._generar_codigo_inventario()
+            self.codigo_inventario = self.codigo_inventario.upper().strip()
+            super().save(*args, **kwargs)
 
 
 class HistorialMovimiento(models.Model):
