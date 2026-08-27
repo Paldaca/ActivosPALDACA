@@ -37,7 +37,6 @@
         </div>
     </header>
 
-    {# --- Filtros por estado, con el recuento a la vista --------------- #}
     <section class="ax-kpis mb-3" aria-label="Estado de las etiquetas">
         <a href="{% url 'activos:etiqueta-list' %}"
            class="ax-kpi ax-kpi--total {% if not estado_activo %}is-active{% endif %}">
@@ -89,8 +88,6 @@
                 <tbody>
                 {% for etiqueta in etiquetas %}
                     <tr>
-                        {# Escaneable directamente de la pantalla: evita imprimir
-                           solo para comprobar que un adhesivo apunta a donde debe. #}
                         <td style="width:1%">
                             <span style="display:block;width:56px;line-height:0;opacity:{% if etiqueta.estado == "AN" %}.25{% else %}1{% endif %}">
                                 {% qr_svg etiqueta 56 %}
@@ -185,9 +182,6 @@
 
 </div>
 
-{# ===================================================================== #}
-{#  Drawer de generación de lote                                         #}
-{# ===================================================================== #}
 <div class="offcanvas offcanvas-end ax-drawer" tabindex="-1" id="drawerGenerarEtiquetas"
      aria-labelledby="drawerGenerarEtiquetasTitulo">
 

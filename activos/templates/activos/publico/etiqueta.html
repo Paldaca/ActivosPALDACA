@@ -1,16 +1,4 @@
 {% load static activo_filters %}<!DOCTYPE html>
-{% comment %}
-Ficha que se abre al escanear el QR de un activo.
-
-NO extiende base.html a propósito: esa plantilla carga el nav del Portal y
-asume sesión, y esta página se sirve a cualquiera con el equipo delante. Se
-mantiene autónoma, ligera y pensada primero para el móvil, que es el único
-dispositivo desde el que se llega aquí de forma natural.
-
-Regla de privacidad: solo se pinta lo que identifica al equipo, más el nombre
-y apellido del responsable. Observaciones, historial y mantenimientos quedan
-detrás de la sesión.
-{% endcomment %}
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -186,7 +174,6 @@ detrás de la sesión.
     <main class="tarjeta">
 
         {% if situacion == 'vinculada' %}
-            {# ---------------- Ficha pública del activo ---------------- #}
             <div class="cabecera-activo">
                 <span class="icono-tipo"><i class="bi {{ activo|icono_activo }}" aria-hidden="true"></i></span>
                 <div>
@@ -230,7 +217,6 @@ detrás de la sesión.
             {% endif %}
 
         {% elif situacion == 'pendiente' %}
-            {# ---------------- Etiqueta impresa, activo sin registrar ---------------- #}
             <div class="cabecera-activo">
                 <span class="icono-tipo"><i class="bi bi-qr-code" aria-hidden="true"></i></span>
                 <div>
@@ -253,7 +239,6 @@ detrás de la sesión.
             </a>
 
         {% else %}
-            {# ---------------- Anulada o activo eliminado ---------------- #}
             <div class="vacia">
                 <i class="bi bi-slash-circle glifo" aria-hidden="true"></i>
                 <h1>Este código ya no está en uso</h1>

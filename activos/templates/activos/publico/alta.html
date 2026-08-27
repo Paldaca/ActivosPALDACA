@@ -1,13 +1,4 @@
 {% load static %}<!DOCTYPE html>
-{% comment %}
-Alta de un activo tras escanear su etiqueta.
-
-Comparte la piel autónoma de `publico/etiqueta.html` (sin base.html, sin nav)
-porque es la continuación natural del escaneo: el usuario ya está en el móvil,
-frente al equipo, y meterlo de vuelta en el layout de escritorio rompería ese
-hilo. Aquí sí hace falta sesión — la vista la exige — pero la presentación
-sigue siendo la de la ficha, no la del panel.
-{% endcomment %}
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -138,8 +129,6 @@ sigue siendo la de la ficha, no la del panel.
 
     <main class="tarjeta">
 
-        {# Lo que viene de la etiqueta se muestra, no se pregunta: cambiarlo
-           dejaría el código impreso en el adhesivo mintiendo. #}
         <div class="fijado">
             <i class="bi bi-qr-code" aria-hidden="true"></i>
             <div>

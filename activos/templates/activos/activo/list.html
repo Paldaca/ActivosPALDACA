@@ -86,19 +86,11 @@
                     </ul>
                 </div>
 
-                {# El alta manual conserva su clic directo: el botón ES el enlace,
-                   y el segundo camino cuelga de una pestaña aparte. Convertir
-                   todo en un desplegable habría cobrado un clic extra al flujo
-                   más frecuente para acomodar al menos frecuente. #}
-                <div class="btn-group ax-alta">
-                    <a href="{% url 'activos:activo-create' %}" class="btn-pastel btn-pastel--cta">
-                        <i class="bi bi-plus-lg"></i> Nuevo activo
-                    </a>
-                    <button type="button"
-                            class="btn-pastel btn-pastel--cta dropdown-toggle dropdown-toggle-split"
+                <div class="dropdown">
+                    <button class="btn-pastel btn-pastel--cta dropdown-toggle" type="button"
                             data-bs-toggle="dropdown" data-bs-display="static"
                             aria-expanded="false" aria-haspopup="true">
-                        <span class="visually-hidden">Otras formas de dar de alta</span>
+                        <i class="bi bi-plus-lg"></i> Agregar activo
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end shadow ax-export-menu">
                         <li>

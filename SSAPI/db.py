@@ -45,11 +45,24 @@ DATABASEPROD = DATABASESPRODUCCION = _mysql_config(
 )
 
 
+def _is_docker_runtime() -> bool:
+    return os.getenv("RUNNING_IN_DOCKER", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+
+
+def _mysql_fallback() -> dict:
+    return DATABASEDES if _DEV_ENV.exists() else DATABASEPROD
+
+
 def get_databases() -> dict:
-    """Usa DATABASE_URL (MySQL compartida en Coolify) si existe; si no, MySQL local/Namecheap."""
+    """Usa DATABASE_URL en Docker/Coolify; en local ignora la URL interna y usa MYSQL_*."""
     database_url = os.getenv("DATABASE_URL", "").strip()
-    if not database_url:
-        return DATABASEDES if _DEV_ENV.exists() else DATABASEPROD
+    if not database_url or not _is_docker_runtime():
+        return _mysql_fallback()
 
     ssl_require = os.getenv("DATABASE_SSL_REQUIRE", "false").lower() == "true"
     conn_max_age = int(os.getenv("DATABASE_CONN_MAX_AGE", "600"))
@@ -58,7 +71,9 @@ def get_databases() -> dict:
         conn_max_age=conn_max_age,
         conn_health_checks=True,
         ssl_require=ssl_require,
+        engine="django.db.backends.mysql",
     )
+    config["ENGINE"] = "django.db.backends.mysql"
     config.setdefault("OPTIONS", {})
     config["OPTIONS"].setdefault("charset", "utf8mb4")
     return {"default": config}
