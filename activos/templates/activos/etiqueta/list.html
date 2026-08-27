@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
 {% load activo_filters %}
+{% load qr_tags %}
 
 {% block title %}Etiquetas QR - {{ block.super }}{% endblock %}
 
@@ -76,6 +77,7 @@
             <table class="table ax-table align-middle mb-0">
                 <thead>
                     <tr>
+                        <th scope="col"><span class="visually-hidden">Código QR</span></th>
                         <th scope="col">Código</th>
                         <th scope="col">Subcategoría</th>
                         <th scope="col">Estado</th>
@@ -87,6 +89,13 @@
                 <tbody>
                 {% for etiqueta in etiquetas %}
                     <tr>
+                        {# Escaneable directamente de la pantalla: evita imprimir
+                           solo para comprobar que un adhesivo apunta a donde debe. #}
+                        <td style="width:1%">
+                            <span style="display:block;width:56px;line-height:0;opacity:{% if etiqueta.estado == "AN" %}.25{% else %}1{% endif %}">
+                                {% qr_svg etiqueta 56 %}
+                            </span>
+                        </td>
                         <td><span class="ax-code ax-mono">{{ etiqueta.codigo_reservado }}</span></td>
                         <td>
                             {{ etiqueta.subcategoria.nombre }}

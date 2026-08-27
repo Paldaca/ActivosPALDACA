@@ -385,3 +385,37 @@ def test_comando_dry_run_no_escribe(subcategoria, catalogo):
     call_command("etiquetar_activos", "--dry-run", verbosity=0)
 
     assert EtiquetaQR.objects.count() == 0
+
+
+# =============================================================================
+# Pantalla de gestión
+# =============================================================================
+
+@pytest.mark.django_db
+def test_listado_de_etiquetas_pinta_el_qr(client_auth, etiqueta):
+    """Cubre la plantilla y el tag: un QR mal formado rompe aquí, no en la calle."""
+    r = client_auth.get(reverse("activos:etiqueta-list"))
+    cuerpo = _texto(r)
+
+    assert r.status_code == 200
+    assert etiqueta.codigo_reservado in cuerpo
+    assert "<svg" in cuerpo
+
+
+@pytest.mark.django_db
+def test_listado_de_etiquetas_filtra_por_estado(client_auth, etiqueta, subcategoria):
+    otra = EtiquetaQR.objects.create(
+        codigo_reservado=reservar_codigos(subcategoria, 1)[0], subcategoria=subcategoria
+    )
+    otra.anular()
+
+    cuerpo = _texto(client_auth.get(reverse("activos:etiqueta-list"), {"estado": "AN"}))
+    assert otra.codigo_reservado in cuerpo
+    assert etiqueta.codigo_reservado not in cuerpo
+
+
+@pytest.mark.django_db
+def test_listado_de_etiquetas_exige_sesion(client):
+    r = client.get(reverse("activos:etiqueta-list"))
+    assert r.status_code == 302
+    assert "login" in r.url.lower()

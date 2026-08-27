@@ -52,9 +52,10 @@ def svg_en_linea(etiqueta, tamano_px=160) -> str:
     Generar al vuelo cuesta ~1 ms y es determinista. Guardar PNG en `/media`
     añadiría un volumen que respaldar y ficheros huérfanos a cambio de nada.
     """
-    escala = max(1, round(tamano_px / (_codigo(etiqueta).symbol_size(border=ZONA_SILENCIO)[0])))
-    return _codigo(etiqueta).svg_inline(
-        scale=escala,
+    codigo = _codigo(etiqueta)
+    modulos = codigo.symbol_size(border=ZONA_SILENCIO)[0]
+    return codigo.svg_inline(
+        scale=max(1, round(tamano_px / modulos)),
         border=ZONA_SILENCIO,
         dark="#000000",
     )
@@ -71,8 +72,3 @@ def matriz(etiqueta):
         list(fila)
         for fila in _codigo(etiqueta).matrix_iter(border=ZONA_SILENCIO)
     ]
-
-
-def lado_en_modulos(etiqueta) -> int:
-    """Cuántos módulos de ancho tiene el símbolo con su zona de silencio."""
-    return _codigo(etiqueta).symbol_size(border=ZONA_SILENCIO)[0]
