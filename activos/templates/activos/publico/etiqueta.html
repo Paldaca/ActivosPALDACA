@@ -1,0 +1,276 @@
+{% load static activo_filters %}<!DOCTYPE html>
+{% comment %}
+Ficha que se abre al escanear el QR de un activo.
+
+NO extiende base.html a propósito: esa plantilla carga el nav del Portal y
+asume sesión, y esta página se sirve a cualquiera con el equipo delante. Se
+mantiene autónoma, ligera y pensada primero para el móvil, que es el único
+dispositivo desde el que se llega aquí de forma natural.
+
+Regla de privacidad: solo se pinta lo que identifica al equipo, más el nombre
+y apellido del responsable. Observaciones, historial y mantenimientos quedan
+detrás de la sesión.
+{% endcomment %}
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex, nofollow">
+    <title>{% if activo %}{{ activo.codigo_inventario }}{% else %}{{ etiqueta.codigo_reservado }}{% endif %} · Activos PALDACA</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        :root {
+            --marca: #32407b;
+            --marca-suave: #eef1f9;
+            --tinta: #1c2333;
+            --tinta-suave: #5b6478;
+            --papel: #f4f6fa;
+            --superficie: #ffffff;
+            --linea: #dde2ec;
+            --ok: #1f7a4d;
+            --aviso: #8a5a10;
+            --alto: #9a3324;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            padding: 0 1rem 3rem;
+            background: var(--papel);
+            color: var(--tinta);
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+            line-height: 1.55;
+            -webkit-font-smoothing: antialiased;
+        }
+        .lienzo { max-width: 34rem; margin: 0 auto; }
+
+        header.marca {
+            display: flex;
+            align-items: center;
+            gap: .6rem;
+            padding: 1.4rem 0 1.1rem;
+            font-weight: 700;
+            color: var(--marca);
+            letter-spacing: .02em;
+        }
+        header.marca img { height: 1.9rem; width: auto; }
+
+        .tarjeta {
+            background: var(--superficie);
+            border: 1px solid var(--linea);
+            border-radius: .9rem;
+            padding: 1.3rem;
+            box-shadow: 0 1px 2px rgba(28,35,51,.04), 0 8px 24px -16px rgba(28,35,51,.3);
+        }
+
+        .cabecera-activo { display: flex; gap: .9rem; align-items: flex-start; }
+        .icono-tipo {
+            flex: 0 0 auto;
+            width: 3rem; height: 3rem;
+            display: grid; place-items: center;
+            background: var(--marca-suave);
+            color: var(--marca);
+            border-radius: .7rem;
+            font-size: 1.4rem;
+        }
+        .rotulo {
+            font-size: .74rem;
+            text-transform: uppercase;
+            letter-spacing: .09em;
+            color: var(--tinta-suave);
+            margin: 0 0 .15rem;
+        }
+        .codigo {
+            font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+            font-size: 1.45rem;
+            font-weight: 700;
+            margin: 0;
+            word-break: break-all;
+        }
+        .equipo { margin: .2rem 0 0; color: var(--tinta-suave); font-size: .96rem; }
+
+        .estado {
+            display: inline-flex;
+            align-items: center;
+            gap: .35rem;
+            margin-top: .9rem;
+            padding: .28rem .7rem;
+            border-radius: 999px;
+            font-size: .82rem;
+            font-weight: 600;
+            background: var(--marca-suave);
+            color: var(--marca);
+        }
+        .estado--mantenimiento { background: #fdf1dd; color: var(--aviso); }
+        .estado--baja { background: #f7e7e4; color: var(--alto); }
+        .estado--disponible { background: #e5f3ec; color: var(--ok); }
+
+        dl.datos {
+            margin: 1.3rem 0 0;
+            padding-top: 1.1rem;
+            border-top: 1px solid var(--linea);
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: .85rem;
+        }
+        @media (min-width: 26rem) {
+            dl.datos { grid-template-columns: 1fr 1fr; }
+            dl.datos .ancho-total { grid-column: 1 / -1; }
+        }
+        dl.datos dt {
+            font-size: .72rem;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            color: var(--tinta-suave);
+            margin-bottom: .1rem;
+        }
+        dl.datos dd { margin: 0; font-weight: 600; font-size: .97rem; word-break: break-word; }
+        dl.datos dd.vacio { font-weight: 400; color: var(--tinta-suave); }
+
+        .aviso {
+            display: flex;
+            gap: .7rem;
+            align-items: flex-start;
+            margin-top: 1.2rem;
+            padding: .9rem 1rem;
+            border-radius: .7rem;
+            background: var(--marca-suave);
+            font-size: .92rem;
+        }
+        .aviso i { color: var(--marca); font-size: 1.1rem; line-height: 1.4; }
+
+        .boton {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: .45rem;
+            width: 100%;
+            margin-top: 1.1rem;
+            padding: .85rem 1.2rem;
+            border-radius: .7rem;
+            background: var(--marca);
+            color: #fff;
+            font-weight: 600;
+            text-decoration: none;
+            border: 0;
+        }
+        .boton:hover, .boton:focus { background: #283461; }
+        .boton--secundario {
+            background: transparent;
+            color: var(--marca);
+            border: 1px solid var(--linea);
+        }
+        .boton--secundario:hover, .boton--secundario:focus { background: var(--marca-suave); color: var(--marca); }
+        .boton:focus-visible { outline: 3px solid #9fb0e6; outline-offset: 2px; }
+
+        .vacia { text-align: center; padding: 1rem 0 .4rem; }
+        .vacia .glifo { font-size: 2.6rem; color: var(--tinta-suave); }
+        .vacia h1 { font-size: 1.2rem; margin: .6rem 0 .35rem; }
+        .vacia p { margin: 0; color: var(--tinta-suave); font-size: .95rem; }
+
+        footer.pie {
+            margin-top: 1.6rem;
+            text-align: center;
+            font-size: .78rem;
+            color: var(--tinta-suave);
+        }
+    </style>
+</head>
+<body>
+<div class="lienzo">
+
+    <header class="marca">
+        <img src="{% static 'core/img/logo_paldaca.png' %}" alt="" aria-hidden="true">
+        <span>Consorcio PALDACA · Activos</span>
+    </header>
+
+    <main class="tarjeta">
+
+        {% if situacion == 'vinculada' %}
+            {# ---------------- Ficha pública del activo ---------------- #}
+            <div class="cabecera-activo">
+                <span class="icono-tipo"><i class="bi {{ activo|icono_activo }}" aria-hidden="true"></i></span>
+                <div>
+                    <p class="rotulo">{{ activo.subcategoria.categoria.nombre }} · {{ activo.subcategoria.nombre }}</p>
+                    <h1 class="codigo">{{ activo.codigo_inventario }}</h1>
+                    <p class="equipo">{{ activo.marca }} {{ activo.modelo }}</p>
+                </div>
+            </div>
+
+            <span class="estado estado--{{ activo|estado_key }}">
+                <i class="bi bi-circle-fill" style="font-size:.5rem" aria-hidden="true"></i>
+                {{ activo|estado_label }}
+            </span>
+
+            <dl class="datos">
+                <div class="ancho-total">
+                    <dt>Responsable</dt>
+                    <dd {% if not activo.usuario_asignado %}class="vacio"{% endif %}>
+                        {{ activo.usuario_asignado|nombre_completo }}
+                    </dd>
+                </div>
+                <div>
+                    <dt>Ubicación</dt>
+                    <dd>{{ activo.ubicacion.nombre }}</dd>
+                </div>
+                <div>
+                    <dt>Número de serie</dt>
+                    <dd {% if not activo.numero_serial %}class="vacio"{% endif %}>
+                        {{ activo.numero_serial|default:"No registrado" }}
+                    </dd>
+                </div>
+            </dl>
+
+            {% if puede_gestionar %}
+            <a class="boton" href="{% url 'activos:activo-detail' activo.pk %}">
+                <i class="bi bi-box-arrow-up-right" aria-hidden="true"></i> Abrir ficha completa
+            </a>
+            <a class="boton boton--secundario" href="{% url 'activos:activo-reasignar' activo.pk %}">
+                <i class="bi bi-person-gear" aria-hidden="true"></i> Reasignar
+            </a>
+            {% endif %}
+
+        {% elif situacion == 'pendiente' %}
+            {# ---------------- Etiqueta impresa, activo sin registrar ---------------- #}
+            <div class="cabecera-activo">
+                <span class="icono-tipo"><i class="bi bi-qr-code" aria-hidden="true"></i></span>
+                <div>
+                    <p class="rotulo">{{ etiqueta.subcategoria.categoria.nombre }} · {{ etiqueta.subcategoria.nombre }}</p>
+                    <h1 class="codigo">{{ etiqueta.codigo_reservado }}</h1>
+                    <p class="equipo">Etiqueta sin activo registrado</p>
+                </div>
+            </div>
+
+            <div class="aviso">
+                <i class="bi bi-info-circle-fill" aria-hidden="true"></i>
+                <span>
+                    Este código está reservado pero todavía nadie ha cargado los datos
+                    del equipo. Si eres quien lo está recibiendo, complétalos ahora.
+                </span>
+            </div>
+
+            <a class="boton" href="{% url 'etiqueta-alta' etiqueta.token %}">
+                <i class="bi bi-pencil-square" aria-hidden="true"></i> Cargar los datos del activo
+            </a>
+
+        {% else %}
+            {# ---------------- Anulada o activo eliminado ---------------- #}
+            <div class="vacia">
+                <i class="bi bi-slash-circle glifo" aria-hidden="true"></i>
+                <h1>Este código ya no está en uso</h1>
+                <p>
+                    La etiqueta <strong>{{ etiqueta.codigo_reservado }}</strong> fue retirada
+                    del inventario. Si el equipo sigue en servicio, pide que se le genere
+                    una etiqueta nueva.
+                </p>
+            </div>
+        {% endif %}
+
+    </main>
+
+    <footer class="pie">
+        Sistema de Gestión de Activos · Consorcio PALDACA
+    </footer>
+
+</div>
+</body>
+</html>

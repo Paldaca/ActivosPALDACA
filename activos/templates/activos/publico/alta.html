@@ -1,0 +1,198 @@
+{% load static %}<!DOCTYPE html>
+{% comment %}
+Alta de un activo tras escanear su etiqueta.
+
+Comparte la piel autónoma de `publico/etiqueta.html` (sin base.html, sin nav)
+porque es la continuación natural del escaneo: el usuario ya está en el móvil,
+frente al equipo, y meterlo de vuelta en el layout de escritorio rompería ese
+hilo. Aquí sí hace falta sesión — la vista la exige — pero la presentación
+sigue siendo la de la ficha, no la del panel.
+{% endcomment %}
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Registrar {{ etiqueta.codigo_reservado }} · Activos PALDACA</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        :root {
+            --marca: #32407b;
+            --marca-suave: #eef1f9;
+            --tinta: #1c2333;
+            --tinta-suave: #5b6478;
+            --papel: #f4f6fa;
+            --superficie: #ffffff;
+            --linea: #dde2ec;
+            --alto: #9a3324;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            padding: 0 1rem 3rem;
+            background: var(--papel);
+            color: var(--tinta);
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+            line-height: 1.55;
+            -webkit-font-smoothing: antialiased;
+        }
+        .lienzo { max-width: 34rem; margin: 0 auto; }
+
+        header.marca {
+            display: flex; align-items: center; gap: .6rem;
+            padding: 1.4rem 0 1.1rem;
+            font-weight: 700; color: var(--marca); letter-spacing: .02em;
+        }
+        header.marca img { height: 1.9rem; width: auto; }
+
+        .tarjeta {
+            background: var(--superficie);
+            border: 1px solid var(--linea);
+            border-radius: .9rem;
+            padding: 1.3rem;
+            box-shadow: 0 1px 2px rgba(28,35,51,.04), 0 8px 24px -16px rgba(28,35,51,.3);
+        }
+
+        .fijado {
+            display: flex; gap: .9rem; align-items: center;
+            padding: .9rem 1rem;
+            background: var(--marca-suave);
+            border-radius: .7rem;
+            margin-bottom: 1.3rem;
+        }
+        .fijado i { font-size: 1.5rem; color: var(--marca); }
+        .fijado .rotulo {
+            font-size: .7rem; text-transform: uppercase; letter-spacing: .09em;
+            color: var(--tinta-suave); margin: 0;
+        }
+        .fijado .codigo {
+            font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+            font-size: 1.15rem; font-weight: 700; margin: 0;
+        }
+        .fijado .sub { margin: 0; font-size: .85rem; color: var(--tinta-suave); }
+
+        h1 { font-size: 1.15rem; margin: 0 0 .3rem; }
+        .intro { margin: 0 0 1.3rem; color: var(--tinta-suave); font-size: .93rem; }
+
+        .campo { margin-bottom: 1.05rem; }
+        .campo label {
+            display: block;
+            font-size: .78rem; font-weight: 600;
+            text-transform: uppercase; letter-spacing: .06em;
+            color: var(--tinta-suave);
+            margin-bottom: .3rem;
+        }
+        .campo .ayuda { font-size: .8rem; color: var(--tinta-suave); margin-top: .25rem; }
+        /* Los widgets llegan con clases de Bootstrap desde el ModelForm; aquí se
+           les da el tamaño táctil que pide un formulario que se rellena de pie. */
+        .campo input, .campo select, .campo textarea {
+            width: 100%;
+            padding: .7rem .8rem;
+            font-size: 1rem;
+            font-family: inherit;
+            color: var(--tinta);
+            background: var(--superficie);
+            border: 1px solid var(--linea);
+            border-radius: .55rem;
+        }
+        .campo input:focus, .campo select:focus, .campo textarea:focus {
+            outline: 3px solid #9fb0e6;
+            outline-offset: 1px;
+            border-color: var(--marca);
+        }
+        .campo textarea { resize: vertical; }
+
+        .errores { margin: .35rem 0 0; padding: 0; list-style: none; color: var(--alto); font-size: .85rem; }
+
+        .boton {
+            display: inline-flex; align-items: center; justify-content: center; gap: .45rem;
+            width: 100%;
+            margin-top: .4rem;
+            padding: .9rem 1.2rem;
+            border-radius: .7rem;
+            background: var(--marca); color: #fff;
+            font-weight: 600; font-size: 1rem;
+            text-decoration: none; border: 0; cursor: pointer;
+        }
+        .boton:hover, .boton:focus { background: #283461; }
+        .boton:focus-visible { outline: 3px solid #9fb0e6; outline-offset: 2px; }
+        .boton--secundario {
+            background: transparent; color: var(--marca);
+            border: 1px solid var(--linea); margin-top: .6rem;
+        }
+        .boton--secundario:hover, .boton--secundario:focus { background: var(--marca-suave); color: var(--marca); }
+
+        footer.pie {
+            margin-top: 1.6rem; text-align: center;
+            font-size: .78rem; color: var(--tinta-suave);
+        }
+    </style>
+</head>
+<body>
+<div class="lienzo">
+
+    <header class="marca">
+        <img src="{% static 'core/img/logo_paldaca.png' %}" alt="" aria-hidden="true">
+        <span>Consorcio PALDACA · Activos</span>
+    </header>
+
+    <main class="tarjeta">
+
+        {# Lo que viene de la etiqueta se muestra, no se pregunta: cambiarlo
+           dejaría el código impreso en el adhesivo mintiendo. #}
+        <div class="fijado">
+            <i class="bi bi-qr-code" aria-hidden="true"></i>
+            <div>
+                <p class="rotulo">Código asignado</p>
+                <p class="codigo">{{ etiqueta.codigo_reservado }}</p>
+                <p class="sub">{{ etiqueta.subcategoria.categoria.nombre }} · {{ etiqueta.subcategoria.nombre }}</p>
+            </div>
+        </div>
+
+        <h1>Registrar este equipo</h1>
+        <p class="intro">
+            Rellena lo que tengas delante. Puedes completar el resto más tarde
+            desde el sistema.
+        </p>
+
+        <form method="post" novalidate>
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+            <ul class="errores">
+                {% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
+            </ul>
+            {% endif %}
+
+            {% for campo in form %}
+            <div class="campo">
+                <label for="{{ campo.id_for_label }}">
+                    {{ campo.label }}{% if not campo.field.required %} <span style="font-weight:400;text-transform:none;letter-spacing:0">(opcional)</span>{% endif %}
+                </label>
+                {{ campo }}
+                {% if campo.help_text %}<p class="ayuda">{{ campo.help_text }}</p>{% endif %}
+                {% if campo.errors %}
+                <ul class="errores">
+                    {% for error in campo.errors %}<li>{{ error }}</li>{% endfor %}
+                </ul>
+                {% endif %}
+            </div>
+            {% endfor %}
+
+            <button type="submit" class="boton">
+                <i class="bi bi-check2-circle" aria-hidden="true"></i> Registrar activo
+            </button>
+            <a class="boton boton--secundario" href="{% url 'etiqueta-publica' etiqueta.token %}">
+                Cancelar
+            </a>
+        </form>
+
+    </main>
+
+    <footer class="pie">
+        Sistema de Gestión de Activos · Consorcio PALDACA
+    </footer>
+
+</div>
+</body>
+</html>

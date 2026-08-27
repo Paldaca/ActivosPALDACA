@@ -111,6 +111,46 @@ Solo reglas **identificadas en el código**. Cada entrada indica dónde se imple
 - **Regla:** Reasignar/reubicar en lote omite activos que ya tienen el destino; solo cuenta cambios reales.
 - **Implementación:** `activos/views.py` → `acciones_masivas()`.
 
+### BR-QR-01 — El código de inventario se reserva al imprimir la etiqueta
+
+- **Regla:** Generar un lote de etiquetas aparta N códigos `PAL-{PREFIJO}-NNN` consecutivos antes de que existan los activos.
+- **Implementación:** `activos/views_etiquetas.py` → `generar_etiquetas()`; `activos/services/codigos.py` → `reservar_codigos()`.
+- **Consecuencia aceptada:** etiquetas impresas que nadie completa dejan huecos en la secuencia. Es cosmético; el código legible impreso junto al QR no lo es.
+
+### BR-QR-02 — El siguiente código se calcula sobre activos Y etiquetas, bajo bloqueo
+
+- **Regla:** El número libre de una subcategoría considera `activos_activo.codigo_inventario` **y** `activos_etiqueta_qr.codigo_reservado`.
+- **Implementación:** `activos/services/codigos.py` → `_ultimo_numero()`, dentro de `transaction.atomic()` con `select_for_update()` sobre la subcategoría.
+- **Motivo:** con dos fuentes de verdad y lotes de hasta 60, la colisión de códigos deja de ser teórica. `Activo._generar_codigo_inventario()` delega aquí.
+
+### BR-QR-03 — La ficha pública publica el responsable, y nada más de él
+
+- **Regla:** `/q/<token>/` se sirve **sin sesión** y muestra código, categoría, subcategoría, marca, modelo, serial, estado, ubicación y **nombre y apellido** del responsable asignado.
+- **Prohibido publicar:** observaciones, historial de movimientos, mantenimientos y cualquier otro dato personal (teléfono, email, disciplina).
+- **Implementación:** `activos/views_publicos.py` → `etiqueta_publica()`; plantilla `activos/templates/activos/publico/etiqueta.html`.
+- **Verificado por:** `activos/tests/test_etiquetas_qr.py` → `test_ficha_publica_visible_sin_sesion`.
+
+### BR-QR-04 — Escribir siempre exige sesión SSO
+
+- **Regla:** Leer la ficha es anónimo; dar de alta, editar o reasignar exige sesión y acceso al módulo, igual que el resto del sistema.
+- **Implementación:** `/q/<token>/alta/` → `@requiere_modulo_paldaca`.
+
+### BR-QR-05 — El alta desde etiqueta sí registra historial
+
+- **Regla:** Completar un activo escaneando su etiqueta crea un `HistorialMovimiento` tipo `CR`. **Excepción deliberada a BR-ACT-11** (el alta de escritorio no lo hace).
+- **Motivo:** el alta en campo, desde un móvil y posiblemente por alguien distinto de quien compró el equipo, es justo el evento que después se quiere reconstruir.
+
+### BR-QR-06 — Vincular es idempotente; anular no libera el código
+
+- **Regla:** Reenviar el alta de una etiqueta ya vinculada no duplica el activo ni mueve `fecha_vinculacion`. Una etiqueta anulada no admite vinculación y su código **no** se reutiliza.
+- **Motivo:** reutilizar el número dejaría dos adhesivos distintos con el mismo código impreso, uno de ellos pegado a un equipo.
+- **Implementación:** `activos/models.py` → `EtiquetaQR.vincular()`, `.anular()`.
+
+### BR-QR-07 — Un activo tiene como mucho una etiqueta vigente
+
+- **Regla:** Constraint única sobre `activo` cuando `estado='VI'`. Puede acumular etiquetas anuladas (adhesivos perdidos o mal pegados), pero solo una en uso.
+- **Implementación:** `activos/models.py` → `Meta.constraints`.
+
 ### BR-ACT-14 — Filtro "Disponible" vs "Asignado"
 
 - **Regla:** Filtro `asignacion=libre` → `usuario_asignado IS NULL`; `asignacion=asignado` → not null. Independiente del campo `estado` salvo otros filtros explícitos.

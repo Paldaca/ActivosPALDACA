@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Categoria, SubCategoria, Ubicacion, Activo
+from .models import Categoria, SubCategoria, Ubicacion, Activo, EtiquetaQR
 
 
 @admin.register(Categoria)
@@ -52,3 +52,17 @@ class ActivoAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
+
+
+@admin.register(EtiquetaQR)
+class EtiquetaQRAdmin(admin.ModelAdmin):
+    list_display = [
+        'codigo_reservado', 'subcategoria', 'estado',
+        'activo', 'creada_por', 'fecha_creacion',
+    ]
+    list_filter = ['estado', 'subcategoria__categoria', 'subcategoria']
+    search_fields = ['codigo_reservado', 'token', 'activo__codigo_inventario']
+    autocomplete_fields = ['subcategoria', 'activo']
+    # El token identifica la etiqueta fisica ya impresa: editarlo dejaria el
+    # adhesivo apuntando a una URL muerta, sin forma de recuperarlo.
+    readonly_fields = ['token', 'fecha_creacion', 'fecha_vinculacion']

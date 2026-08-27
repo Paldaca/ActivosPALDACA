@@ -37,9 +37,12 @@ Proyecto Django: **`SSAPI/`**. Entry: `manage.py`.
 
 **Compartidos (`core_*`):** `UsuarioPaldaca`, `Modulo`, `UsuarioModulo`, `Disciplina`, `Perfil`
 
-**Negocio (`activos_*`):** `Categoria`, `SubCategoria` (prefijo único), `Ubicacion`, `Activo`, `HistorialMovimiento`, `Mantenimiento`, `ReporteGenerado`
+**Negocio (`activos_*`):** `Categoria`, `SubCategoria` (prefijo único), `Ubicacion`, `Activo`, `HistorialMovimiento`, `EtiquetaQR`, `Mantenimiento`, `ReporteGenerado`
 
 **Activo:** FK `subcategoria`, `ubicacion`, `usuario_asignado` → `core.UsuarioPaldaca`. Estados: `AC/IN/EM`. Código auto: `PAL-{PREFIJO}-NNN`.
+
+**EtiquetaQR:** etiqueta física. `token` opaco (12 chars, va en el QR), `codigo_reservado`, FK `subcategoria`, FK `activo` (null). Estados `PE/VI/AN`.
+El código se reserva **al imprimir**, antes de que exista el activo — por eso es tabla propia y no un campo de `Activo`.
 
 ---
 
@@ -55,6 +58,8 @@ MODULO_CODIGO = "activos"  # activos/constants.py
 - Guard: `ModuloActivoRequiredMixin`, `@requiere_modulo_paldaca` → `tiene_acceso_modulo("activos")`
 - `PaldacaSessionMiddleware`: invalida sesión si cambian permisos (`get_auth_revision`)
 - **`es_administrador_en_modulo()` no se usa en vistas** — acceso binario al módulo
+- **Excepción anónima:** `/q/<token>/` (ficha pública de una etiqueta QR) es la ÚNICA vista sin sesión.
+  Vive aislada en `activos/views_publicos.py`. Publica datos del equipo + nombre y apellido del responsable; nada más.
 
 ---
 
@@ -114,6 +119,11 @@ activos/models.py          # Dominio inventario
 activos/views.py           # Lógica principal + historial
 activos/decorators.py      # Guard módulo
 activos/constants.py       # MODULO_CODIGO, TABLA()
+activos/services/codigos.py # Reserva de codigo_inventario (único punto, con bloqueo)
+activos/services/qr.py      # Generación de QR (segno) y URL pública
+activos/views_publicos.py   # Ficha anónima /q/<token>/
+activos/views_etiquetas.py  # Gestión de etiquetas (protegida)
+reportes/services/etiquetas.py # Hoja Avery 5160 sobre Letter
 activos/forms.py           # Validaciones asignación
 activos/templatetags/activo_filters.py  # Estado derivado UI
 key.env.example            # Plantilla env SSO
@@ -128,6 +138,10 @@ key.env.example            # Plantilla env SSO
 | `/` | `core:home` |
 | `/activos/` | `activos:activo-list` |
 | `/activos/crear/` | `activos:activo-create` |
+| `/activos/etiquetas/` | `activos:etiqueta-list` |
+| `/q/<token>/` | `etiqueta-publica` (**anónima**, sin namespace) |
+| `/q/<token>/alta/` | `etiqueta-alta` (SSO; bajo `/q/` para heredar su exclusión del shell) |
+| `/reportes/etiquetas/` | `reportes:etiquetas-pdf` |
 | `/mantenimientos/` | `mantenimientos:mantenimiento-list` |
 | `/reportes/activos/` | `reportes:reporte-activos` |
 | `/usuarios/` | `usuarios:usuario-search` |
@@ -138,7 +152,7 @@ key.env.example            # Plantilla env SSO
 ## Riesgos conocidos
 
 1. `README.md` obsoleto (dice PostgreSQL/SQLite; código usa MySQL)
-2. `psycopg2-binary` en requirements sin uso
+2. `psycopg2-binary` en requirements sin uso (Pillow SÍ es necesario: ReportLab lo usa para el logo PNG; se añadió en la rama rework-QR)
 3. Rol administrador no enforced en vistas Activos
 4. `ReporteGenerado` no persistido al generar PDF
 5. Alta usuario en Activos no crea `UsuarioModulo` → puede quedar sin acceso
@@ -156,6 +170,7 @@ key.env.example            # Plantilla env SSO
 python manage.py migrate
 python manage.py seed_core_modulos
 python manage.py seed_activos_pal          # datos demo
+python manage.py etiquetar_activos --dry-run  # etiquetas QR para inventario existente
 pytest                                      # SSAPI/settings_test
 python manage.py runserver 8001            # puerto oficial Suite (Portal .env.development)
 ```

@@ -1,0 +1,230 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load activo_filters %}
+
+{% block title %}Etiquetas QR - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/activos-ui.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="ax-page">
+
+    <nav class="ax-crumbs" aria-label="Ruta de navegación">
+        <a href="{% url 'activos:activo-list' %}"><i class="bi bi-boxes"></i> Activos</a>
+        <span class="sep">/</span>
+        <span aria-current="page">Etiquetas QR</span>
+    </nav>
+
+    <header class="ax-hero">
+        <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
+            <div>
+                <span class="ax-hero-eyebrow"><i class="bi bi-qr-code"></i> Inventario físico</span>
+                <h1 class="ax-hero-title">Etiquetas QR</h1>
+                <p class="ax-hero-sub">
+                    Cada etiqueta aparta un código antes de que exista el activo. Se imprime,
+                    se pega en el equipo y al escanearla se cargan sus datos.
+                </p>
+            </div>
+            <div class="ax-hero-actions">
+                <button type="button" class="btn-pastel btn-pastel--cta"
+                        data-bs-toggle="offcanvas" data-bs-target="#drawerGenerarEtiquetas">
+                    <i class="bi bi-plus-lg"></i> Generar etiquetas
+                </button>
+            </div>
+        </div>
+    </header>
+
+    {# --- Filtros por estado, con el recuento a la vista --------------- #}
+    <section class="ax-kpis mb-3" aria-label="Estado de las etiquetas">
+        <a href="{% url 'activos:etiqueta-list' %}"
+           class="ax-kpi ax-kpi--total {% if not estado_activo %}is-active{% endif %}">
+            <span class="ax-kpi-head">
+                <span class="ax-kpi-label">Todas</span>
+                <span class="ax-kpi-icon"><i class="bi bi-collection"></i></span>
+            </span>
+            <span class="ax-kpi-value">{{ paginator.count|default:0 }}</span>
+        </a>
+        <a href="?estado=PE" class="ax-kpi ax-kpi--disponible {% if estado_activo == 'PE' %}is-active{% endif %}"
+           title="Impresas, esperando a que alguien cargue los datos del equipo">
+            <span class="ax-kpi-head">
+                <span class="ax-kpi-label">Pendientes</span>
+                <span class="ax-kpi-icon"><i class="bi bi-hourglass-split"></i></span>
+            </span>
+            <span class="ax-kpi-value">{{ resumen.pendientes }}</span>
+        </a>
+        <a href="?estado=VI" class="ax-kpi ax-kpi--asignado {% if estado_activo == 'VI' %}is-active{% endif %}">
+            <span class="ax-kpi-head">
+                <span class="ax-kpi-label">Vinculadas</span>
+                <span class="ax-kpi-icon"><i class="bi bi-link-45deg"></i></span>
+            </span>
+            <span class="ax-kpi-value">{{ resumen.vinculadas }}</span>
+        </a>
+        <a href="?estado=AN" class="ax-kpi ax-kpi--baja {% if estado_activo == 'AN' %}is-active{% endif %}">
+            <span class="ax-kpi-head">
+                <span class="ax-kpi-label">Anuladas</span>
+                <span class="ax-kpi-icon"><i class="bi bi-slash-circle"></i></span>
+            </span>
+            <span class="ax-kpi-value">{{ resumen.anuladas }}</span>
+        </a>
+    </section>
+
+    <section class="ax-card">
+        {% if etiquetas %}
+        <div class="ax-table-wrap">
+            <table class="table ax-table align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th scope="col">Código</th>
+                        <th scope="col">Subcategoría</th>
+                        <th scope="col">Estado</th>
+                        <th scope="col">Activo</th>
+                        <th scope="col">Generada</th>
+                        <th scope="col" class="text-end">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for etiqueta in etiquetas %}
+                    <tr>
+                        <td><span class="ax-code ax-mono">{{ etiqueta.codigo_reservado }}</span></td>
+                        <td>
+                            {{ etiqueta.subcategoria.nombre }}
+                            <div class="ax-equipo-sub">{{ etiqueta.subcategoria.categoria.nombre }}</div>
+                        </td>
+                        <td>
+                            {% if etiqueta.estado == 'PE' %}
+                                <span class="ax-estado"><i class="bi bi-hourglass-split"></i> Pendiente</span>
+                            {% elif etiqueta.estado == 'VI' %}
+                                <span class="ax-estado"><i class="bi bi-link-45deg"></i> Vinculada</span>
+                            {% else %}
+                                <span class="ax-estado"><i class="bi bi-slash-circle"></i> Anulada</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if etiqueta.activo %}
+                                <a href="{% url 'activos:activo-detail' etiqueta.activo.pk %}">
+                                    {{ etiqueta.activo.marca }} {{ etiqueta.activo.modelo }}
+                                </a>
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {{ etiqueta.fecha_creacion|date:"d/m/Y" }}
+                            <div class="ax-equipo-sub">{{ etiqueta.creada_por|nombre_completo:"—" }}</div>
+                        </td>
+                        <td class="text-end">
+                            <div class="d-inline-flex gap-1 flex-wrap justify-content-end">
+                                {% if etiqueta.estado != 'AN' %}
+                                <a class="btn-pastel btn-pastel--glass btn-sm"
+                                   href="{% url 'reportes:etiquetas-pdf' %}?ids={{ etiqueta.pk }}"
+                                   target="_blank" rel="noopener">
+                                    <i class="bi bi-printer"></i> Imprimir
+                                </a>
+                                {% endif %}
+
+                                {% if etiqueta.estado == 'PE' %}
+                                <a class="btn-pastel btn-pastel--cta btn-sm"
+                                   href="{% url 'etiqueta-alta' etiqueta.token %}">
+                                    <i class="bi bi-pencil-square"></i> Cargar datos
+                                </a>
+                                {% elif etiqueta.estado == 'VI' %}
+                                <form method="post" class="d-inline"
+                                      action="{% url 'activos:etiqueta-desvincular' etiqueta.pk %}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn-pastel btn-pastel--neutro btn-sm">
+                                        <i class="bi bi-x-circle"></i> Desvincular
+                                    </button>
+                                </form>
+                                {% endif %}
+
+                                {% if etiqueta.estado != 'AN' %}
+                                <form method="post" class="d-inline"
+                                      action="{% url 'activos:etiqueta-anular' etiqueta.pk %}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn-pastel btn-pastel--neutro btn-sm">
+                                        <i class="bi bi-slash-circle"></i> Anular
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% include 'activos/includes/_paginacion.html' %}
+
+        {% else %}
+        <div class="ax-card-body text-center py-5">
+            <i class="bi bi-qr-code" style="font-size:2.4rem;opacity:.35"></i>
+            <h2 class="h5 mt-3">Todavía no hay etiquetas</h2>
+            <p class="text-muted mb-3">
+                Genera un lote al comprar equipos: se apartan los códigos y sale la hoja
+                lista para imprimir, sin necesidad de saber aún qué equipo es cada uno.
+            </p>
+            <button type="button" class="btn-pastel btn-pastel--cta"
+                    data-bs-toggle="offcanvas" data-bs-target="#drawerGenerarEtiquetas">
+                <i class="bi bi-plus-lg"></i> Generar etiquetas
+            </button>
+        </div>
+        {% endif %}
+    </section>
+
+</div>
+
+{# ===================================================================== #}
+{#  Drawer de generación de lote                                         #}
+{# ===================================================================== #}
+<div class="offcanvas offcanvas-end ax-drawer" tabindex="-1" id="drawerGenerarEtiquetas"
+     aria-labelledby="drawerGenerarEtiquetasTitulo">
+
+    <div class="offcanvas-header">
+        <h5 class="offcanvas-title" id="drawerGenerarEtiquetasTitulo">
+            <i class="bi bi-qr-code me-1"></i> Generar etiquetas
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Cerrar"></button>
+    </div>
+
+    <form method="post" action="{% url 'activos:etiqueta-generar' %}" target="_blank">
+        {% csrf_token %}
+        <div class="offcanvas-body">
+            <div class="ax-callout">
+                <i class="bi bi-info-circle"></i>
+                <span>
+                    Se apartarán los códigos <strong>ahora</strong>, aunque los equipos
+                    todavía no existan en el inventario. Al confirmar se abre el PDF.
+                </span>
+            </div>
+
+            <div class="ax-form mt-3">
+                <label class="form-label" for="{{ form_generar.subcategoria.id_for_label }}">
+                    {{ form_generar.subcategoria.label }}
+                </label>
+                {{ form_generar.subcategoria }}
+                <small class="ax-hint">{{ form_generar.subcategoria.help_text }}</small>
+            </div>
+
+            <div class="ax-form mt-3">
+                <label class="form-label" for="{{ form_generar.cantidad.id_for_label }}">
+                    {{ form_generar.cantidad.label }}
+                </label>
+                {{ form_generar.cantidad }}
+                <small class="ax-hint">{{ form_generar.cantidad.help_text }}</small>
+            </div>
+        </div>
+
+        <div class="ax-formbar rounded-0 border-0 border-top m-0">
+            <button type="button" class="btn-pastel btn-pastel--neutro" data-bs-dismiss="offcanvas">
+                <i class="bi bi-x-lg"></i> Cancelar
+            </button>
+            <button type="submit" class="btn-pastel btn-pastel--menta">
+                <i class="bi bi-printer"></i> Generar e imprimir
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

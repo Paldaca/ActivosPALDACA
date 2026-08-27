@@ -2,7 +2,7 @@ from django import forms
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 
-from .models import Activo, Categoria, SubCategoria, Ubicacion
+from .models import Activo, Categoria, EtiquetaQR, SubCategoria, Ubicacion
 
 
 def usuarios_asignables():
@@ -218,3 +218,97 @@ class ReubicarActivoForm(forms.ModelForm):
         }
 
 
+
+class GenerarEtiquetasForm(forms.Form):
+    """Lote de etiquetas QR a imprimir.
+
+    Deliberadamente corto: subcategoría y cantidad son lo ÚNICO que se sabe
+    cuando llega una caja de equipos sin abrir. Pedir más aquí obligaría a
+    inventar datos o a retrasar la impresión, que es justo lo que este camino
+    evita frente al alta manual.
+    """
+
+    #: Una hoja Avery 5160 trae 30 etiquetas. Se permiten dos hojas por lote:
+    #: por encima de eso conviene revisar si de verdad se van a pegar todas,
+    #: porque cada etiqueta impresa aparta un código del inventario.
+    MAX_POR_LOTE = 60
+
+    subcategoria = forms.ModelChoiceField(
+        queryset=SubCategoria.objects.select_related("categoria"),
+        empty_label="Selecciona una subcategoría",
+        label="Subcategoría",
+        help_text="Determina el prefijo del código: PAL-{PREFIJO}-NNN.",
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+    cantidad = forms.IntegerField(
+        min_value=1,
+        max_value=MAX_POR_LOTE,
+        initial=1,
+        label="Cantidad de etiquetas",
+        help_text=f"Entre 1 y {MAX_POR_LOTE}. Una hoja Avery 5160 son 30.",
+        widget=forms.NumberInput(attrs={
+            "class": "form-control",
+            "inputmode": "numeric",
+            "min": 1,
+            "max": MAX_POR_LOTE,
+        }),
+    )
+
+
+class AltaDesdeEtiquetaForm(forms.ModelForm):
+    """Alta de un activo escaneando su etiqueta, pensada para el móvil.
+
+    Frente a `ActivoForm` faltan dos campos a propósito:
+
+    - `subcategoria` viene fijada por la etiqueta impresa. Cambiarla dejaría el
+      código `PAL-{PREFIJO}-NNN` del adhesivo mintiendo sobre lo que hay dentro.
+    - `estado` no se pregunta: un equipo que se acaba de registrar en campo está
+      operativo. Darlo de baja o mandarlo a mantenimiento es una decisión
+      posterior, y se toma desde el escritorio.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        field = self.fields["usuario_asignado"]
+        field.queryset = _usuarios_asignables_queryset()
+        field.required = False
+        field.label_from_instance = _label_usuario
+        field.empty_label = "Sin asignar por ahora"
+
+    def clean_usuario_asignado(self):
+        usuario = self.cleaned_data.get("usuario_asignado")
+        _validar_usuario_asignable(usuario)
+        return usuario
+
+    class Meta:
+        model = Activo
+        fields = [
+            "marca", "modelo", "numero_serial",
+            "ubicacion", "usuario_asignado", "observaciones",
+        ]
+        widgets = {
+            "marca": forms.TextInput(attrs={
+                "class": "form-control",
+                "placeholder": "Ej: Lenovo",
+                "autocomplete": "off",
+                "autocapitalize": "words",
+            }),
+            "modelo": forms.TextInput(attrs={
+                "class": "form-control",
+                "placeholder": "Ej: ThinkPad T14",
+                "autocomplete": "off",
+            }),
+            "numero_serial": forms.TextInput(attrs={
+                "class": "form-control",
+                "placeholder": "El de la pegatina del equipo (opcional)",
+                "autocomplete": "off",
+                "autocapitalize": "characters",
+            }),
+            "ubicacion": forms.Select(attrs={"class": "form-select"}),
+            "usuario_asignado": forms.Select(attrs={"class": "form-select"}),
+            "observaciones": forms.Textarea(attrs={
+                "class": "form-control",
+                "rows": 2,
+                "placeholder": "Golpes, faltantes, accesorios… (opcional)",
+            }),
+        }

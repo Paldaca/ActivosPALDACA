@@ -17,6 +17,7 @@ services:
       PALDACA_SSO_LOGOUT_URL: ${PALDACA_SSO_LOGOUT_URL:-https://cpaldaca.com/api/auth/sso/logout/}
       PALDACA_PORTAL_URL: ${PALDACA_PORTAL_URL:-https://cpaldaca.com}
       PALDACA_SHELL_PATH: ${PALDACA_SHELL_PATH:-/activos}
+      PALDACA_PUBLIC_BASE_URL: ${PALDACA_PUBLIC_BASE_URL:-https://activos.cpaldaca.com}
       DJANGO_LOG_TO_STDOUT: "true"
       PORT: "8082"
     volumes:

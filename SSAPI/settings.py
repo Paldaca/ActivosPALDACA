@@ -208,6 +208,29 @@ PALDACA_EMBED_REDIRECT_TO_SHELL = os.getenv(
     "PALDACA_EMBED_REDIRECT_TO_SHELL",
     "false",
 ).lower() == "true"
+
+# Rutas que NUNCA se redirigen al shell del Portal. Se replica la lista por
+# defecto de core.embed y se anade /q/ (ficha publica de una etiqueta QR): esa
+# pagina se abre escaneando un adhesivo con la camara del telefono y debe
+# funcionar suelta, sin sesion. Si se redirigiera, quien ya tuviera sesion
+# acabaria viendo la ficha dentro del iframe del Portal.
+PALDACA_EMBED_EXCLUDED_PREFIXES = (
+    "/admin/",
+    "/static/",
+    "/media/",
+    "/logout/",
+    "/healthz/",
+    "/q/",
+)
+
+# Origen absoluto que se imprime dentro del QR. Debe ser el subdominio del
+# satelite, NUNCA la ruta dentro del shell: la etiqueta se pega una vez y tiene
+# que resolver aunque el Portal no este por medio.
+PALDACA_PUBLIC_BASE_URL = (
+    (os.getenv("PALDACA_PUBLIC_BASE_URL") or "").strip().rstrip("/")
+    or ("http://localhost:8001" if _dev_env.exists() else "https://activos.cpaldaca.com")
+)
+
 SESSION_COOKIE_NAME = os.getenv("SESSION_COOKIE_NAME", "paldaca_sessionid")
 _raw_cookie_domain = (os.getenv("SESSION_COOKIE_DOMAIN") or "").strip()
 SESSION_COOKIE_DOMAIN = (

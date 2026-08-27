@@ -1,5 +1,5 @@
 from django.urls import path
-from . import views
+from . import views, views_etiquetas
 
 app_name = 'activos'
 
@@ -36,6 +36,12 @@ urlpatterns = [
 
     # Acciones en lote (reasignar / reubicar varios activos a la vez)
     path('acciones-masivas/', views.acciones_masivas, name='activo-acciones-masivas'),
+
+    # URLs de Etiquetas QR
+    path('etiquetas/', views_etiquetas.EtiquetaListView.as_view(), name='etiqueta-list'),
+    path('etiquetas/generar/', views_etiquetas.generar_etiquetas, name='etiqueta-generar'),
+    path('etiquetas/<int:pk>/anular/', views_etiquetas.etiqueta_anular, name='etiqueta-anular'),
+    path('etiquetas/<int:pk>/desvincular/', views_etiquetas.etiqueta_desvincular, name='etiqueta-desvincular'),
 
     # Alta express de catálogo desde el formulario de activos (JSON)
     path('catalogo/<slug:tipo>/rapido/', views.crear_rapido, name='crear-rapido'),

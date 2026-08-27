@@ -3,10 +3,13 @@ from django.shortcuts import redirect
 
 from activos.decorators import requiere_modulo_paldaca
 
+from activos.models import EtiquetaQR
+
 from .services import (
     exportar_inventario_excel,
     exportar_inventario_pdf,
     exportar_nota_entrega_pdf,
+    generar_hoja_etiquetas,
 )
 
 
@@ -50,3 +53,32 @@ def generar_nota_entrega(request):
     except Exception as e:
         messages.error(request, f"Error al generar la nota de entrega: {e}")
         return redirect("activos:activo-list")
+
+
+@requiere_modulo_paldaca
+def imprimir_etiquetas(request):
+    """Hoja Avery 5160 con las etiquetas cuyos ids llegan en `?ids=1,2,3`."""
+    crudos = (request.GET.get("ids") or "").strip()
+    ids = [trozo for trozo in crudos.split(",") if trozo.isdigit()]
+    if not ids:
+        messages.error(request, "No indicaste qué etiquetas imprimir.")
+        return redirect("activos:etiqueta-list")
+
+    etiquetas = list(
+        EtiquetaQR.objects.select_related("subcategoria__categoria")
+        .filter(pk__in=ids)
+        .exclude(estado=EtiquetaQR.EstadoEtiqueta.ANULADA)
+        .order_by("codigo_reservado")
+    )
+    if not etiquetas:
+        messages.error(
+            request,
+            "Esas etiquetas ya no existen o están anuladas.",
+        )
+        return redirect("activos:etiqueta-list")
+
+    try:
+        return generar_hoja_etiquetas(etiquetas)
+    except Exception as e:
+        messages.error(request, f"Error al generar las etiquetas: {e}")
+        return redirect("activos:etiqueta-list")

@@ -21,6 +21,9 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.views.static import serve as media_serve
 
+from activos.views_etiquetas import etiqueta_alta
+from activos.views_publicos import etiqueta_publica
+
 
 def healthz(_request):
     return HttpResponse("ok", content_type="text/plain")
@@ -29,6 +32,16 @@ def healthz(_request):
 urlpatterns = [
     path('healthz/', healthz, name='healthz'),
     path('admin/', admin.site.urls),
+
+    # Ficha publica de una etiqueta QR. Cuelga de la raiz y no de /activos/
+    # porque esta URL se imprime dentro del codigo: cada caracter ahorrado baja
+    # la densidad del simbolo y lo hace mas legible en un adhesivo de 25 mm.
+    # Sin app_name ni namespace, por lo mismo.
+    path('q/<str:token>/', etiqueta_publica, name='etiqueta-publica'),
+    # El alta cuelga de /q/ (y no de /activos/) para heredar esa exclusion:
+    # se llega escaneando desde el movil y no debe acabar dentro del iframe.
+    path('q/<str:token>/alta/', etiqueta_alta, name='etiqueta-alta'),
+
     path('', include('core.urls')),
     path('activos/', include('activos.urls')),
     path('mantenimientos/', include('mantenimientos.urls')),

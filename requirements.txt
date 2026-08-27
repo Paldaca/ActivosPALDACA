@@ -1,6 +1,12 @@
 openpyxl==3.1.5
 Django==5.2.7
 reportlab==4.0.4
+# ReportLab necesita PIL para incrustar PNG (el logo institucional del
+# encabezado). Sin Pillow, ImageReader._read_image() llama Image.open() sobre
+# None y TODA generacion de PDF falla. Estaba en el venv local pero no aqui,
+# asi que los PDF venian rotos en Docker.
+Pillow==12.2.0
+segno==1.6.6
 python-dotenv
 mysqlclient
 gunicorn==23.0.0
