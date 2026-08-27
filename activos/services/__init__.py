@@ -5,10 +5,10 @@ vista (porque no depende del request). Se importa desde ambos.
 """
 
 from .codigos import reservar_codigos, siguiente_codigo
-from .qr import matriz, svg_en_linea, url_publica
+from .qr import plano, svg_en_linea, url_publica
 
 __all__ = [
-    "matriz",
+    "plano",
     "reservar_codigos",
     "siguiente_codigo",
     "svg_en_linea",

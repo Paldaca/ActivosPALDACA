@@ -419,3 +419,97 @@ def test_listado_de_etiquetas_exige_sesion(client):
     r = client.get(reverse("activos:etiqueta-list"))
     assert r.status_code == 302
     assert "login" in r.url.lower()
+
+
+# =============================================================================
+# Estilo del símbolo: puntos, ojos redondeados y marca integrada
+# =============================================================================
+
+@pytest.mark.django_db
+def test_el_svg_dibuja_puntos_ojos_y_marca(etiqueta):
+    from activos.services.qr import LOGO_ESTATICO, ROJO, svg_en_linea
+
+    svg = svg_en_linea(etiqueta, tamano_px=160)
+
+    assert "<circle" in svg, "los módulos de datos van como puntos"
+    assert svg.count(f'fill="{ROJO}"') >= 6, "tres ojos, anillo y núcleo cada uno"
+    assert LOGO_ESTATICO in svg
+    assert svg.rstrip().endswith("</svg>")
+
+
+@pytest.mark.django_db
+def test_los_ojos_se_dibujan_macizos_y_nunca_trazados(etiqueta):
+    """El fallo que costó encontrar: un anillo trazado NO se lee.
+
+    Dibujar el patrón de búsqueda con `stroke` en vez de con figuras macizas
+    superpuestas deforma la proporción 1:1:3:1:1 que el lector usa para
+    localizar el símbolo. El código sale bonito y no lo abre ningún teléfono.
+    """
+    from activos.services.qr import svg_en_linea
+
+    svg = svg_en_linea(etiqueta)
+
+    assert "stroke=" not in svg
+    assert 'fill="none"' not in svg
+
+
+@pytest.mark.django_db
+def test_el_hueco_de_la_marca_no_lleva_placa(etiqueta):
+    """La marca se integra apoyándose en el hueco, no parcheando encima."""
+    from activos.services.qr import HUECO_MODULOS, plano
+
+    p = plano(etiqueta)
+    hx, hy, hlado = p.hueco
+
+    assert hlado == HUECO_MODULOS
+    # Ningún punto de datos cae dentro del hueco: por eso no hace falta taparlo.
+    assert not [
+        (x, y) for x, y in p.puntos
+        if hx <= x <= hx + hlado and hy <= y <= hy + hlado
+    ]
+
+
+def test_la_correccion_de_errores_soporta_el_estilo():
+    """Puntos y hueco central restan información: exige nivel H."""
+    from activos.services.qr import NIVEL_CORRECCION
+
+    assert NIVEL_CORRECCION == "h"
+
+
+def test_el_hueco_no_invade_la_reserva_de_correccion():
+    """Frontera medida decodificando símbolos reales con zxing, no teórica.
+
+    9 módulos sobre 41 tapan ~4,8 % del área, muy por debajo del 30 % que
+    recupera el nivel H. Si alguien agranda el hueco, esto salta antes que un
+    adhesivo ilegible pegado a un equipo.
+    """
+    from activos.services.qr import DIAMETRO_PUNTO, HUECO_MODULOS
+
+    assert HUECO_MODULOS <= 11
+    # Puntos demasiado finos se pierden en papel antes que un cuadrado igual.
+    assert DIAMETRO_PUNTO >= 0.8
+
+
+@pytest.mark.django_db
+def test_el_pdf_se_genera_aunque_falte_el_fichero_de_la_marca(etiqueta, monkeypatch):
+    """Un despliegue sin la marca debe imprimir etiquetas válidas, no reventar."""
+    from reportes.services import etiquetas as servicio
+
+    monkeypatch.setattr(servicio.servicio_qr, "ruta_logo_disco", lambda: None)
+    respuesta = servicio.generar_hoja_etiquetas([etiqueta])
+
+    assert respuesta.content.startswith(b"%PDF")
+
+
+def test_la_marca_existe_y_tiene_fondo_transparente():
+    from PIL import Image
+
+    from activos.services.qr import ruta_logo_disco
+
+    ruta = ruta_logo_disco()
+    assert ruta is not None, "falta core/static/core/img/marca_cp.png"
+
+    imagen = Image.open(ruta)
+    assert imagen.mode == "RGBA"
+    # La esquina superior izquierda queda fuera del trazo de la marca.
+    assert imagen.getpixel((0, 0))[3] == 0
