@@ -6,6 +6,11 @@ que tienen que caer sobre unos adhesivos ya troquelados. Colocar cada elemento
 por coordenadas absolutas es lo que permite decir "este QR mide 21 mm" y que
 mida 21 mm en el papel.
 
+Cada etiqueta lleva ÚNICAMENTE el símbolo, centrado en el adhesivo. Sin código
+legible ni texto de acompañamiento: la marca ya integrada en el QR basta para
+identificarlo, y menos elementos es menos que se desalinee entre lotes de
+papel.
+
 El símbolo se dibuja como vectores, no como una imagen escalada: una imagen
 reescalada por el driver de impresión difumina los bordes, y a medio milímetro
 de módulo eso es la diferencia entre que el teléfono lea el código al primer
@@ -16,7 +21,7 @@ import io
 from datetime import datetime
 
 from django.http import HttpResponse
-from reportlab.lib.colors import HexColor, black, white
+from reportlab.lib.colors import HexColor, white
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.units import inch, mm
 from reportlab.lib.utils import ImageReader
@@ -49,9 +54,6 @@ RESPIRO = 2.2 * mm
 #: lo que deja ~0,51 mm por módulo: verificado decodificando el resultado
 #: rasterizado a 300, 600 y 1200 ppp.
 LADO_QR = ALTO_ETIQUETA - (2 * RESPIRO)
-
-AZUL_PALDACA = HexColor("#32407b")
-GRIS_TENUE = HexColor("#8a91a4")
 
 
 def _cargar_marca():
@@ -154,33 +156,16 @@ def _dibujar_qr(lienzo, p, marca, x, y, lado):
 
 
 def _dibujar_etiqueta(lienzo, etiqueta, plano, marca, x, y):
-    """Una etiqueta: QR a la izquierda, identificación a la derecha."""
-    _dibujar_qr(lienzo, plano, marca, x + RESPIRO, y + RESPIRO, LADO_QR)
+    """Una etiqueta: solo el símbolo, centrado en el adhesivo.
 
-    texto_x = x + RESPIRO + LADO_QR + (2.2 * mm)
-    ancho_texto = ANCHO_ETIQUETA - (texto_x - x) - RESPIRO
-    if ancho_texto <= 0:
-        return
-
-    lienzo.setFillColor(AZUL_PALDACA)
-    lienzo.setFont("Helvetica-Bold", 5.4)
-    lienzo.drawString(texto_x, y + ALTO_ETIQUETA - RESPIRO - 4.4, "CONSORCIO PALDACA")
-
-    # El código legible es lo que se usa en un inventario físico con portapapeles,
-    # cuando nadie quiere sacar el teléfono para cada equipo.
-    lienzo.setFillColor(black)
-    lienzo.setFont("Helvetica-Bold", 10)
-    lienzo.drawString(texto_x, y + ALTO_ETIQUETA - RESPIRO - 15, etiqueta.codigo_reservado)
-
-    lienzo.setFillColor(GRIS_TENUE)
-    lienzo.setFont("Helvetica", 6)
-    nombre = etiqueta.subcategoria.nombre
-    while nombre and lienzo.stringWidth(nombre, "Helvetica", 6) > ancho_texto:
-        nombre = nombre[:-1]
-    lienzo.drawString(texto_x, y + ALTO_ETIQUETA - RESPIRO - 23.5, nombre)
-
-    lienzo.setFont("Helvetica", 5.2)
-    lienzo.drawString(texto_x, y + RESPIRO + 1.5, "Escanea para ver la ficha")
+    Sin código legible ni texto de acompañamiento a propósito: el QR ya lleva
+    la marca y basta por sí solo para identificar y abrir la ficha del
+    activo. Menos elementos también significa menos que se desalinee si el
+    troquel del papel se desvía entre lotes.
+    """
+    centrado_x = x + (ANCHO_ETIQUETA - LADO_QR) / 2
+    centrado_y = y + (ALTO_ETIQUETA - LADO_QR) / 2
+    _dibujar_qr(lienzo, plano, marca, centrado_x, centrado_y, LADO_QR)
 
 
 def generar_hoja_etiquetas(etiquetas, filename=None) -> HttpResponse:
