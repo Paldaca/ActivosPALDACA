@@ -60,11 +60,14 @@ _default_hosts = [
     "localhost",
     "activos.cpaldaca.com",
     "www.activos.cpaldaca.com",
+    ".cereipo.com",
 ]
 ALLOWED_HOSTS = _csv_env("DJANGO_ALLOWED_HOSTS", "ALLOWED_HOSTS") or _default_hosts
 _coolify_fqdn = os.getenv("COOLIFY_FQDN", "").strip()
 if _coolify_fqdn and _coolify_fqdn not in ALLOWED_HOSTS:
     ALLOWED_HOSTS.append(_coolify_fqdn)
+if "*" not in ALLOWED_HOSTS and ".cereipo.com" not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(".cereipo.com")
 
 
 # Application definition
@@ -119,6 +122,9 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
                 'core.context_processors.paldaca_urls',
             ],
+            'libraries': {
+                'cache_bust': 'core.templatetags.cache_bust',
+            },
         },
     },
 ]
@@ -284,6 +290,16 @@ for origin in _csrf_extra:
 _coolify_url = (os.getenv("COOLIFY_URL") or "").strip().rstrip("/")
 if _coolify_url and _coolify_url not in CSRF_TRUSTED_ORIGINS:
     CSRF_TRUSTED_ORIGINS.append(_coolify_url)
+
+_CEREIPO_CSRF_ORIGINS = (
+    "https://cereipo.com",
+    "https://www.cereipo.com",
+    "https://activos.cereipo.com",
+    "https://www.activos.cereipo.com",
+)
+for _origin in _CEREIPO_CSRF_ORIGINS:
+    if _origin not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(_origin)
 
 LOGIN_URL = PALDACA_SSO_LOGIN_URL
 LOGIN_REDIRECT_URL = 'core:home'

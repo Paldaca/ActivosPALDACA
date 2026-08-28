@@ -716,15 +716,25 @@ def test_fila_vinculada_ofrece_desvincular_en_el_menu(
 
 
 @pytest.mark.django_db
-def test_columna_de_acciones_usa_el_mismo_patron_sticky_que_el_resto(client_auth, etiqueta):
-    """`ax-col-actions` reserva ancho y fija la columna a la derecha para que
-    no se recorte con el resto de celdas. Todas las demás tablas del módulo
-    (activo, categoria, subcategoria, ubicacion) ya la llevan; a esta le
-    faltaba, y era justo lo que dejaba desbordar los botones en viewports
-    angostos.
+def test_listado_de_etiquetas_usa_tarjetas_con_acciones_integradas(client_auth, etiqueta):
+    """El listado ya no usa tabla + columna sticky `ax-col-actions`: cada
+    etiqueta es una tarjeta con QR, estado y acciones en el propio pie.
+    Así se evita el desborde móvil y se mantiene imprimir / cargar datos.
     """
     cuerpo = _texto(client_auth.get(reverse("activos:etiqueta-list")))
-    assert "ax-col-actions" in cuerpo
+    assert "ax-etiqueta-card" in cuerpo
+    assert "ax-etiqueta-grid" in cuerpo
+    assert "ax-col-actions" not in cuerpo
+    assert "Cargar datos" in cuerpo
+    assert "ax-etiqueta-chips" in cuerpo
+
+
+@pytest.mark.django_db
+def test_filtro_por_estado_pendiente(client_auth, etiqueta):
+    cuerpo = _texto(client_auth.get(reverse("activos:etiqueta-list"), {"estado": "PE"}))
+    assert etiqueta.codigo_reservado in cuerpo
+    assert "Filtros activos" in cuerpo
+    assert "Pendiente" in cuerpo
 
 
 # =============================================================================

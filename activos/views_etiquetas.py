@@ -18,6 +18,8 @@ from .forms import AltaDesdeEtiquetaForm, GenerarEtiquetasForm
 from .models import EtiquetaQR, HistorialMovimiento
 from .services.codigos import reservar_codigos
 
+_ESTADO_ETIQUETA_LABELS = dict(EtiquetaQR.EstadoEtiqueta.choices)
+
 
 class EtiquetaListView(ModuloActivoRequiredMixin, ListView):
     """Parque de etiquetas emitidas, filtrable por estado."""
@@ -36,17 +38,40 @@ class EtiquetaListView(ModuloActivoRequiredMixin, ListView):
         estado = (self.request.GET.get("estado") or "").upper()
         if estado in dict(EtiquetaQR.EstadoEtiqueta.choices):
             qs = qs.filter(estado=estado)
+
+        q = (self.request.GET.get("q") or "").strip()
+        if q:
+            qs = qs.filter(codigo_reservado__icontains=q)
         return qs
 
     def get_context_data(self, **kwargs):
         contexto = super().get_context_data(**kwargs)
         contexto["form_generar"] = GenerarEtiquetasForm()
-        contexto["estado_activo"] = (self.request.GET.get("estado") or "").upper()
+        estado_activo = (self.request.GET.get("estado") or "").upper()
+        q = (self.request.GET.get("q") or "").strip()
+        contexto["estado_activo"] = estado_activo
+        contexto["q"] = q
         contexto["resumen"] = {
+            "total": EtiquetaQR.objects.count(),
             "pendientes": EtiquetaQR.objects.filter(estado="PE").count(),
             "vinculadas": EtiquetaQR.objects.filter(estado="VI").count(),
             "anuladas": EtiquetaQR.objects.filter(estado="AN").count(),
         }
+
+        filtros_activos = []
+        if q:
+            filtros_activos.append({
+                "param": "q",
+                "etiqueta": "Código",
+                "valor": q,
+            })
+        if estado_activo in _ESTADO_ETIQUETA_LABELS:
+            filtros_activos.append({
+                "param": "estado",
+                "etiqueta": "Estado",
+                "valor": _ESTADO_ETIQUETA_LABELS[estado_activo],
+            })
+        contexto["filtros_activos"] = filtros_activos
         return contexto
 
 
