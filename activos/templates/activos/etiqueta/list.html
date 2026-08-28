@@ -55,7 +55,7 @@
                            type="search"
                            name="q"
                            value="{{ q }}"
-                           placeholder="Buscar por código (ej. PAL-LAP-012)"
+                           placeholder="Buscar por código (ej. PAL-L-002)"
                            autocomplete="off"
                            enterkeyhint="search"
                            aria-label="Buscar etiqueta por código">
@@ -64,7 +64,22 @@
                     </button>
                 </div>
 
-                <div class="ax-etiqueta-filters__row">
+                <div class="row g-2 ax-form ax-etiqueta-catalog-filters">
+                    <div class="col-md-6">
+                        <label class="form-label" for="{{ filter_form.categoria.id_for_label }}">
+                            Categoría
+                        </label>
+                        {{ filter_form.categoria }}
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="{{ filter_form.subcategoria.id_for_label }}">
+                            Subcategoría
+                        </label>
+                        {{ filter_form.subcategoria }}
+                    </div>
+                </div>
+
+                <div class="ax-etiqueta-filters__row mt-3">
                     <span class="ax-etiqueta-filters__label">Estado</span>
                     <div class="ax-chips ax-etiqueta-chips" role="group" aria-label="Filtrar por estado">
                         <a href="{% query_params estado='' %}"
@@ -351,6 +366,15 @@
 
         syncCamposEstado();
         window.addEventListener("resize", syncCamposEstado);
+
+        var catSelect = document.getElementById("id_categoria");
+        if (catSelect && formFiltros) {
+            catSelect.addEventListener("change", function () {
+                var subSelect = document.getElementById("id_subcategoria");
+                if (subSelect) subSelect.value = "";
+                formFiltros.submit();
+            });
+        }
 
         // El formulario abre el PDF en una pestaña nueva (target="_blank") a
         // propósito: quien genera un lote lo hace para imprimirlo ya. Pero eso

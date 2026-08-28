@@ -11,7 +11,7 @@ import unittest.mock
 import pytest
 from django.urls import reverse
 
-from activos.models import Activo, EtiquetaQR, HistorialMovimiento, SubCategoria
+from activos.models import Activo, Categoria, EtiquetaQR, HistorialMovimiento, SubCategoria
 from activos.services.codigos import reservar_codigos
 
 
@@ -735,6 +735,53 @@ def test_filtro_por_estado_pendiente(client_auth, etiqueta):
     assert etiqueta.codigo_reservado in cuerpo
     assert "Filtros activos" in cuerpo
     assert "Pendiente" in cuerpo
+
+
+@pytest.mark.django_db
+def test_filtro_por_subcategoria(client_auth, etiqueta, subcategoria):
+    otra = SubCategoria.objects.create(
+        categoria=subcategoria.categoria,
+        nombre="Otra sub",
+        prefijo="OTR",
+    )
+    EtiquetaQR.objects.create(
+        codigo_reservado="PAL-OTR-001",
+        subcategoria=otra,
+        creada_por=etiqueta.creada_por,
+        token=EtiquetaQR.generar_token(),
+    )
+
+    cuerpo = _texto(client_auth.get(
+        reverse("activos:etiqueta-list"),
+        {"subcategoria": subcategoria.pk},
+    ))
+    assert etiqueta.codigo_reservado in cuerpo
+    assert "PAL-OTR-001" not in cuerpo
+    assert "Subcategoría" in cuerpo
+
+
+@pytest.mark.django_db
+def test_filtro_por_categoria(client_auth, etiqueta, catalogo, subcategoria):
+    otra_cat = Categoria.objects.create(nombre="Mobiliario")
+    otra_sub = SubCategoria.objects.create(
+        categoria=otra_cat,
+        nombre="Silla",
+        prefijo="SIL",
+    )
+    EtiquetaQR.objects.create(
+        codigo_reservado="PAL-SIL-001",
+        subcategoria=otra_sub,
+        creada_por=etiqueta.creada_por,
+        token=EtiquetaQR.generar_token(),
+    )
+
+    cuerpo = _texto(client_auth.get(
+        reverse("activos:etiqueta-list"),
+        {"categoria": subcategoria.categoria_id},
+    ))
+    assert etiqueta.codigo_reservado in cuerpo
+    assert "PAL-SIL-001" not in cuerpo
+    assert "Categoría" in cuerpo
 
 
 # =============================================================================

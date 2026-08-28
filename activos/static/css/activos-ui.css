@@ -2093,6 +2093,19 @@ tr:hover .ax-avatar { transform: scale(1.1); }
     animation: ax-qr-scanline 1.7s ease-in-out infinite;
 }
 
+.ax-etiqueta-catalog-filters {
+    margin-top: .15rem;
+}
+
+.ax-etiqueta-catalog-filters .form-label {
+    font-size: .72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--ax-ink-3);
+    margin-bottom: .25rem;
+}
+
 .ax-etiqueta-search {
     display: flex;
     flex-wrap: wrap;

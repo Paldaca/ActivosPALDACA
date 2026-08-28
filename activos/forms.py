@@ -219,6 +219,31 @@ class ReubicarActivoForm(forms.ModelForm):
 
 
 
+class EtiquetaFilterForm(forms.Form):
+    """Filtros de catálogo para el listado de etiquetas QR."""
+
+    categoria = forms.ModelChoiceField(
+        queryset=Categoria.objects.all(),
+        required=False,
+        empty_label="Todas las categorías",
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+    subcategoria = forms.ModelChoiceField(
+        queryset=SubCategoria.objects.select_related("categoria"),
+        required=False,
+        empty_label="Todas las subcategorías",
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        categoria_id = (self.data.get("categoria") or "").strip()
+        if categoria_id.isdigit():
+            self.fields["subcategoria"].queryset = SubCategoria.objects.filter(
+                categoria_id=categoria_id,
+            ).select_related("categoria")
+
+
 class GenerarEtiquetasForm(forms.Form):
     """Lote de etiquetas QR a imprimir.
 

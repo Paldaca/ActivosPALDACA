@@ -14,8 +14,8 @@ from django.views.decorators.http import require_POST
 from django.views.generic import ListView
 
 from .decorators import ModuloActivoRequiredMixin, requiere_modulo_paldaca
-from .forms import AltaDesdeEtiquetaForm, GenerarEtiquetasForm
-from .models import EtiquetaQR, HistorialMovimiento
+from .forms import AltaDesdeEtiquetaForm, EtiquetaFilterForm, GenerarEtiquetasForm
+from .models import Categoria, EtiquetaQR, HistorialMovimiento, SubCategoria
 from .services.codigos import reservar_codigos
 
 _ESTADO_ETIQUETA_LABELS = dict(EtiquetaQR.EstadoEtiqueta.choices)
@@ -42,11 +42,21 @@ class EtiquetaListView(ModuloActivoRequiredMixin, ListView):
         q = (self.request.GET.get("q") or "").strip()
         if q:
             qs = qs.filter(codigo_reservado__icontains=q)
+
+        categoria_id = (self.request.GET.get("categoria") or "").strip()
+        if categoria_id.isdigit():
+            qs = qs.filter(subcategoria__categoria_id=categoria_id)
+
+        subcategoria_id = (self.request.GET.get("subcategoria") or "").strip()
+        if subcategoria_id.isdigit():
+            qs = qs.filter(subcategoria_id=subcategoria_id)
+
         return qs
 
     def get_context_data(self, **kwargs):
         contexto = super().get_context_data(**kwargs)
         contexto["form_generar"] = GenerarEtiquetasForm()
+        contexto["filter_form"] = EtiquetaFilterForm(self.request.GET or None)
         estado_activo = (self.request.GET.get("estado") or "").upper()
         q = (self.request.GET.get("q") or "").strip()
         contexto["estado_activo"] = estado_activo
@@ -71,6 +81,27 @@ class EtiquetaListView(ModuloActivoRequiredMixin, ListView):
                 "etiqueta": "Estado",
                 "valor": _ESTADO_ETIQUETA_LABELS[estado_activo],
             })
+
+        categoria_id = (self.request.GET.get("categoria") or "").strip()
+        if categoria_id.isdigit():
+            categoria = Categoria.objects.filter(pk=categoria_id).first()
+            if categoria:
+                filtros_activos.append({
+                    "param": "categoria",
+                    "etiqueta": "Categoría",
+                    "valor": categoria.nombre,
+                })
+
+        subcategoria_id = (self.request.GET.get("subcategoria") or "").strip()
+        if subcategoria_id.isdigit():
+            subcategoria = SubCategoria.objects.filter(pk=subcategoria_id).first()
+            if subcategoria:
+                filtros_activos.append({
+                    "param": "subcategoria",
+                    "etiqueta": "Subcategoría",
+                    "valor": subcategoria.nombre,
+                })
+
         contexto["filtros_activos"] = filtros_activos
         return contexto
 
