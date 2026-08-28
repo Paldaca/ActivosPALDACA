@@ -674,3 +674,42 @@ def test_anular_etiqueta_pendiente_no_falla_sin_activo(client_auth, etiqueta):
     assert r.status_code == 302
     etiqueta.refresh_from_db()
     assert etiqueta.estado == EtiquetaQR.EstadoEtiqueta.ANULADA
+
+
+# =============================================================================
+# Botones de la pantalla de gestión: visibles y con destino correcto
+# =============================================================================
+
+@pytest.mark.django_db
+def test_boton_imprimir_no_usa_el_estilo_translucido(client_auth, etiqueta):
+    """El estilo `--glass` es blanco translúcido, pensado para fondos de color
+    (el hero). Sobre una fila de tabla blanca queda invisible: ese fue el
+    motivo real por el que parecía no existir un botón para imprimir.
+    """
+    cuerpo = _texto(client_auth.get(reverse("activos:etiqueta-list")))
+    assert "btn-pastel--glass" not in cuerpo
+
+
+@pytest.mark.django_db
+def test_fila_de_etiqueta_ofrece_imprimir_y_cargar_datos(client_auth, etiqueta):
+    r = client_auth.get(reverse("activos:etiqueta-list"))
+    cuerpo = _texto(r)
+
+    assert f"ids={etiqueta.pk}" in cuerpo
+    assert reverse("etiqueta-alta", args=[etiqueta.token]) in cuerpo
+
+
+@pytest.mark.django_db
+def test_fila_vinculada_ofrece_desvincular_en_el_menu(
+    client_auth, etiqueta, catalogo, subcategoria
+):
+    activo = Activo.objects.create(
+        subcategoria=subcategoria, marca="M", modelo="X",
+        ubicacion=catalogo["ubicacion_almacen"],
+    )
+    etiqueta.vincular(activo)
+
+    cuerpo = _texto(client_auth.get(reverse("activos:etiqueta-list")))
+    assert reverse("activos:etiqueta-desvincular", args=[etiqueta.pk]) in cuerpo
+    # Sin la etiqueta vinculada no se ofrece "Cargar datos": ya tiene sus datos.
+    assert reverse("etiqueta-alta", args=[etiqueta.token]) not in cuerpo

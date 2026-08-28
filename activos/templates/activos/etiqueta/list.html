@@ -29,9 +29,9 @@
                 </p>
             </div>
             <div class="ax-hero-actions">
-                <button type="button" class="btn-pastel btn-pastel--cta"
+                <button type="button" class="btn-pastel btn-pastel--cta btn-pastel--lg"
                         data-bs-toggle="offcanvas" data-bs-target="#drawerGenerarEtiquetas">
-                    <i class="bi bi-plus-lg"></i> Generar etiquetas
+                    <i class="bi bi-qr-code-scan"></i> Generar etiquetas
                 </button>
             </div>
         </div>
@@ -88,17 +88,17 @@
                 <tbody>
                 {% for etiqueta in etiquetas %}
                     <tr>
-                        <td style="width:1%">
-                            <span style="display:block;width:56px;line-height:0;opacity:{% if etiqueta.estado == "AN" %}.25{% else %}1{% endif %}">
-                                {% qr_svg etiqueta 56 %}
+                        <td data-label="" class="ax-col-tight">
+                            <span style="display:block;width:44px;line-height:0;opacity:{% if etiqueta.estado == "AN" %}.3{% else %}1{% endif %}">
+                                {% qr_svg etiqueta 44 %}
                             </span>
                         </td>
-                        <td><span class="ax-code ax-mono">{{ etiqueta.codigo_reservado }}</span></td>
-                        <td>
+                        <td data-label="Código"><span class="ax-code ax-mono">{{ etiqueta.codigo_reservado }}</span></td>
+                        <td data-label="Subcategoría">
                             {{ etiqueta.subcategoria.nombre }}
                             <div class="ax-equipo-sub">{{ etiqueta.subcategoria.categoria.nombre }}</div>
                         </td>
-                        <td>
+                        <td data-label="Estado">
                             {% if etiqueta.estado == 'PE' %}
                                 <span class="ax-estado"><i class="bi bi-hourglass-split"></i> Pendiente</span>
                             {% elif etiqueta.estado == 'VI' %}
@@ -107,7 +107,7 @@
                                 <span class="ax-estado"><i class="bi bi-slash-circle"></i> Anulada</span>
                             {% endif %}
                         </td>
-                        <td>
+                        <td data-label="Activo">
                             {% if etiqueta.activo %}
                                 <a href="{% url 'activos:activo-detail' etiqueta.activo.pk %}">
                                     {{ etiqueta.activo.marca }} {{ etiqueta.activo.modelo }}
@@ -116,43 +116,59 @@
                                 <span class="text-muted">—</span>
                             {% endif %}
                         </td>
-                        <td>
+                        <td data-label="Generada">
                             {{ etiqueta.fecha_creacion|date:"d/m/Y" }}
                             <div class="ax-equipo-sub">{{ etiqueta.creada_por|nombre_completo:"—" }}</div>
                         </td>
-                        <td class="text-end">
-                            <div class="d-inline-flex gap-1 flex-wrap justify-content-end">
+                        <td data-label="Acciones" class="text-end ax-col-tight">
+                            <div class="ax-row-actions justify-content-end">
                                 {% if etiqueta.estado != 'AN' %}
-                                <a class="btn-pastel btn-pastel--glass btn-sm"
+                                <a class="btn-pastel btn-pastel--cielo btn-pastel--icon"
                                    href="{% url 'reportes:etiquetas-pdf' %}?ids={{ etiqueta.pk }}"
-                                   target="_blank" rel="noopener">
-                                    <i class="bi bi-printer"></i> Imprimir
+                                   target="_blank" rel="noopener"
+                                   title="Imprimir {{ etiqueta.codigo_reservado }}">
+                                    <i class="bi bi-printer"></i>
+                                    <span class="visually-hidden">Imprimir</span>
                                 </a>
                                 {% endif %}
 
                                 {% if etiqueta.estado == 'PE' %}
-                                <a class="btn-pastel btn-pastel--cta btn-sm"
-                                   href="{% url 'etiqueta-alta' etiqueta.token %}">
+                                <a class="btn-pastel btn-pastel--cta btn-pastel--sm"
+                                   href="{% url 'etiqueta-alta' etiqueta.token %}"
+                                   title="Cargar los datos del activo para {{ etiqueta.codigo_reservado }}">
                                     <i class="bi bi-pencil-square"></i> Cargar datos
                                 </a>
-                                {% elif etiqueta.estado == 'VI' %}
-                                <form method="post" class="d-inline"
-                                      action="{% url 'activos:etiqueta-desvincular' etiqueta.pk %}">
-                                    {% csrf_token %}
-                                    <button type="submit" class="btn-pastel btn-pastel--neutro btn-sm">
-                                        <i class="bi bi-x-circle"></i> Desvincular
-                                    </button>
-                                </form>
                                 {% endif %}
 
                                 {% if etiqueta.estado != 'AN' %}
-                                <form method="post" class="d-inline"
-                                      action="{% url 'activos:etiqueta-anular' etiqueta.pk %}">
-                                    {% csrf_token %}
-                                    <button type="submit" class="btn-pastel btn-pastel--neutro btn-sm">
-                                        <i class="bi bi-slash-circle"></i> Anular
+                                <div class="dropdown">
+                                    <button class="btn-pastel btn-pastel--neutro btn-pastel--icon" type="button"
+                                            data-bs-toggle="dropdown" aria-expanded="false"
+                                            title="Más acciones">
+                                        <i class="bi bi-three-dots"></i>
+                                        <span class="visually-hidden">Más acciones para {{ etiqueta.codigo_reservado }}</span>
                                     </button>
-                                </form>
+                                    <ul class="dropdown-menu dropdown-menu-end shadow">
+                                        {% if etiqueta.estado == 'VI' %}
+                                        <li>
+                                            <form method="post" action="{% url 'activos:etiqueta-desvincular' etiqueta.pk %}">
+                                                {% csrf_token %}
+                                                <button type="submit" class="dropdown-item">
+                                                    <i class="bi bi-x-circle me-2"></i>Desvincular
+                                                </button>
+                                            </form>
+                                        </li>
+                                        {% endif %}
+                                        <li>
+                                            <form method="post" action="{% url 'activos:etiqueta-anular' etiqueta.pk %}">
+                                                {% csrf_token %}
+                                                <button type="submit" class="dropdown-item text-danger">
+                                                    <i class="bi bi-slash-circle me-2"></i>Anular
+                                                </button>
+                                            </form>
+                                        </li>
+                                    </ul>
+                                </div>
                                 {% endif %}
                             </div>
                         </td>
@@ -230,4 +246,28 @@
         </div>
     </form>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    (function () {
+        // El formulario abre el PDF en una pestaña nueva (target="_blank") a
+        // propósito: quien genera un lote lo hace para imprimirlo ya. Pero eso
+        // deja ESTA pestaña intacta — las etiquetas recién creadas no aparecen
+        // en la tabla hasta recargar a mano. El plazo le da tiempo al
+        // navegador a abrir la pestaña nueva antes de perder el formulario
+        // bajo la recarga.
+        var form = document.querySelector('#drawerGenerarEtiquetas form');
+        if (!form) return;
+
+        form.addEventListener('submit', function () {
+            var boton = form.querySelector('button[type="submit"]');
+            if (boton) {
+                boton.disabled = true;
+                boton.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Generando…';
+            }
+            setTimeout(function () { window.location.reload(); }, 600);
+        });
+    })();
+</script>
 {% endblock %}
