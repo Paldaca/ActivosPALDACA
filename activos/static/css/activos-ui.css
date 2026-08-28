@@ -83,9 +83,15 @@
 /* -----------------------------------------------------------------------------
    2. ANIMACIONES BASE
    -------------------------------------------------------------------------- */
+/* Sin `transform`: si un elemento animado con esto es ancestro de un
+   `.dropdown-menu` (Popper con `strategy: 'fixed'`), el `transform` de una
+   animación EN CURSO lo reancla a esa tarjeta/fila en vez de al viewport —
+   el menú abre en cualquier parte menos donde debería. Con solo opacidad no
+   hay containing block nuevo que romper, así que el menú es seguro de abrir
+   incluso en el primer medio segundo tras cargar la página. */
 @keyframes ax-rise {
-    from { opacity: 0; transform: translateY(14px); }
-    to   { opacity: 1; transform: none; }
+    from { opacity: 0; }
+    to   { opacity: 1; }
 }
 
 @keyframes ax-fade {
