@@ -725,3 +725,18 @@ def test_columna_de_acciones_usa_el_mismo_patron_sticky_que_el_resto(client_auth
     """
     cuerpo = _texto(client_auth.get(reverse("activos:etiqueta-list")))
     assert "ax-col-actions" in cuerpo
+
+
+# =============================================================================
+# Caché del navegador: el CSS/JS versionado evita servir copias viejas
+# =============================================================================
+
+@pytest.mark.django_db
+def test_el_listado_de_etiquetas_carga_css_con_version(client_auth, etiqueta):
+    """Sin esto, un navegador puede seguir pintando una hoja de estilos vieja
+    después de un cambio de código — pasó varias veces depurando esta misma
+    pantalla: el fix ya estaba en el servidor y la pestaña no lo mostraba.
+    """
+    cuerpo = _texto(client_auth.get(reverse("activos:etiqueta-list")))
+    assert "activos-ui.css?v=" in cuerpo
+    assert "activos-ui.js?v=" in cuerpo

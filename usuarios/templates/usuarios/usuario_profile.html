@@ -1,11 +1,12 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load cache_bust %}
 {% load activo_filters %}
 
 {% block title %}{{ usuario|nombre_completo }} - {{ block.super }}{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'css/activos-ui.css' %}">
+<link rel="stylesheet" href="{% static_v 'css/activos-ui.css' %}">
 {% endblock %}
 
 {% block content %}
@@ -274,5 +275,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'js/activos-ui.js' %}"></script>
+<script src="{% static_v 'js/activos-ui.js' %}"></script>
 {% endblock %}

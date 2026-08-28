@@ -869,14 +869,18 @@ tr:focus-within .ax-row-actions,
 /* -----------------------------------------------------------------------------
    7. TABLA DE DATOS
    -------------------------------------------------------------------------- */
-/* `overflow-x: auto` recorta cualquier menú desplegable de las filas. Se
-   compensa en dos frentes: aquí se reserva sitio bajo la tabla, y en
-   activos-ui.js los dropdowns se posicionan con estrategia `fixed` para que
-   escapen del contenedor. */
+/* `overflow-x: auto` recorta menús de fila; activos-ui.js los mueve a body
+   (clase `.ax-dropdown-portal`) al abrir el dropdown. */
 .ax-table-wrap {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     scrollbar-gutter: stable;
+}
+
+.ax-dropdown-portal {
+    position: fixed !important;
+    z-index: 1090 !important;
+    display: block;
 }
 
 /* Los menús de Bootstrap deben ganar a la cabecera sticky y a las barras */

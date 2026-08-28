@@ -774,33 +774,133 @@
     }
 
     /* -------------------------------------------------------------------------
-       10. Dropdowns que escapan del scroll horizontal de la tabla
-       Popper posiciona en `absolute` por defecto, así que el menú de una fila
-       queda recortado por el `overflow-x` del contenedor. Con estrategia
-       `fixed` sale del recorte y se ve completo.
+       10. Dropdowns en tablas: portal al body para escapar overflow-x
+       `overflow-x: auto` en .ax-table-wrap recorta menús aunque Popper use
+       `strategy: fixed`. Tras abrir, movemos el .dropdown-menu a document.body.
        ---------------------------------------------------------------------- */
+    var axPortaledToggle = null;
+
     function initDropdowns() {
         if (!window.bootstrap || !bootstrap.Dropdown) return;
+        if (initDropdowns._ready) return;
+        initDropdowns._ready = true;
 
-        function popperFixed(config) {
-            var base = typeof config === "function" ? config({}) : (config || {});
-            return Object.assign({}, base, { strategy: "fixed" });
+        function popperFixed(defaultConfig) {
+            return Object.assign({}, defaultConfig, {
+                strategy: "fixed",
+                modifiers: [].concat(defaultConfig.modifiers || [], [
+                    { name: "preventOverflow", options: { boundary: "viewport", padding: 8 } },
+                ]),
+            });
         }
 
         $$("[data-bs-toggle=\"dropdown\"]").forEach(function (el) {
-            var existing = bootstrap.Dropdown.getInstance(el);
-            if (existing) existing.dispose();
             bootstrap.Dropdown.getOrCreateInstance(el, { popperConfig: popperFixed });
         });
 
+        function portalTableMenu(toggle) {
+            if (!toggle.closest(".ax-table-wrap")) return;
+
+            var dropdown = toggle.closest(".dropdown");
+            if (!dropdown) return;
+
+            var menu = (toggle._axDropdownPortal && toggle._axDropdownPortal.menu)
+                || dropdown.querySelector(".dropdown-menu");
+            if (!menu || menu.classList.contains("ax-dropdown-portal")) return;
+
+            var rect = menu.getBoundingClientRect();
+            var placeholder = document.createComment("ax-dropdown-portal");
+            menu.parentNode.insertBefore(placeholder, menu);
+            document.body.appendChild(menu);
+
+            menu.classList.add("ax-dropdown-portal");
+            menu.style.position = "fixed";
+            menu.style.top = Math.round(rect.top) + "px";
+            menu.style.left = Math.round(rect.left) + "px";
+            menu.style.margin = "0";
+            menu.style.transform = "none";
+            menu.style.inset = "auto";
+
+            toggle._axDropdownPortal = { menu: menu, placeholder: placeholder };
+            axPortaledToggle = toggle;
+            repositionPortaledMenu(toggle);
+        }
+
+        function restoreTableMenu(toggle) {
+            var portal = toggle._axDropdownPortal;
+            if (!portal) return;
+
+            var menu = portal.menu;
+            var placeholder = portal.placeholder;
+
+            menu.classList.remove("ax-dropdown-portal");
+            ["position", "top", "left", "margin", "transform", "inset", "z-index"].forEach(function (prop) {
+                menu.style.removeProperty(prop);
+            });
+
+            if (placeholder.parentNode) {
+                placeholder.parentNode.insertBefore(menu, placeholder);
+                placeholder.remove();
+            }
+
+            delete toggle._axDropdownPortal;
+            if (axPortaledToggle === toggle) axPortaledToggle = null;
+        }
+
+        function repositionPortaledMenu(toggle) {
+            var portal = toggle._axDropdownPortal;
+            if (!portal) return;
+
+            var menu = portal.menu;
+            var rect = toggle.getBoundingClientRect();
+            var menuW = menu.offsetWidth || 180;
+            var menuH = menu.offsetHeight || 120;
+            var top = rect.bottom;
+            var left = rect.right - menuW;
+
+            if (top + menuH > window.innerHeight - 8) top = rect.top - menuH;
+            if (left < 8) left = 8;
+            if (left + menuW > window.innerWidth - 8) left = window.innerWidth - menuW - 8;
+
+            menu.style.top = Math.round(top) + "px";
+            menu.style.left = Math.round(left) + "px";
+        }
+
         document.addEventListener("show.bs.dropdown", function (event) {
-            var row = event.target.closest(".ax-table tbody tr");
+            var toggle = event.target;
+            if (!toggle.matches || !toggle.matches('[data-bs-toggle="dropdown"]')) return;
+
+            var row = toggle.closest(".ax-table tbody tr");
             if (row) row.classList.add("is-row-menu-open");
         });
 
+        document.addEventListener("shown.bs.dropdown", function (event) {
+            var toggle = event.target;
+            if (!toggle.matches || !toggle.matches('[data-bs-toggle="dropdown"]')) return;
+            portalTableMenu(toggle);
+        });
+
         document.addEventListener("hide.bs.dropdown", function (event) {
-            var row = event.target.closest(".ax-table tbody tr");
+            var toggle = event.target;
+            if (!toggle.matches || !toggle.matches('[data-bs-toggle="dropdown"]')) return;
+
+            var row = toggle.closest(".ax-table tbody tr");
             if (row) row.classList.remove("is-row-menu-open");
+        });
+
+        document.addEventListener("hidden.bs.dropdown", function (event) {
+            var toggle = event.target;
+            if (!toggle.matches || !toggle.matches('[data-bs-toggle="dropdown"]')) return;
+
+            restoreTableMenu(toggle);
+        });
+
+        document.addEventListener("scroll", function () {
+            if (axPortaledToggle) repositionPortaledMenu(axPortaledToggle);
+        }, true);
+
+        window.addEventListener("resize", function () {
+            if (axPortaledToggle) repositionPortaledMenu(axPortaledToggle);
         });
     }
 
