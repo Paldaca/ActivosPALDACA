@@ -339,7 +339,7 @@
                         <th scope="col">Asignado a</th>
                         <th scope="col">Ubicación</th>
                         <th scope="col">Estado</th>
-                        <th scope="col" class="ax-col-tight text-end">
+                        <th scope="col" class="ax-col-tight ax-col-actions text-end">
                             <span class="visually-hidden">Acciones</span>
                         </th>
                     </tr>
@@ -401,7 +401,7 @@
 
                         <td data-label="Estado">{% badge_estado activo %}</td>
 
-                        <td class="text-end ax-col-tight" data-label="Acciones">
+                        <td class="text-end ax-col-tight ax-col-actions" data-label="Acciones">
                             <div class="ax-row-actions justify-content-end">
                                 {# Enlaces reales: sin JS llevan a la página completa #}
                                 <a href="{% url 'activos:activo-reasignar' activo.pk %}"

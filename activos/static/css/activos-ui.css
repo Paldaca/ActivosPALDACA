@@ -459,6 +459,8 @@ html { scroll-padding-bottom: 6rem; }
    El desplazamiento se hace con `padding-left`, que no crea contexto. */
 .ax-row-actions {
     display: inline-flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
     gap: .3rem;
     opacity: 0;
     padding-left: 6px;
@@ -480,6 +482,11 @@ tr:focus-within .ax-row-actions,
     overflow: hidden;
     transition: box-shadow var(--ax-mid) var(--ax-ease), transform var(--ax-mid) var(--ax-ease);
     animation: ax-rise var(--ax-slow) var(--ax-ease-out) both;
+}
+
+/* Tablas con menús de fila: no recortar dropdowns ni botones que sobresalen */
+.ax-card:has(> .ax-table-wrap) {
+    overflow: visible;
 }
 
 .ax-card:hover { box-shadow: var(--ax-sh-2); }
@@ -914,10 +921,19 @@ tr:focus-within .ax-row-actions,
 }
 
 .ax-table tbody tr {
+    position: relative;
+    z-index: 0;
     background: var(--ax-surface);
     animation: ax-rise .42s var(--ax-ease-out) both;
     animation-delay: calc(var(--i, 0) * 28ms);
     transition: background var(--ax-fast) var(--ax-ease), box-shadow var(--ax-fast) var(--ax-ease);
+}
+
+.ax-table tbody tr:hover,
+.ax-table tbody tr:focus-within,
+.ax-table tbody tr.is-row-menu-open,
+.ax-table tbody tr:has(.dropdown.show) {
+    z-index: 8;
 }
 
 .ax-table tbody tr:hover {
@@ -932,6 +948,58 @@ tr:focus-within .ax-row-actions,
 
 .ax-table tbody tr:last-child td { border-bottom: 0; }
 .ax-table .ax-col-tight { width: 1%; white-space: nowrap; }
+
+/* Columna de acciones: ancho reservado y sticky a la derecha para que el
+   contenido de otras celdas no la tape al hacer scroll horizontal. */
+.ax-table .ax-col-actions {
+    width: 1%;
+    min-width: max(9.5rem, max-content);
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+.ax-table thead th.ax-col-actions {
+    position: sticky;
+    right: 0;
+    top: 0;
+    z-index: 5;
+    background: var(--ax-surface-2);
+}
+
+.ax-table tbody td.ax-col-actions {
+    position: sticky;
+    right: 0;
+    z-index: 1;
+    overflow: visible;
+    background: var(--ax-surface);
+    box-shadow: -10px 0 14px -12px rgba(20, 22, 68, .16);
+}
+
+.ax-table tbody tr:hover td.ax-col-actions,
+.ax-table tbody tr:focus-within td.ax-col-actions,
+.ax-table tbody tr.is-row-menu-open td.ax-col-actions,
+.ax-table tbody tr:has(.dropdown.show) td.ax-col-actions {
+    z-index: 9;
+}
+
+.ax-col-actions .dropdown-menu {
+    z-index: 1085;
+}
+
+.ax-col-actions .ax-row-actions {
+    position: relative;
+    z-index: 1;
+    opacity: 1;
+    padding-left: 0;
+}
+
+.ax-table tbody tr:hover td.ax-col-actions {
+    background: var(--ax-surface-2);
+}
+
+.ax-table tbody tr.is-selected td.ax-col-actions {
+    background: color-mix(in srgb, var(--ax-lila) 55%, #fff);
+}
 
 /* Código de inventario = identificador primario, siempre destacado */
 .ax-code {
@@ -1875,6 +1943,11 @@ tr:hover .ax-avatar { transform: scale(1.1); }
     }
 
     .ax-table td[data-label=""]::before { content: none; }
+    .ax-table .ax-col-actions {
+        position: static;
+        min-width: 0;
+        box-shadow: none;
+    }
     .ax-equipo-main, .ax-equipo-sub, .ax-person-name { max-width: 100%; white-space: normal; }
     .ax-bulkbar { bottom: .5rem; border-radius: var(--ax-r-lg); }
     .ax-bulkbar .btn-pastel { flex: 1 1 auto; }

@@ -713,3 +713,15 @@ def test_fila_vinculada_ofrece_desvincular_en_el_menu(
     assert reverse("activos:etiqueta-desvincular", args=[etiqueta.pk]) in cuerpo
     # Sin la etiqueta vinculada no se ofrece "Cargar datos": ya tiene sus datos.
     assert reverse("etiqueta-alta", args=[etiqueta.token]) not in cuerpo
+
+
+@pytest.mark.django_db
+def test_columna_de_acciones_usa_el_mismo_patron_sticky_que_el_resto(client_auth, etiqueta):
+    """`ax-col-actions` reserva ancho y fija la columna a la derecha para que
+    no se recorte con el resto de celdas. Todas las demás tablas del módulo
+    (activo, categoria, subcategoria, ubicacion) ya la llevan; a esta le
+    faltaba, y era justo lo que dejaba desbordar los botones en viewports
+    angostos.
+    """
+    cuerpo = _texto(client_auth.get(reverse("activos:etiqueta-list")))
+    assert "ax-col-actions" in cuerpo

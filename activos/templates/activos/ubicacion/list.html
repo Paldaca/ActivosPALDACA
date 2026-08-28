@@ -45,7 +45,7 @@
                     <tr>
                         <th scope="col">Ubicación</th>
                         <th scope="col">Activos</th>
-                        <th scope="col" class="ax-col-tight text-end">
+                        <th scope="col" class="ax-col-tight ax-col-actions text-end">
                             <span class="visually-hidden">Acciones</span>
                         </th>
                     </tr>
@@ -65,7 +65,7 @@
                                 <span>{{ ubicacion.num_activos }} activo(s)</span>
                             </a>
                         </td>
-                        <td class="text-end ax-col-tight" data-label="Acciones">
+                        <td class="text-end ax-col-tight ax-col-actions" data-label="Acciones">
                             <div class="ax-row-actions justify-content-end">
                                 <a href="{% url 'activos:ubicacion-update' ubicacion.pk %}"
                                    class="btn-pastel btn-pastel--lila btn-pastel--icon" title="Editar">

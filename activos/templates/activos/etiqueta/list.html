@@ -73,7 +73,7 @@
     <section class="ax-card">
         {% if etiquetas %}
         <div class="ax-table-wrap">
-            <table class="table ax-table align-middle mb-0">
+            <table class="ax-table align-middle mb-0">
                 <thead>
                     <tr>
                         <th scope="col"><span class="visually-hidden">Código QR</span></th>
@@ -82,7 +82,7 @@
                         <th scope="col">Estado</th>
                         <th scope="col">Activo</th>
                         <th scope="col">Generada</th>
-                        <th scope="col" class="text-end">Acciones</th>
+                        <th scope="col" class="ax-col-tight ax-col-actions text-end">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -120,7 +120,7 @@
                             {{ etiqueta.fecha_creacion|date:"d/m/Y" }}
                             <div class="ax-equipo-sub">{{ etiqueta.creada_por|nombre_completo:"—" }}</div>
                         </td>
-                        <td data-label="Acciones" class="text-end ax-col-tight">
+                        <td data-label="Acciones" class="text-end ax-col-tight ax-col-actions">
                             <div class="ax-row-actions justify-content-end">
                                 {% if etiqueta.estado != 'AN' %}
                                 <a class="btn-pastel btn-pastel--cielo btn-pastel--icon"
@@ -249,6 +249,7 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="{% static 'js/activos-ui.js' %}"></script>
 <script>
     (function () {
         // El formulario abre el PDF en una pestaña nueva (target="_blank") a

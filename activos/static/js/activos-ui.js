@@ -781,12 +781,26 @@
        ---------------------------------------------------------------------- */
     function initDropdowns() {
         if (!window.bootstrap || !bootstrap.Dropdown) return;
-        $$('[data-bs-toggle="dropdown"]').forEach(function (el) {
-            bootstrap.Dropdown.getOrCreateInstance(el, {
-                popperConfig: function (config) {
-                    return Object.assign({}, config, { strategy: 'fixed' });
-                }
-            });
+
+        function popperFixed(config) {
+            var base = typeof config === "function" ? config({}) : (config || {});
+            return Object.assign({}, base, { strategy: "fixed" });
+        }
+
+        $$("[data-bs-toggle=\"dropdown\"]").forEach(function (el) {
+            var existing = bootstrap.Dropdown.getInstance(el);
+            if (existing) existing.dispose();
+            bootstrap.Dropdown.getOrCreateInstance(el, { popperConfig: popperFixed });
+        });
+
+        document.addEventListener("show.bs.dropdown", function (event) {
+            var row = event.target.closest(".ax-table tbody tr");
+            if (row) row.classList.add("is-row-menu-open");
+        });
+
+        document.addEventListener("hide.bs.dropdown", function (event) {
+            var row = event.target.closest(".ax-table tbody tr");
+            if (row) row.classList.remove("is-row-menu-open");
         });
     }
 

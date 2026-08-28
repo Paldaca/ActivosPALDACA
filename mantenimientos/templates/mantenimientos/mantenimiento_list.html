@@ -174,7 +174,7 @@
                         <th scope="col">Fecha</th>
                         <th scope="col" class="text-end">Costo</th>
                         <th scope="col">Estado</th>
-                        <th scope="col" class="ax-col-tight text-end">
+                        <th scope="col" class="ax-col-tight ax-col-actions text-end">
                             <span class="visually-hidden">Acciones</span>
                         </th>
                     </tr>
@@ -216,7 +216,7 @@
                             </span>
                             {% endif %}
                         </td>
-                        <td class="text-end ax-col-tight" data-label="Acciones">
+                        <td class="text-end ax-col-tight ax-col-actions" data-label="Acciones">
                             <div class="ax-row-actions justify-content-end">
                                 {% if m.estado == 'EP' %}
                                 {# POST: cambia el estado del mantenimiento y devuelve el activo a servicio #}
