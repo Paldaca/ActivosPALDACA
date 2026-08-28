@@ -18,6 +18,8 @@
         <span aria-current="page">{{ usuario|nombre_completo }}</span>
     </nav>
 
+    {% include 'activos/includes/_constancia_aviso.html' %}
+
     <header class="ax-hero">
         <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
             <div class="d-flex align-items-center gap-3 ax-min0">
@@ -77,6 +79,9 @@
                     <table class="ax-table">
                         <thead>
                             <tr>
+                                <th scope="col" class="ax-col-tight">
+                                    <span class="visually-hidden">Incluir en planilla</span>
+                                </th>
                                 <th scope="col">Código</th>
                                 <th scope="col">Equipo</th>
                                 <th scope="col">Ubicación</th>
@@ -89,6 +94,12 @@
                         <tbody data-ax-stagger="30">
                             {% for activo in activos_asignados %}
                             <tr>
+                                <td data-label="Incluir">
+                                    <input type="checkbox" class="form-check-input"
+                                           form="axFormPlanilla"
+                                           name="activos_seleccionados"
+                                           value="{{ activo.pk }}" checked>
+                                </td>
                                 <td data-label="Código">
                                     <a href="{% url 'activos:activo-detail' activo.pk %}" class="ax-code">
                                         {{ activo.codigo_inventario }}
@@ -120,6 +131,14 @@
                                 <td data-label="Estado">{% badge_estado activo %}</td>
                                 <td class="text-end ax-col-tight" data-label="Acciones">
                                     <div class="ax-row-actions justify-content-end">
+                                        {% if activo.planilla_pdf %}
+                                        <a href="{% url 'reportes:planilla-vigente' activo.pk %}"
+                                           class="btn-pastel btn-pastel--durazno btn-pastel--icon"
+                                           title="Ver planilla vigente">
+                                            <i class="bi bi-file-earmark-pdf"></i>
+                                            <span class="visually-hidden">Ver planilla de {{ activo.codigo_inventario }}</span>
+                                        </a>
+                                        {% endif %}
                                         <a href="{% url 'activos:activo-reasignar' activo.pk %}"
                                            class="btn-pastel btn-pastel--lila btn-pastel--icon"
                                            title="Reasignar a otra persona"
@@ -191,34 +210,27 @@
                     </div>
                 </section>
 
-                {# Responsiva de todos sus equipos en un solo PDF #}
+                {# Planillas vigentes: una por equipo, regenerar las actualiza #}
                 {% if activos_asignados %}
                 <section class="ax-card">
-                    <div class="ax-card-head"><h2 class="ax-card-title">Responsiva</h2></div>
+                    <div class="ax-card-head"><h2 class="ax-card-title">Planilla de asignación</h2></div>
                     <div class="ax-card-body ax-form">
                         <p class="ax-hint mt-0 mb-3">
-                            Genera la nota de entrega con los {{ total_activos }} equipo(s) a su cargo
-                            y espacio para las firmas de entrega y recepción.
+                            Se genera una planilla por equipo marcado, cada una con
+                            sus propias firmas. Regenerar actualiza la vigente del perfil.
                         </p>
-                        <form method="post" action="{% url 'reportes:nota-entrega' %}">
+                        <form id="axFormPlanilla" method="post" action="{% url 'reportes:constancia' %}">
                             {% csrf_token %}
-                            {% for activo in activos_asignados %}
-                            <input type="hidden" name="activos_seleccionados" value="{{ activo.pk }}">
-                            {% endfor %}
-                            <div class="mb-2">
-                                <label class="form-label" for="axResponsableEntrega">
-                                    Entrega <span class="ax-req">*</span>
-                                </label>
-                                <input type="text" name="responsable_entrega" id="axResponsableEntrega"
-                                       class="form-control form-control-sm" placeholder="Nombre y Apellido" required>
-                            </div>
                             <div class="mb-3">
                                 <label class="form-label" for="axObsEntrega">Observaciones</label>
-                                <input type="text" name="observaciones" id="axObsEntrega"
-                                       class="form-control form-control-sm" placeholder="Accesorios, estado…">
+                                <textarea name="observaciones" id="axObsEntrega"
+                                          class="form-control form-control-sm" rows="2"
+                                          placeholder="Estado, notas…"></textarea>
                             </div>
+                            <p class="ax-hint">Entrega: {{ request.user.get_full_name|default:request.user.username }}</p>
                             <button type="submit" class="btn-pastel btn-pastel--durazno btn-pastel--block">
-                                Generar nota de entrega
+                                <i class="bi bi-file-earmark-pdf"></i>
+                                Generar / actualizar planilla(s)
                             </button>
                         </form>
                     </div>

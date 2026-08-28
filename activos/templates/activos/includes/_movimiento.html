@@ -5,6 +5,7 @@ Un movimiento de la línea de tiempo. Espera `movimiento` en el contexto.
 {% elif movimiento.tipo_movimiento == 'AC' %}{% firstof 'actualizacion' as tono %}{% firstof 'bi-pencil' as icono %}
 {% elif movimiento.tipo_movimiento == 'RE' %}{% firstof 'reasignacion' as tono %}{% firstof 'bi-person-gear' as icono %}
 {% elif movimiento.tipo_movimiento == 'RU' %}{% firstof 'reubicacion' as tono %}{% firstof 'bi-geo-alt' as icono %}
+{% elif movimiento.tipo_movimiento == 'PA' %}{% firstof 'actualizacion' as tono %}{% firstof 'bi-file-earmark-pdf' as icono %}
 {% elif movimiento.tipo_movimiento == 'CE' %}{% firstof 'estado' as tono %}{% firstof 'bi-arrow-repeat' as icono %}
 {% else %}{% firstof 'eliminacion' as tono %}{% firstof 'bi-trash' as icono %}{% endif %}
 <li class="ax-tl-item ax-tl--{{ tono }}">
@@ -30,6 +31,12 @@ Un movimiento de la línea de tiempo. Espera `movimiento` en el contexto.
         {# …y la descripción registrada, que puede llevar contexto propio. #}
         {% if movimiento.descripcion %}
         <p class="ax-hint mt-2 mb-0">{{ movimiento.descripcion }}</p>
+        {% endif %}
+        {% if movimiento.archivo_planilla %}
+        <a href="{% url 'reportes:planilla-historial' movimiento.pk %}"
+           class="btn-pastel btn-pastel--durazno btn-pastel--sm mt-2">
+            <i class="bi bi-file-earmark-pdf"></i> Descargar planilla
+        </a>
         {% endif %}
     </div>
 </li>

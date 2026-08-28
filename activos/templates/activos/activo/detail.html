@@ -18,6 +18,8 @@
         <span aria-current="page">{{ activo.codigo_inventario }}</span>
     </nav>
 
+    {% include 'activos/includes/_constancia_aviso.html' %}
+
     {# ===================================================================== #}
     {#  ENCABEZADO — identidad del activo y estado, siempre a la vista       #}
     {# ===================================================================== #}
@@ -252,8 +254,21 @@
                         </span>
                         <p class="ax-spec-value mb-1">{{ activo.usuario_asignado|nombre_completo }}</p>
                         {% if activo.usuario_asignado.perfil %}
-                        <p class="ax-person-meta mb-3">{{ activo.usuario_asignado.perfil }}</p>
+                        <p class="ax-person-meta mb-2">{{ activo.usuario_asignado.perfil }}</p>
                         {% endif %}
+                        {% if activo.planilla_pdf %}
+                        <a href="{% url 'reportes:planilla-vigente' activo.pk %}"
+                           class="btn-pastel btn-pastel--durazno btn-pastel--sm mb-2">
+                            <i class="bi bi-file-earmark-pdf"></i> Ver planilla
+                        </a>
+                        {% endif %}
+                        <form method="post" action="{% url 'reportes:constancia' %}" class="mb-3">
+                            {% csrf_token %}
+                            <input type="hidden" name="activos_seleccionados" value="{{ activo.pk }}">
+                            <button type="submit" class="btn-pastel btn-pastel--durazno btn-pastel--block">
+                                <i class="bi bi-file-earmark-pdf"></i> Planilla de asignación
+                            </button>
+                        </form>
                         {% else %}
                         <span class="ax-avatar ax-avatar--xl mx-auto mb-2" style="border-style: dashed;">
                             <i class="bi bi-person-dash"></i>
@@ -298,37 +313,33 @@
                     </div>
                 </section>
 
-                {# Responsiva / nota de entrega con firma #}
+                {# Planilla de asignación con firmas #}
+                {% if activo.usuario_asignado %}
                 <section class="ax-card">
                     <div class="ax-card-head">
-                        <h2 class="ax-card-title"><i class="bi bi-vector-pen"></i> Responsiva</h2>
+                        <h2 class="ax-card-title"><i class="bi bi-vector-pen"></i> Planilla de asignación</h2>
                     </div>
                     <div class="ax-card-body ax-form">
                         <p class="ax-hint mt-0 mb-3">
-                            Genera la nota de entrega en PDF, con espacio para las firmas
-                            de quien entrega y quien recibe.
+                            Una planilla de este equipo, con firmas de quien entrega
+                            y quien recibe. Regenerar actualiza la vigente del perfil.
                         </p>
-                        <form method="post" action="{% url 'reportes:nota-entrega' %}">
+                        <form method="post" action="{% url 'reportes:constancia' %}">
                             {% csrf_token %}
                             <input type="hidden" name="activos_seleccionados" value="{{ activo.pk }}">
-                            <div class="mb-2">
-                                <label class="form-label" for="axResponsableEntrega">
-                                    Entrega <span class="ax-req">*</span>
-                                </label>
-                                <input type="text" name="responsable_entrega" id="axResponsableEntrega"
-                                       class="form-control form-control-sm" placeholder="Nombre y Apellido" required>
-                            </div>
                             <div class="mb-3">
                                 <label class="form-label" for="axObsEntrega">Observaciones</label>
-                                <input type="text" name="observaciones" id="axObsEntrega"
-                                       class="form-control form-control-sm" placeholder="Accesorios, estado…">
+                                <textarea name="observaciones" id="axObsEntrega"
+                                          class="form-control form-control-sm" rows="2"
+                                          placeholder="Estado, notas…"></textarea>
                             </div>
                             <button type="submit" class="btn-pastel btn-pastel--durazno btn-pastel--block">
-                                <i class="bi bi-file-earmark-pdf"></i> Generar nota de entrega
+                                <i class="bi bi-file-earmark-pdf"></i> Generar / actualizar planilla
                             </button>
                         </form>
                     </div>
                 </section>
+                {% endif %}
 
                 {# Resto de acciones, deliberadamente menos prominentes #}
                 <section class="ax-card">

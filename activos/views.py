@@ -10,6 +10,7 @@ from django.db.models import Q, Count
 from django.http import JsonResponse
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from .models import Categoria, SubCategoria, Ubicacion, Activo, HistorialMovimiento
 from .forms import (
     CategoriaForm, SubCategoriaForm, UbicacionForm,
@@ -28,6 +29,43 @@ def _url_de_retorno(request, url, fallback='activos:activo-list'):
     ):
         return url
     return reverse(fallback)
+
+
+def _url_con_constancia(url, ids):
+    """Append ?constancia=1,2,3 keeping any filters already in the URL."""
+    if not ids:
+        return url
+    parts = urlsplit(url)
+    query = dict(parse_qsl(parts.query, keep_blank_values=True))
+    query["constancia"] = ",".join(str(pk) for pk in ids)
+    return urlunsplit((
+        parts.scheme,
+        parts.netloc,
+        parts.path,
+        urlencode(query),
+        parts.fragment,
+    ))
+
+
+def _aplicar_planilla_de_reasignacion(
+    activo, usuario_nuevo, entrega_usuario, movimiento
+):
+    """Save or clear the current planilla after a responsible change."""
+    from reportes.services.asignacion import (
+        guardar_planilla,
+        limpiar_planilla_vigente,
+    )
+
+    if movimiento is None:
+        return
+    if usuario_nuevo:
+        guardar_planilla(
+            activo,
+            entrega_usuario=entrega_usuario,
+            movimiento=movimiento,
+        )
+        return
+    limpiar_planilla_vigente(activo)
 
 
 class SinPaginaDeBorradoMixin:
@@ -429,12 +467,24 @@ class ActivoUpdateView(ActivoFormContextMixin, ModuloActivoRequiredMixin, Update
             activo_actualizado.ubicacion,
             self.request.user,
         )
-        _registrar_reasignacion_en_historial(
+        movimiento = _registrar_reasignacion_en_historial(
             activo_actualizado,
             activo_original.usuario_asignado,
             activo_actualizado.usuario_asignado,
             self.request.user,
         )
+        try:
+            _aplicar_planilla_de_reasignacion(
+                activo_actualizado,
+                activo_actualizado.usuario_asignado,
+                self.request.user,
+                movimiento,
+            )
+        except Exception as exc:
+            messages.error(
+                self.request,
+                f"Se guardó el cambio, pero no se pudo generar la planilla: {exc}",
+            )
         messages.success(self.request, 'Activo actualizado exitosamente.')
         return response
 
@@ -489,7 +539,7 @@ def _registrar_reasignacion_en_historial(activo, usuario_anterior, usuario_nuevo
     # El historial también respeta la regla: "Nombre Apellido", nunca username.
     valor_anterior = _nombre(usuario_anterior)
     valor_nuevo = _nombre(usuario_nuevo)
-    HistorialMovimiento.objects.create(
+    return HistorialMovimiento.objects.create(
         activo=activo,
         tipo_movimiento=HistorialMovimiento.TipoMovimiento.REASIGNACION,
         descripcion=f"Reasignación de usuario: {valor_anterior} -> {valor_nuevo}",
@@ -530,20 +580,40 @@ def reasignar_activo(request, pk):
             activo_actualizado = form.save()
             usuario_nuevo = activo_actualizado.usuario_asignado
 
-            _registrar_reasignacion_en_historial(
+            movimiento = _registrar_reasignacion_en_historial(
                 activo_actualizado,
                 usuario_anterior,
                 usuario_nuevo,
                 request.user,
             )
+            try:
+                _aplicar_planilla_de_reasignacion(
+                    activo_actualizado,
+                    usuario_nuevo,
+                    request.user,
+                    movimiento,
+                )
+            except Exception as exc:
+                messages.error(
+                    request,
+                    f"Se reasignó el equipo, pero no se pudo generar la planilla: {exc}",
+                )
 
             messages.success(
                 request,
                 f'{activo.codigo_inventario} · {_nombre(usuario_anterior)} → {_nombre(usuario_nuevo)}',
             )
             if request.POST.get('next'):
-                return redirect(destino)
-            return redirect('activos:activo-detail', pk=pk)
+                destino_final = destino
+            else:
+                destino_final = reverse(
+                    'activos:activo-detail', kwargs={'pk': pk}
+                )
+            if usuario_nuevo and movimiento is not None:
+                destino_final = _url_con_constancia(
+                    destino_final, [pk]
+                )
+            return redirect(destino_final)
     else:
         form = ReasignarActivoForm(instance=activo)
 
@@ -701,6 +771,8 @@ def acciones_masivas(request):
                 messages.error(request, 'La persona seleccionada no está disponible.')
                 return redirect(volver)
 
+        pendientes = []
+        liberados = []
         with transaction.atomic():
             for activo in activos:
                 if activo.usuario_asignado_id == (usuario.pk if usuario else None):
@@ -708,14 +780,39 @@ def acciones_masivas(request):
                 anterior = activo.usuario_asignado
                 activo.usuario_asignado = usuario
                 activo.save(update_fields=['usuario_asignado', 'fecha_actualizacion'])
-                _registrar_reasignacion_en_historial(activo, anterior, usuario, request.user)
+                movimiento = _registrar_reasignacion_en_historial(
+                    activo, anterior, usuario, request.user,
+                )
                 cambios += 1
+                if usuario:
+                    pendientes.append((activo, movimiento))
+                else:
+                    liberados.append((activo, movimiento))
+
+        for activo, movimiento in liberados:
+            _aplicar_planilla_de_reasignacion(
+                activo, None, request.user, movimiento,
+            )
+        ids_constancia = []
+        try:
+            for activo, movimiento in pendientes:
+                _aplicar_planilla_de_reasignacion(
+                    activo, usuario, request.user, movimiento,
+                )
+                ids_constancia.append(activo.pk)
+        except Exception as exc:
+            messages.error(
+                request,
+                f"Se reasignaron los equipos, pero no se pudo generar la planilla: {exc}",
+            )
 
         messages.success(
             request,
             f'{cambios} activo(s) reasignado(s) a {_nombre(usuario)}.'
             if cambios else 'Los activos seleccionados ya tenían ese responsable.',
         )
+        if ids_constancia:
+            return redirect(_url_con_constancia(volver, ids_constancia))
 
     elif accion == 'reubicar':
         ubicacion = Ubicacion.objects.filter(pk=destino_id).first() if destino_id else None

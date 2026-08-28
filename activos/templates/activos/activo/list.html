@@ -12,6 +12,8 @@
 {% block content %}
 <div class="ax-page">
 
+    {% include 'activos/includes/_constancia_aviso.html' %}
+
     {# ===================================================================== #}
     {#  ENCABEZADO                                                           #}
     {# ===================================================================== #}
@@ -513,9 +515,9 @@
                 data-bs-toggle="offcanvas" data-bs-target="#drawerLoteReubicar">
             <i class="bi bi-geo-alt"></i> Reubicar
         </button>
-        <button type="button" class="btn-pastel btn-pastel--durazno btn-pastel--sm"
+                <button type="button" class="btn-pastel btn-pastel--durazno btn-pastel--sm"
                 data-bs-toggle="modal" data-bs-target="#modalNotaEntrega">
-            <i class="bi bi-clipboard-check"></i> Nota de entrega
+            <i class="bi bi-clipboard-check"></i> Planilla de asignación
         </button>
         <button type="button" class="btn-pastel btn-pastel--glass btn-pastel--sm ms-auto" data-ax-bulk-clear>
             <i class="bi bi-x-lg"></i> Cancelar
@@ -587,32 +589,26 @@
 
 <div class="modal fade" id="modalNotaEntrega" tabindex="-1" aria-labelledby="modalNotaEntregaTitulo" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-        <form method="post" action="{% url 'reportes:nota-entrega' %}"
+        <form method="post" action="{% url 'reportes:constancia' %}"
               class="modal-content ax-form" data-ax-bulk-form="activos_seleccionados">
             {% csrf_token %}
             <div class="modal-header">
                 <h5 class="modal-title ax-card-title" id="modalNotaEntregaTitulo">
-                    <i class="bi bi-clipboard-check"></i> Generar nota de entrega
+                    <i class="bi bi-clipboard-check"></i> Generar planilla de asignación
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
             </div>
             <div class="modal-body">
                 <div class="ax-callout mb-3">
                     <i class="bi bi-file-earmark-text"></i>
-                    <span>Se generará un PDF con <strong data-ax-bulk-label="{n} activo(s)">0 activo(s)</strong>
-                        y espacio para las firmas de entrega y recepción.</span>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label" for="axResponsableEntrega">
-                        Responsable de la entrega <span class="ax-req">*</span>
-                    </label>
-                    <input type="text" name="responsable_entrega" id="axResponsableEntrega"
-                           class="form-control" placeholder="Nombre y Apellido" required>
+                    <span>Se generará una planilla por cada
+                        <strong data-ax-bulk-label="{n} activo(s)">0 activo(s)</strong>,
+                        con sus propias firmas de entrega y recepción.</span>
                 </div>
                 <div>
                     <label class="form-label" for="axObsEntrega">Observaciones</label>
                     <textarea name="observaciones" id="axObsEntrega" class="form-control" rows="2"
-                              placeholder="Condiciones del equipo, accesorios incluidos…"></textarea>
+                              placeholder="Estado, notas…"></textarea>
                 </div>
             </div>
             <div class="modal-footer">

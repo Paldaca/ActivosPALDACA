@@ -784,6 +784,17 @@ def test_filtro_por_categoria(client_auth, etiqueta, catalogo, subcategoria):
     assert "Categoría" in cuerpo
 
 
+@pytest.mark.django_db
+def test_filtro_por_categoria_abre_mas_filtros(client_auth, etiqueta, subcategoria):
+    cuerpo = _texto(client_auth.get(
+        reverse("activos:etiqueta-list"),
+        {"categoria": subcategoria.categoria_id},
+    ))
+    assert "axEtiquetaFiltrosAvanzados" in cuerpo
+    assert "Más filtros" in cuerpo
+    assert "collapse show" in cuerpo
+
+
 # =============================================================================
 # Caché del navegador: el CSS/JS versionado evita servir copias viejas
 # =============================================================================

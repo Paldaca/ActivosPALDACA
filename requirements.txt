@@ -6,6 +6,8 @@ reportlab==4.0.4
 # None y TODA generacion de PDF falla. Estaba en el venv local pero no aqui,
 # asi que los PDF venian rotos en Docker.
 Pillow==12.2.0
+# HTML→PDF de la planilla de asignación. Python puro; reutiliza ReportLab.
+xhtml2pdf==0.2.17
 segno==1.6.6
 python-dotenv
 mysqlclient

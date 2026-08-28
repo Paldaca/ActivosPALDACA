@@ -64,49 +64,68 @@
                     </button>
                 </div>
 
-                <div class="row g-2 ax-form ax-etiqueta-catalog-filters">
-                    <div class="col-md-6">
-                        <label class="form-label" for="{{ filter_form.categoria.id_for_label }}">
-                            Categoría
-                        </label>
-                        {{ filter_form.categoria }}
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    <div class="ax-etiqueta-filters__row flex-grow-1">
+                        <span class="ax-etiqueta-filters__label d-none d-md-inline">Estado</span>
+                        <div class="ax-chips ax-etiqueta-chips" role="group" aria-label="Filtrar por estado">
+                            <a href="{% query_params estado='' %}"
+                               class="ax-chip ax-chip--todos {% if not estado_activo %}is-active{% endif %}">
+                                Todas
+                                <span class="ax-chip-count">{{ resumen.total }}</span>
+                            </a>
+                            <a href="{% query_params estado='PE' %}"
+                               class="ax-chip ax-chip--mantenimiento {% filtro_activo 'estado' 'PE' %}"
+                               title="Impresas, esperando a que alguien cargue los datos del equipo">
+                                <i class="bi bi-hourglass-split"></i> Pendientes
+                                <span class="ax-chip-count">{{ resumen.pendientes }}</span>
+                            </a>
+                            <a href="{% query_params estado='VI' %}"
+                               class="ax-chip ax-chip--asignado {% filtro_activo 'estado' 'VI' %}">
+                                <i class="bi bi-link-45deg"></i> Vinculadas
+                                <span class="ax-chip-count">{{ resumen.vinculadas }}</span>
+                            </a>
+                            <a href="{% query_params estado='AN' %}"
+                               class="ax-chip ax-chip--baja {% filtro_activo 'estado' 'AN' %}">
+                                <i class="bi bi-slash-circle"></i> Anuladas
+                                <span class="ax-chip-count">{{ resumen.anuladas }}</span>
+                            </a>
+                        </div>
                     </div>
-                    <div class="col-md-6">
-                        <label class="form-label" for="{{ filter_form.subcategoria.id_for_label }}">
-                            Subcategoría
-                        </label>
-                        {{ filter_form.subcategoria }}
+
+                    <button class="btn-pastel btn-pastel--neutro btn-pastel--sm ms-auto ax-filters-toggle"
+                            type="button" data-bs-toggle="collapse" data-bs-target="#axEtiquetaFiltrosAvanzados"
+                            aria-expanded="{% if hay_filtros %}true{% else %}false{% endif %}">
+                        <i class="bi bi-funnel"></i> Más filtros
+                        <i class="bi bi-chevron-down ax-caret"></i>
+                    </button>
+                </div>
+
+                <div class="collapse {% if hay_filtros %}show{% endif %}" id="axEtiquetaFiltrosAvanzados">
+                    <div class="row g-3 mt-1 ax-form">
+                        <div class="col-md-6">
+                            <label class="form-label" for="{{ filter_form.categoria.id_for_label }}">
+                                Categoría
+                            </label>
+                            {{ filter_form.categoria }}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="{{ filter_form.subcategoria.id_for_label }}">
+                                Subcategoría
+                            </label>
+                            {{ filter_form.subcategoria }}
+                        </div>
+                        <div class="col-12 d-flex gap-2">
+                            <button type="submit" class="btn-pastel btn-pastel--lila btn-pastel--sm">
+                                <i class="bi bi-check2"></i> Aplicar filtros
+                            </button>
+                            <a href="{% url 'activos:etiqueta-list' %}" class="btn-pastel btn-pastel--neutro btn-pastel--sm">
+                                <i class="bi bi-arrow-counterclockwise"></i> Limpiar todo
+                            </a>
+                        </div>
                     </div>
                 </div>
 
-                <div class="ax-etiqueta-filters__row mt-3">
-                    <span class="ax-etiqueta-filters__label">Estado</span>
-                    <div class="ax-chips ax-etiqueta-chips" role="group" aria-label="Filtrar por estado">
-                        <a href="{% query_params estado='' %}"
-                           class="ax-chip ax-chip--todos {% if not estado_activo %}is-active{% endif %}">
-                            Todas
-                            <span class="ax-chip-count">{{ resumen.total }}</span>
-                        </a>
-                        <a href="{% query_params estado='PE' %}"
-                           class="ax-chip ax-chip--mantenimiento {% filtro_activo 'estado' 'PE' %}"
-                           title="Impresas, esperando a que alguien cargue los datos del equipo">
-                            <i class="bi bi-hourglass-split"></i> Pendientes
-                            <span class="ax-chip-count">{{ resumen.pendientes }}</span>
-                        </a>
-                        <a href="{% query_params estado='VI' %}"
-                           class="ax-chip ax-chip--asignado {% filtro_activo 'estado' 'VI' %}">
-                            <i class="bi bi-link-45deg"></i> Vinculadas
-                            <span class="ax-chip-count">{{ resumen.vinculadas }}</span>
-                        </a>
-                        <a href="{% query_params estado='AN' %}"
-                           class="ax-chip ax-chip--baja {% filtro_activo 'estado' 'AN' %}">
-                            <i class="bi bi-slash-circle"></i> Anuladas
-                            <span class="ax-chip-count">{{ resumen.anuladas }}</span>
-                        </a>
-                    </div>
-                </div>
-
-                <div class="ax-etiqueta-filters__mobile d-md-none">
+                <div class="ax-etiqueta-filters__mobile d-md-none mt-2">
                     <label class="form-label" for="ax-etiqueta-estado">Estado</label>
                     <select id="ax-etiqueta-estado" class="form-select" name="estado" disabled
                             onchange="this.form.submit()">
@@ -138,9 +157,6 @@
                     </a>
                 </span>
                 {% endfor %}
-                <a href="{% url 'activos:etiqueta-list' %}" class="btn-pastel btn-pastel--neutro btn-pastel--sm">
-                    <i class="bi bi-arrow-counterclockwise"></i> Limpiar todo
-                </a>
             </div>
             {% endif %}
         </div>

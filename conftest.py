@@ -26,6 +26,15 @@ def client_auth(client, user):
     return client
 
 
+@pytest.fixture(autouse=True)
+def media_tmp(tmp_path, settings):
+    """Isolate uploaded planillas from the project media folder."""
+    root = tmp_path / "media"
+    root.mkdir()
+    settings.MEDIA_ROOT = root
+    return root
+
+
 @pytest.fixture
 def catalogo(db):
     """Categoría, subcategoría, dos ubicaciones y dos usuarios Paldaca asignables."""

@@ -1,0 +1,11 @@
+{% if request.GET.constancia %}
+<div class="ax-callout ax-callout--ok mb-3" role="status">
+    <i class="bi bi-file-earmark-pdf" aria-hidden="true"></i>
+    <span>
+        Planilla lista para imprimir y firmar.
+        <a href="{% url 'reportes:constancia' %}?activos={{ request.GET.constancia }}">
+            Imprimir planilla
+        </a>
+    </span>
+</div>
+{% endif %}

@@ -13,6 +13,8 @@ from django.urls import reverse
 from django.views.decorators.http import require_POST
 from django.views.generic import ListView
 
+from reportes.services.asignacion import guardar_planilla
+
 from .decorators import ModuloActivoRequiredMixin, requiere_modulo_paldaca
 from .forms import AltaDesdeEtiquetaForm, EtiquetaFilterForm, GenerarEtiquetasForm
 from .models import Categoria, EtiquetaQR, HistorialMovimiento, SubCategoria
@@ -103,6 +105,10 @@ class EtiquetaListView(ModuloActivoRequiredMixin, ListView):
                 })
 
         contexto["filtros_activos"] = filtros_activos
+        contexto["hay_filtros"] = bool(
+            (self.request.GET.get("categoria") or "").strip().isdigit()
+            or (self.request.GET.get("subcategoria") or "").strip().isdigit()
+        )
         return contexto
 
 
@@ -208,7 +214,7 @@ def etiqueta_alta(request, token):
                 # deja rastro: registrar un equipo en campo, desde un móvil y
                 # posiblemente por alguien distinto de quien lo compró, es
                 # justo el evento que después se quiere poder reconstruir.
-                HistorialMovimiento.objects.create(
+                movimiento_alta = HistorialMovimiento.objects.create(
                     activo=activo,
                     tipo_movimiento=HistorialMovimiento.TipoMovimiento.CREACION,
                     descripcion=(
@@ -223,11 +229,17 @@ def etiqueta_alta(request, token):
             )
             destino = reverse("activos:activo-detail", kwargs={"pk": activo.pk})
             if activo.usuario_asignado_id:
-                # Enganche para la constancia de asignación (fase pendiente,
-                # sin implementar todavía): hoy `?constancia=` no lo lee nadie,
-                # así que esto no ofrece nada en la ficha. Se deja el parámetro
-                # para no tener que volver a tocar este punto de disparo
-                # cuando se construya esa pieza.
+                try:
+                    guardar_planilla(
+                        activo,
+                        entrega_usuario=request.user,
+                        movimiento=movimiento_alta,
+                    )
+                except Exception as exc:
+                    messages.error(
+                        request,
+                        f"Se registró el activo, pero no se pudo generar la planilla: {exc}",
+                    )
                 return redirect(f"{destino}?constancia={activo.pk}")
             return redirect(destino)
     else:

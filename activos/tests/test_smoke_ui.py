@@ -126,7 +126,8 @@ def test_reasignar_con_next_vuelve_al_listado(cli, datos):
         {"usuario_asignado": datos["ana"].pk, "next": destino},
     )
     assert r.status_code == 302
-    assert r.url == destino
+    assert r.url.startswith(destino)
+    assert f"constancia={a.pk}" in r.url
     a.refresh_from_db()
     assert a.usuario_asignado_id == datos["ana"].pk
     assert a.historial_movimientos.filter(tipo_movimiento="RE").count() == 1
@@ -149,6 +150,7 @@ def test_acciones_masivas_reasignar(cli, datos):
         "next": reverse("activos:activo-list"),
     })
     assert r.status_code == 302
+    assert "constancia=" in r.url
     for pk in ids:
         act = Activo.objects.get(pk=pk)
         assert act.usuario_asignado_id == datos["ana"].pk

@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Planilla de Asignación de Equipos</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 1.4cm 1.6cm;
+        }
+        body {
+            font-family: Helvetica, Arial, sans-serif;
+            font-size: 10px;
+            color: #1b2430;
+            margin: 0;
+            padding: 0;
+        }
+        .planilla { width: 100%; }
+        .header td { vertical-align: middle; }
+        .logo { width: 210px; }
+        .brand {
+            text-align: right;
+            color: #32407b;
+        }
+        .brand .rif {
+            font-size: 8px;
+            color: #5a6472;
+        }
+        h1 {
+            font-size: 15px;
+            color: #32407b;
+            text-align: center;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            margin: 12px 0 10px;
+            border-top: 2px solid #32407b;
+            border-bottom: 1px solid #32407b;
+            padding: 8px 0;
+        }
+        .section-title {
+            background: #32407b;
+            color: #ffffff;
+            font-size: 9px;
+            font-weight: bold;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            padding: 5px 8px;
+        }
+        table.block {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 10px;
+        }
+        table.block td {
+            border: 1px solid #c5ced8;
+            padding: 5px 8px;
+            vertical-align: top;
+        }
+        .label {
+            width: 28%;
+            background: #f4f6f9;
+            color: #32407b;
+            font-weight: bold;
+        }
+        .obs {
+            min-height: 42px;
+        }
+        table.firmas {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 18px;
+        }
+        table.firmas td {
+            width: 50%;
+            border: 1px solid #32407b;
+            padding: 10px 12px 8px;
+            text-align: center;
+            vertical-align: top;
+        }
+        .firmas h2 {
+            font-size: 10px;
+            color: #32407b;
+            margin: 0 0 8px;
+            text-transform: uppercase;
+        }
+        .sign-gap {
+            height: 62px;
+            border-bottom: 1px solid #1b2430;
+            margin: 28px 18px 6px;
+        }
+        .muted {
+            font-size: 8px;
+            color: #5a6472;
+        }
+        .footer {
+            margin-top: 14px;
+            border-top: 1px solid #c5ced8;
+            padding-top: 6px;
+            text-align: center;
+            font-size: 8px;
+            color: #5a6472;
+        }
+        .break { page-break-after: always; }
+    </style>
+</head>
+<body>
+{% for activo in activos %}
+<div class="planilla">
+    <table class="header" style="width:100%; border-collapse:collapse;">
+        <tr>
+            <td style="width:46%;">
+                {% if logo_url %}
+                <img src="{{ logo_url }}" class="logo" alt="Consorcio Paldaca">
+                {% endif %}
+            </td>
+            <td class="brand">
+                <strong>CONSORCIO PALDACA C.A.</strong><br>
+                <span class="rif">J-30757583-2</span><br>
+                <span class="rif">Sistema de Gestión de Activos</span>
+            </td>
+        </tr>
+    </table>
+
+    <h1>Planilla de Asignación de Equipos</h1>
+
+    <div class="section-title">Portador del equipo</div>
+    <table class="block">
+        <tr>
+            <td class="label">Nombre y apellido</td>
+            <td>{{ recibe.nombre|default:"________________" }}</td>
+        </tr>
+        <tr>
+            <td class="label">Cédula</td>
+            <td>{{ recibe.cedula|default:"________________" }}</td>
+        </tr>
+        <tr>
+            <td class="label">Cargo / disciplina</td>
+            <td>{{ recibe.cargo|default:"________________" }}</td>
+        </tr>
+        <tr>
+            <td class="label">Teléfono</td>
+            <td>{{ recibe.telefono|default:"________________" }}</td>
+        </tr>
+        <tr>
+            <td class="label">Correo</td>
+            <td>{{ recibe.email|default:"________________" }}</td>
+        </tr>
+    </table>
+
+    <div class="section-title">Datos del equipo</div>
+    <table class="block">
+        <tr>
+            <td class="label">Código de inventario</td>
+            <td>{{ activo.codigo_inventario }}</td>
+        </tr>
+        <tr>
+            <td class="label">Categoría</td>
+            <td>
+                {{ activo.subcategoria.categoria.nombre }}
+                · {{ activo.subcategoria.nombre }}
+            </td>
+        </tr>
+        <tr>
+            <td class="label">Marca / modelo</td>
+            <td>{{ activo.marca }} {{ activo.modelo }}</td>
+        </tr>
+        <tr>
+            <td class="label">Número de serial</td>
+            <td>{{ activo.numero_serial|default:"N/A" }}</td>
+        </tr>
+        <tr>
+            <td class="label">Ubicación</td>
+            <td>{{ activo.ubicacion.nombre }}</td>
+        </tr>
+        <tr>
+            <td class="label">Estado</td>
+            <td>{{ activo.get_estado_display }}</td>
+        </tr>
+    </table>
+
+    <div class="section-title">Detalles de la asignación</div>
+    <table class="block">
+        <tr>
+            <td class="label">Fecha</td>
+            <td>{{ fecha }}</td>
+        </tr>
+        <tr>
+            <td class="label">Responsable de la asignación</td>
+            <td>{{ entrega.nombre }}</td>
+        </tr>
+        <tr>
+            <td class="label">Observaciones</td>
+            <td class="obs">{{ observaciones|default:" " }}</td>
+        </tr>
+    </table>
+
+    <table class="firmas">
+        <tr>
+            <td>
+                <h2>Responsable de la asignación</h2>
+                <div class="sign-gap"></div>
+                <strong>{{ entrega.nombre }}</strong><br>
+                <span class="muted">Firma</span>
+            </td>
+            <td>
+                <h2>Quien recibe</h2>
+                <div class="sign-gap"></div>
+                <strong>{{ recibe.nombre }}</strong><br>
+                <span class="muted">Firma</span>
+            </td>
+        </tr>
+    </table>
+
+    <div class="footer">
+        Documento generado por el Sistema de Gestión de Activos
+        de Consorcio PALDACA · {{ fecha }}
+        · {{ activo.codigo_inventario }}
+    </div>
+</div>
+{% if not forloop.last %}<div class="break"></div>{% endif %}
+{% endfor %}
+</body>
+</html>

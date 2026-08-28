@@ -11,6 +11,17 @@ urlpatterns = [
     # Etiquetas QR (hoja Avery 5160 sobre Letter)
     path('etiquetas/', views.imprimir_etiquetas, name='etiquetas-pdf'),
 
-    # Nota de entrega
+    # Planilla de asignación (sustituye la nota de entrega)
     path('nota-entrega/', views.generar_nota_entrega, name='nota-entrega'),
+    path('constancia/', views.constancia_asignacion, name='constancia'),
+    path(
+        'planilla/<int:pk>/',
+        views.descargar_planilla_vigente,
+        name='planilla-vigente',
+    ),
+    path(
+        'planilla/historial/<int:pk>/',
+        views.descargar_planilla_historial,
+        name='planilla-historial',
+    ),
 ]
