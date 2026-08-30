@@ -6,10 +6,10 @@ from django.views.generic import (
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.db import transaction
-from django.db.models import Q, Count
+from django.db.models import Count, Q, Sum
 from django.http import JsonResponse
 from django.utils.http import url_has_allowed_host_and_scheme
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET, require_POST
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from .models import Categoria, SubCategoria, Ubicacion, Activo, HistorialMovimiento
 from .forms import (
@@ -353,6 +353,7 @@ class ActivoListView(ModuloActivoRequiredMixin, ListView):
 
         if get.get('usuario_asignado'):
             obj = usuarios_asignables().filter(pk=get['usuario_asignado']).first()
+            self._usuario_filtro = obj
             agregar('usuario_asignado', 'Responsable', _nombre(obj) if obj else None)
 
         return pills
@@ -373,8 +374,8 @@ class ActivoListView(ModuloActivoRequiredMixin, ListView):
         context['filtros_activos'] = self._filtros_activos()
         context['hay_filtros'] = bool(context['filtros_activos'])
 
-        # Datos para los drawers de acción rápida (se renderizan una sola vez)
-        context['usuarios_asignables'] = usuarios_asignables()
+        # La lista completa de personas se carga bajo demanda desde el drawer.
+        context['usuario_filtro'] = getattr(self, '_usuario_filtro', None)
         context['ubicaciones'] = Ubicacion.objects.all()
 
         # Distribución (top 5 con activos)
@@ -393,6 +394,35 @@ class ActivoListView(ModuloActivoRequiredMixin, ListView):
         return context
 
 
+@require_GET
+@requiere_modulo_paldaca
+def buscar_usuarios_asignables(request):
+    """Return a small, searchable page of assignable people."""
+    query = (request.GET.get('q') or '').strip()[:80]
+    try:
+        page = max(1, int(request.GET.get('page', '1')))
+    except ValueError:
+        page = 1
+    page_size = 20
+    queryset = usuarios_asignables()
+    if query:
+        queryset = queryset.filter(
+            Q(first_name__icontains=query)
+            | Q(last_name__icontains=query)
+            | Q(username__icontains=query)
+            | Q(email__icontains=query)
+        )
+    start = (page - 1) * page_size
+    rows = list(queryset[start:start + page_size + 1])
+    return JsonResponse({
+        'results': [
+            {'id': user.pk, 'text': _nombre(user)}
+            for user in rows[:page_size]
+        ],
+        'has_more': len(rows) > page_size,
+    })
+
+
 class ActivoDetailView(ModuloActivoRequiredMixin, DetailView):
     model = Activo
     template_name = 'activos/activo/detail.html'
@@ -401,7 +431,7 @@ class ActivoDetailView(ModuloActivoRequiredMixin, DetailView):
     def get_queryset(self):
         return super().get_queryset().select_related(
             'subcategoria__categoria', 'ubicacion', 'usuario_asignado'
-        ).prefetch_related('mantenimientos')
+        )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -413,7 +443,15 @@ class ActivoDetailView(ModuloActivoRequiredMixin, DetailView):
             .order_by('-fecha_movimiento')[:6]
         )
         context['total_movimientos'] = self.object.historial_movimientos.count()
-        context['usuarios_asignables'] = usuarios_asignables()
+        context['mantenimientos_recientes'] = list(
+            self.object.mantenimientos.order_by('-fecha')[:10]
+        )
+        context['resumen_mantenimientos'] = (
+            self.object.mantenimientos.aggregate(
+                total=Count('id'),
+                costo_total=Sum('costo'),
+            )
+        )
         context['ubicaciones'] = Ubicacion.objects.all()
         return context
 

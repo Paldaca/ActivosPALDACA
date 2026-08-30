@@ -92,6 +92,9 @@
         }).filter(function (o) { return o.label !== ''; });
 
         var vacia = contenedor.dataset.comboEmptyLabel || 'Sin asignar';
+        var remoteUrl = contenedor.dataset.comboRemoteUrl || '';
+        var remoteTimer = null;
+        var remoteController = null;
         // Normaliza la opción vacía del ModelChoiceField ("---------").
         opciones = opciones.map(function (o) {
             return o.value === '' ? { value: '', label: vacia } : o;
@@ -134,6 +137,55 @@
 
         function sincronizarInput() { input.value = etiquetaActual(); }
 
+        function agregarOpcion(valor, etiqueta) {
+            var value = String(valor);
+            if (!opciones.some(function (o) { return o.value === value; })) {
+                opciones.push({ value: value, label: etiqueta });
+                opciones.sort(function (a, b) {
+                    if (a.value === '') return -1;
+                    if (b.value === '') return 1;
+                    return a.label.localeCompare(b.label, 'es');
+                });
+            }
+            if (!Array.prototype.some.call(select.options, function (o) {
+                return o.value === value;
+            })) {
+                select.add(new Option(etiqueta, value));
+            }
+        }
+
+        function cargarRemoto(q) {
+            if (!remoteUrl) return;
+            if (remoteController) remoteController.abort();
+            remoteController = new AbortController();
+            var url = new URL(remoteUrl, window.location.origin);
+            url.searchParams.set('q', (q || '').trim());
+            url.searchParams.set('page', '1');
+            lista.innerHTML = '<li class="ax-combo-empty">Buscando…</li>';
+            lista.hidden = false;
+            fetch(url.toString(), {
+                credentials: 'same-origin',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                signal: remoteController.signal
+            })
+                .then(function (response) {
+                    if (!response.ok) throw new Error('request failed');
+                    return response.json();
+                })
+                .then(function (data) {
+                    (data.results || []).forEach(function (item) {
+                        agregarOpcion(item.id, item.text);
+                    });
+                    activo = -1;
+                    pintar(q);
+                })
+                .catch(function (error) {
+                    if (error.name === 'AbortError') return;
+                    lista.innerHTML =
+                        '<li class="ax-combo-empty">No se pudo cargar la lista</li>';
+                });
+        }
+
         function resaltar(label, q) {
             if (!q) return escapeHtml(label);
             var i = label.toLowerCase().indexOf(q.toLowerCase());
@@ -173,6 +225,7 @@
             lista.hidden = false;
             input.setAttribute('aria-expanded', 'true');
             input.select();
+            cargarRemoto('');
         }
 
         function cerrar() {
@@ -188,7 +241,16 @@
         }
 
         input.addEventListener('focus', abrir);
-        input.addEventListener('input', function () { activo = -1; pintar(input.value); lista.hidden = false; });
+        input.addEventListener('input', function () {
+            activo = -1;
+            pintar(input.value);
+            lista.hidden = false;
+            if (!remoteUrl) return;
+            if (remoteTimer) window.clearTimeout(remoteTimer);
+            remoteTimer = window.setTimeout(function () {
+                cargarRemoto(input.value);
+            }, 250);
+        });
 
         input.addEventListener('keydown', function (e) {
             if (lista.hidden && (e.key === 'ArrowDown' || e.key === 'Enter')) { abrir(); return; }
@@ -228,14 +290,7 @@
             select: select,
             // Permite que un alta express aparezca sin recargar la página
             agregarOpcion: function (valor, etiqueta) {
-                if (!opciones.some(function (o) { return o.value === String(valor); })) {
-                    opciones.push({ value: String(valor), label: etiqueta });
-                    opciones.sort(function (a, b) {
-                        if (a.value === '') return -1;
-                        if (b.value === '') return 1;
-                        return a.label.localeCompare(b.label, 'es');
-                    });
-                }
+                agregarOpcion(valor, etiqueta);
                 sincronizarInput();
             }
         };
@@ -315,6 +370,9 @@
                     // El origen queda anotado en el propio <select>: así el botón
                     // de guardar sabe si hubo cambio real o no.
                     combo._axCombo.select.dataset.axOrigenId = actualId;
+                    if (actualId && actual) {
+                        combo._axCombo.agregarOpcion(actualId, actual);
+                    }
                     combo._axCombo.setValue(actualId);
                     actualizarDestino(drawer, cfg.campo, combo._axCombo);
                 }

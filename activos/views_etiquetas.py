@@ -8,6 +8,7 @@ del activo, que ocurre en `etiqueta_alta()`.
 
 from django.contrib import messages
 from django.db import transaction
+from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
@@ -63,12 +64,12 @@ class EtiquetaListView(ModuloActivoRequiredMixin, ListView):
         q = (self.request.GET.get("q") or "").strip()
         contexto["estado_activo"] = estado_activo
         contexto["q"] = q
-        contexto["resumen"] = {
-            "total": EtiquetaQR.objects.count(),
-            "pendientes": EtiquetaQR.objects.filter(estado="PE").count(),
-            "vinculadas": EtiquetaQR.objects.filter(estado="VI").count(),
-            "anuladas": EtiquetaQR.objects.filter(estado="AN").count(),
-        }
+        contexto["resumen"] = EtiquetaQR.objects.aggregate(
+            total=Count("id"),
+            pendientes=Count("id", filter=Q(estado="PE")),
+            vinculadas=Count("id", filter=Q(estado="VI")),
+            anuladas=Count("id", filter=Q(estado="AN")),
+        )
 
         filtros_activos = []
         if q:

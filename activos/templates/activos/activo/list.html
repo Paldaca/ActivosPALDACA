@@ -270,15 +270,20 @@
                         </div>
                         <div class="col-md-3">
                             <label class="form-label" for="axResponsable">Responsable</label>
-                            <select name="usuario_asignado" id="axResponsable" class="form-select">
-                                <option value="">Cualquier persona</option>
-                                {% for persona in usuarios_asignables %}
-                                <option value="{{ persona.pk }}"
-                                        {% if request.GET.usuario_asignado == persona.pk|stringformat:"s" %}selected{% endif %}>
-                                    {{ persona|nombre_completo }}
-                                </option>
-                                {% endfor %}
-                            </select>
+                            <div class="ax-combo"
+                                 data-combo-placeholder="Escribe un nombre…"
+                                 data-combo-empty-label="Cualquier persona"
+                                 data-combo-remote-url="{% url 'activos:usuarios-asignables' %}">
+                                <select name="usuario_asignado" id="axResponsable"
+                                        class="form-select ax-combo-native">
+                                    <option value="">Cualquier persona</option>
+                                    {% if usuario_filtro %}
+                                    <option value="{{ usuario_filtro.pk }}" selected>
+                                        {{ usuario_filtro|nombre_completo }}
+                                    </option>
+                                    {% endif %}
+                                </select>
+                            </div>
                         </div>
                         <div class="col-12 d-flex gap-2">
                             <button type="submit" class="btn-pastel btn-pastel--lila btn-pastel--sm">

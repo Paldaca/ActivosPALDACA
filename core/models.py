@@ -151,11 +151,17 @@ class UsuarioPaldaca(AbstractUser):
             .values_list("modulo__codigo", flat=True)
         )
 
-    def get_auth_revision(self):
+    def get_auth_revision(self, module_codes=None):
+        """Build the permission revision, reusing prefetched module codes."""
         if self.is_superuser:
             module_part = "*"
         else:
-            module_part = ",".join(self._codigos_modulos_asignados())
+            codes = (
+                self._codigos_modulos_asignados()
+                if module_codes is None
+                else sorted(module_codes)
+            )
+            module_part = ",".join(codes)
         raw_value = "|".join(
             [
                 str(self.pk or ""),

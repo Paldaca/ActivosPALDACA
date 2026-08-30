@@ -11,7 +11,11 @@ from core.embed import embed_signal_response, is_embedded
 from .constants import MODULO_CODIGO
 
 
-def _usuario_tiene_acceso(user):
+def _usuario_tiene_acceso(request):
+    user = request.user
+    module_codes = getattr(request, "paldaca_module_codes", None)
+    if module_codes is not None:
+        return user.is_authenticated and MODULO_CODIGO in module_codes
     return (
         user.is_authenticated
         and hasattr(user, "tiene_acceso_modulo")
@@ -32,7 +36,7 @@ def requiere_modulo_paldaca(view_func):
     @wraps(view_func)
     @login_required
     def _wrapped(request, *args, **kwargs):
-        if _usuario_tiene_acceso(request.user):
+        if _usuario_tiene_acceso(request):
             return view_func(request, *args, **kwargs)
         return HttpResponseForbidden("No tienes acceso a este programa.")
 
@@ -41,7 +45,7 @@ def requiere_modulo_paldaca(view_func):
 
 class ModuloActivoRequiredMixin(LoginRequiredMixin):
     def dispatch(self, request, *args, **kwargs):
-        if _usuario_tiene_acceso(request.user):
+        if _usuario_tiene_acceso(request):
             return super().dispatch(request, *args, **kwargs)
         if not request.user.is_authenticated:
             return _deny_unauthenticated(request)

@@ -47,12 +47,10 @@ Los IDs seleccionados los inyecta activos-ui.js al enviar (data-ax-bulk-form).
                 </label>
                 <div class="ax-combo"
                      data-combo-placeholder="Escribe un nombre o apellido…"
-                     data-combo-empty-label="Sin asignar · liberar equipos">
+                     data-combo-empty-label="Sin asignar · liberar equipos"
+                     data-combo-remote-url="{% url 'activos:usuarios-asignables' %}">
                     <select name="destino" id="{{ drawer_id }}Select" class="ax-combo-native form-select">
                         <option value="">Sin asignar · liberar equipos</option>
-                        {% for persona in usuarios_asignables %}
-                        <option value="{{ persona.pk }}">{{ persona|nombre_completo }}</option>
-                        {% endfor %}
                     </select>
                 </div>
                 {% else %}

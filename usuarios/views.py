@@ -7,7 +7,6 @@ from django.views.decorators.http import require_POST
 from django.views.generic import CreateView, DetailView, ListView, UpdateView
 
 from activos.decorators import ModuloActivoRequiredMixin, requiere_modulo_paldaca
-from activos.forms import usuarios_asignables
 
 from .forms import UsuarioForm
 
@@ -26,7 +25,7 @@ def _usuarios_gestion_queryset():
     """
     return (
         UserModel.objects.filter(is_superuser=False)
-        .select_related("perfil")
+        .select_related("perfil", "disciplina")
         .annotate(num_activos=Count("activos_asignados", distinct=True))
     )
 
@@ -71,14 +70,28 @@ class UsuarioSearchView(ModuloActivoRequiredMixin, ListView):
         context["buscar"] = self.request.GET.get("buscar", "")
         context["estado_actual"] = self.request.GET.get("estado", "activos")
 
-        base = UserModel.objects.filter(is_superuser=False).annotate(
-            num_activos=Count("activos_asignados", distinct=True)
+        resumen = UserModel.objects.filter(is_superuser=False).aggregate(
+            total=Count("id", filter=Q(is_active=True), distinct=True),
+            con_activos=Count(
+                "id",
+                filter=Q(
+                    is_active=True,
+                    activos_asignados__isnull=False,
+                ),
+                distinct=True,
+            ),
+            inactivos=Count(
+                "id",
+                filter=Q(is_active=False),
+                distinct=True,
+            ),
         )
+        resumen["sin_activos"] = resumen["total"] - resumen["con_activos"]
         context["resumen"] = {
-            "total": base.filter(is_active=True).count(),
-            "con_activos": base.filter(is_active=True, num_activos__gt=0).count(),
-            "sin_activos": base.filter(is_active=True, num_activos=0).count(),
-            "inactivos": base.filter(is_active=False).count(),
+            "total": resumen["total"],
+            "con_activos": resumen["con_activos"],
+            "sin_activos": resumen["sin_activos"],
+            "inactivos": resumen["inactivos"],
         }
         return context
 
@@ -96,14 +109,17 @@ class UsuarioProfileView(ModuloActivoRequiredMixin, DetailView):
         )
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        activos = self.object.activos_asignados.select_related(
+        activos = list(self.object.activos_asignados.select_related(
             "subcategoria__categoria", "ubicacion"
-        ).order_by("subcategoria__categoria__nombre", "codigo_inventario")
+        ).order_by(
+            "subcategoria__categoria__nombre",
+            "codigo_inventario",
+        ))
         context["activos_asignados"] = activos
-        context["total_activos"] = activos.count()
-        context["en_mantenimiento"] = activos.filter(estado="EM").count()
-        # Alimenta el drawer de reasignación rápida desde la propia ficha.
-        context["usuarios_asignables"] = usuarios_asignables()
+        context["total_activos"] = len(activos)
+        context["en_mantenimiento"] = sum(
+            activo.estado == "EM" for activo in activos
+        )
         return context
 
 

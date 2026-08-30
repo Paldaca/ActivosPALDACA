@@ -166,7 +166,7 @@
                     </a>
                 </div>
 
-                {% if activo.mantenimientos.all %}
+                {% if mantenimientos_recientes %}
                 <div class="ax-table-wrap">
                     <table class="ax-table">
                         <thead>
@@ -181,7 +181,7 @@
                             </tr>
                         </thead>
                         <tbody data-ax-stagger="20">
-                            {% for mantenimiento in activo.mantenimientos.all %}
+                            {% for mantenimiento in mantenimientos_recientes %}
                             <tr>
                                 <td data-label="Fecha">{{ mantenimiento.fecha|date:"d/m/Y" }}</td>
                                 <td data-label="Técnico">{{ mantenimiento.tecnico }}</td>
@@ -214,9 +214,9 @@
                 <div class="ax-card-body d-flex flex-wrap justify-content-between gap-2 border-top">
                     <span class="ax-kpi-label mb-0">Total registrado</span>
                     <span>
-                        <span class="ax-tag">{{ activo.mantenimientos.count }} intervención(es)</span>
+                        <span class="ax-tag">{{ resumen_mantenimientos.total }} intervención(es)</span>
                         <span class="ax-tag" style="background: var(--ax-menta); color: var(--ax-menta-ink);">
-                            ${{ activo.mantenimientos.all|sum_costo|floatformat:2 }}
+                            ${{ resumen_mantenimientos.costo_total|default:0|floatformat:2 }}
                         </span>
                     </span>
                 </div>
@@ -363,7 +363,7 @@
                            data-titulo="Vas a eliminar este activo del inventario."
                            data-codigo="{{ activo.codigo_inventario }}"
                            data-ficha="{{ activo.marca }} {{ activo.modelo }} · {{ activo.ubicacion.nombre }}"
-                           data-impacto="Se borrarán también sus {{ total_movimientos }} movimiento(s) de historial y sus {{ activo.mantenimientos.count }} mantenimiento(s). No se puede deshacer."
+                           data-impacto="Se borrarán también sus {{ total_movimientos }} movimiento(s) de historial y sus {{ resumen_mantenimientos.total }} mantenimiento(s). No se puede deshacer."
                            {% if activo.usuario_asignado %}data-aviso="Está bajo la responsabilidad de {{ activo.usuario_asignado|nombre_completo }}. Si solo quieres liberarlo, reasígnalo o márcalo como Inactivo: así conservas la trazabilidad."{% endif %}
                            data-confirmar="{{ activo.codigo_inventario }}">
                             <i class="bi bi-trash"></i> Eliminar activo

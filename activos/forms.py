@@ -156,7 +156,7 @@ class ActivoFilterForm(forms.Form):
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     subcategoria = forms.ModelChoiceField(
-        queryset=SubCategoria.objects.all(),
+        queryset=SubCategoria.objects.select_related("categoria"),
         required=False,
         empty_label="Todas las subcategorías",
         widget=forms.Select(attrs={'class': 'form-select'})

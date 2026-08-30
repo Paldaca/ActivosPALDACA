@@ -1,9 +1,9 @@
 from django.conf import settings
-from django.contrib.auth import get_user_model
 from django.http import HttpResponseServerError, JsonResponse
 from django.shortcuts import redirect
 
 from .embed import embed_signal_response, is_embedded
+from .models import Modulo
 from .session_logout import apply_paldaca_cookie_clearance, close_paldaca_session
 from django.template.loader import render_to_string
 from django.utils.deprecation import MiddlewareMixin
@@ -29,11 +29,13 @@ class PaldacaSessionMiddleware:
         if not hasattr(request, "session"):
             return self.get_response(request)
 
-        current_user = self._get_current_user(user.pk)
-        if not current_user or not current_user.is_active:
+        current_user = user
+        if not current_user.is_active:
             return self._close_session(request)
 
-        current_revision = current_user.get_auth_revision()
+        module_codes = self._active_module_codes(current_user)
+        request.paldaca_module_codes = frozenset(module_codes)
+        current_revision = current_user.get_auth_revision(module_codes)
         session_revision = request.session.get(self.SESSION_REVISION_KEY)
 
         if not session_revision:
@@ -53,14 +55,15 @@ class PaldacaSessionMiddleware:
 
         return self.get_response(request)
 
-    def _get_current_user(self, user_id):
-        user_model = get_user_model()
-        try:
-            return user_model.objects.select_related("disciplina", "perfil").get(
-                pk=user_id
+    @staticmethod
+    def _active_module_codes(user):
+        if user.is_superuser:
+            return list(
+                Modulo.objects.filter(activo=True).values_list(
+                    "codigo", flat=True
+                )
             )
-        except user_model.DoesNotExist:
-            return None
+        return user._codigos_modulos_asignados()
 
     def _store_snapshot(self, request, user, revision):
         request.session[self.SESSION_REVISION_KEY] = revision

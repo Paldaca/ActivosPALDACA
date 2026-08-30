@@ -26,6 +26,10 @@ class HomeView(ModuloActivoRequiredMixin, TemplateView):
             asignados=Count('id', filter=Q(estado='AC', usuario_asignado__isnull=False)),
             mantenimiento=Count('id', filter=Q(estado='EM')),
             baja=Count('id', filter=Q(estado='IN')),
+            sin_serial=Count(
+                'id',
+                filter=Q(numero_serial__isnull=True) | Q(numero_serial=''),
+            ),
         )
 
         # Lo que de verdad requiere atención hoy
@@ -35,9 +39,7 @@ class HomeView(ModuloActivoRequiredMixin, TemplateView):
             .order_by('-fecha')[:5]
         )
         context['total_mantenimientos_abiertos'] = Mantenimiento.objects.filter(estado='EP').count()
-        context['sin_serial'] = Activo.objects.filter(
-            Q(numero_serial__isnull=True) | Q(numero_serial='')
-        ).count()
+        context['sin_serial'] = context['resumen']['sin_serial']
 
         context['movimientos_recientes'] = (
             HistorialMovimiento.objects.select_related('activo', 'usuario')
