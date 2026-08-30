@@ -47,27 +47,6 @@ def _url_con_constancia(url, ids):
     ))
 
 
-def _aplicar_planilla_de_reasignacion(
-    activo, usuario_nuevo, entrega_usuario, movimiento
-):
-    """Save or clear the current planilla after a responsible change."""
-    from reportes.services.asignacion import (
-        guardar_planilla,
-        limpiar_planilla_vigente,
-    )
-
-    if movimiento is None:
-        return
-    if usuario_nuevo:
-        guardar_planilla(
-            activo,
-            entrega_usuario=entrega_usuario,
-            movimiento=movimiento,
-        )
-        return
-    limpiar_planilla_vigente(activo)
-
-
 class SinPaginaDeBorradoMixin:
     """El borrado se confirma en un modal, no en una pantalla aparte.
 
@@ -511,18 +490,6 @@ class ActivoUpdateView(ActivoFormContextMixin, ModuloActivoRequiredMixin, Update
             activo_actualizado.usuario_asignado,
             self.request.user,
         )
-        try:
-            _aplicar_planilla_de_reasignacion(
-                activo_actualizado,
-                activo_actualizado.usuario_asignado,
-                self.request.user,
-                movimiento,
-            )
-        except Exception as exc:
-            messages.error(
-                self.request,
-                f"Se guardó el cambio, pero no se pudo generar la planilla: {exc}",
-            )
         messages.success(self.request, 'Activo actualizado exitosamente.')
         return response
 
@@ -624,18 +591,6 @@ def reasignar_activo(request, pk):
                 usuario_nuevo,
                 request.user,
             )
-            try:
-                _aplicar_planilla_de_reasignacion(
-                    activo_actualizado,
-                    usuario_nuevo,
-                    request.user,
-                    movimiento,
-                )
-            except Exception as exc:
-                messages.error(
-                    request,
-                    f"Se reasignó el equipo, pero no se pudo generar la planilla: {exc}",
-                )
 
             messages.success(
                 request,
@@ -810,7 +765,6 @@ def acciones_masivas(request):
                 return redirect(volver)
 
         pendientes = []
-        liberados = []
         with transaction.atomic():
             for activo in activos:
                 if activo.usuario_asignado_id == (usuario.pk if usuario else None):
@@ -823,27 +777,9 @@ def acciones_masivas(request):
                 )
                 cambios += 1
                 if usuario:
-                    pendientes.append((activo, movimiento))
-                else:
-                    liberados.append((activo, movimiento))
+                    pendientes.append(activo.pk)
 
-        for activo, movimiento in liberados:
-            _aplicar_planilla_de_reasignacion(
-                activo, None, request.user, movimiento,
-            )
-        ids_constancia = []
-        try:
-            for activo, movimiento in pendientes:
-                _aplicar_planilla_de_reasignacion(
-                    activo, usuario, request.user, movimiento,
-                )
-                ids_constancia.append(activo.pk)
-        except Exception as exc:
-            messages.error(
-                request,
-                f"Se reasignaron los equipos, pero no se pudo generar la planilla: {exc}",
-            )
-
+        ids_constancia = pendientes
         messages.success(
             request,
             f'{cambios} activo(s) reasignado(s) a {_nombre(usuario)}.'

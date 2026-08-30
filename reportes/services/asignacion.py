@@ -1,17 +1,12 @@
-"""Planilla de asignación de equipos: render, guardar y descargar."""
+"""Planilla de asignación de equipos: render bajo demanda."""
 
-import re
 from datetime import datetime
 
-from django.core.files.base import ContentFile
-from django.core.files.storage import default_storage
 from django.http import HttpResponse
 from django.templatetags.static import static
 from django.utils import timezone
 
-from activos.models import Activo, HistorialMovimiento
-
-from .html_pdf import render_html_pdf, render_html_pdf_bytes
+from .html_pdf import render_html_pdf
 from .pdf import formatear_fecha
 
 PLANTILLA = "reportes/asignacion_activos.html"
@@ -59,79 +54,6 @@ def contexto_planilla(activos, entrega_usuario, observaciones=""):
 
 def _timestamp() -> str:
     return datetime.now().strftime("%Y%m%d_%H%M%S")
-
-
-def _ruta_planilla(activo) -> str:
-    stamp = timezone.now().strftime("%Y%m%d_%H%M%S_%f")
-    codigo = re.sub(
-        r"[^A-Z0-9._-]",
-        "_",
-        (activo.codigo_inventario or "ACTIVO").upper(),
-    )
-    return f"planillas/{codigo}_{stamp}.pdf"
-
-
-def _activo_con_relaciones(activo) -> Activo:
-    return Activo.objects.select_related(
-        "subcategoria__categoria",
-        "ubicacion",
-        "usuario_asignado__disciplina",
-    ).get(pk=activo.pk)
-
-
-def _usuario_para_historial(entrega_usuario):
-    if entrega_usuario is None:
-        return None
-    if getattr(entrega_usuario, "is_authenticated", True):
-        return entrega_usuario
-    return None
-
-
-def guardar_planilla(
-    activo,
-    entrega_usuario,
-    observaciones="",
-    movimiento=None,
-):
-    """Render one planilla, store as current file, attach to history."""
-    activo = _activo_con_relaciones(activo)
-    if not activo.usuario_asignado_id:
-        raise ValueError("El activo no tiene responsable.")
-    pdf_bytes = render_html_pdf_bytes(
-        PLANTILLA,
-        contexto_planilla([activo], entrega_usuario, observaciones),
-    )
-    rel = default_storage.save(
-        _ruta_planilla(activo),
-        ContentFile(pdf_bytes),
-    )
-    Activo.objects.filter(pk=activo.pk).update(
-        planilla_pdf=rel,
-        planilla_generada_en=timezone.now(),
-    )
-    if movimiento is None:
-        movimiento = HistorialMovimiento.objects.create(
-            activo=activo,
-            tipo_movimiento=HistorialMovimiento.TipoMovimiento.PLANILLA,
-            descripcion="Planilla de asignación generada.",
-            campo_modificado="planilla_pdf",
-            usuario=_usuario_para_historial(entrega_usuario),
-        )
-    HistorialMovimiento.objects.filter(pk=movimiento.pk).update(
-        archivo_planilla=rel,
-    )
-    activo.planilla_pdf = rel
-    return rel
-
-
-def limpiar_planilla_vigente(activo):
-    """Clear the current planilla pointer without deleting history files."""
-    Activo.objects.filter(pk=activo.pk).update(
-        planilla_pdf="",
-        planilla_generada_en=None,
-    )
-    activo.planilla_pdf = ""
-    activo.planilla_generada_en = None
 
 
 def exportar_asignacion_pdf(

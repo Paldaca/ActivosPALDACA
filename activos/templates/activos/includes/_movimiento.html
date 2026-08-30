@@ -32,11 +32,5 @@ Un movimiento de la línea de tiempo. Espera `movimiento` en el contexto.
         {% if movimiento.descripcion %}
         <p class="ax-hint mt-2 mb-0">{{ movimiento.descripcion }}</p>
         {% endif %}
-        {% if movimiento.archivo_planilla %}
-        <a href="{% url 'reportes:planilla-historial' movimiento.pk %}"
-           class="btn-pastel btn-pastel--durazno btn-pastel--sm mt-2">
-            <i class="bi bi-file-earmark-pdf"></i> Descargar planilla
-        </a>
-        {% endif %}
     </div>
 </li>

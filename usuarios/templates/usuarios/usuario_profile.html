@@ -131,14 +131,12 @@
                                 <td data-label="Estado">{% badge_estado activo %}</td>
                                 <td class="text-end ax-col-tight" data-label="Acciones">
                                     <div class="ax-row-actions justify-content-end">
-                                        {% if activo.planilla_pdf %}
                                         <a href="{% url 'reportes:planilla-vigente' activo.pk %}"
                                            class="btn-pastel btn-pastel--durazno btn-pastel--icon"
-                                           title="Ver planilla vigente">
+                                           title="Ver planilla">
                                             <i class="bi bi-file-earmark-pdf"></i>
                                             <span class="visually-hidden">Ver planilla de {{ activo.codigo_inventario }}</span>
                                         </a>
-                                        {% endif %}
                                         <a href="{% url 'activos:activo-reasignar' activo.pk %}"
                                            class="btn-pastel btn-pastel--lila btn-pastel--icon"
                                            title="Reasignar a otra persona"
@@ -210,14 +208,14 @@
                     </div>
                 </section>
 
-                {# Planillas vigentes: una por equipo, regenerar las actualiza #}
+                {# Planillas: una por equipo, generadas al descargar #}
                 {% if activos_asignados %}
                 <section class="ax-card">
                     <div class="ax-card-head"><h2 class="ax-card-title">Planilla de asignación</h2></div>
                     <div class="ax-card-body ax-form">
                         <p class="ax-hint mt-0 mb-3">
                             Se genera una planilla por equipo marcado, cada una con
-                            sus propias firmas. Regenerar actualiza la vigente del perfil.
+                            sus propias firmas. El PDF se crea al momento de descargarlo.
                         </p>
                         <form id="axFormPlanilla" method="post" action="{% url 'reportes:constancia' %}">
                             {% csrf_token %}
@@ -230,7 +228,7 @@
                             <p class="ax-hint">Entrega: {{ request.user.get_full_name|default:request.user.username }}</p>
                             <button type="submit" class="btn-pastel btn-pastel--durazno btn-pastel--block">
                                 <i class="bi bi-file-earmark-pdf"></i>
-                                Generar / actualizar planilla(s)
+                                Generar planilla(s)
                             </button>
                         </form>
                     </div>

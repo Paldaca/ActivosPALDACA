@@ -1,21 +1,15 @@
-import os
-
 from django.contrib import messages
-from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404, redirect
 
 from activos.decorators import requiere_modulo_paldaca
-from activos.models import Activo, EtiquetaQR, HistorialMovimiento
+from activos.models import Activo, EtiquetaQR
 
 from .services import (
     exportar_inventario_excel,
     exportar_inventario_pdf,
     generar_hoja_etiquetas,
 )
-from .services.asignacion import (
-    exportar_asignacion_pdf,
-    guardar_planilla,
-)
+from .services.asignacion import exportar_asignacion_pdf
 
 
 def _ids_desde_request(request):
@@ -69,21 +63,21 @@ def _redirect_planilla(ids):
     return redirect("activos:activo-list")
 
 
-def _respuesta_archivo_pdf(campo, nombre):
-    if not campo:
-        raise Http404("No hay planilla guardada.")
+def _respuesta_planilla(request, ids, observaciones=""):
+    activos = _activos_para_planilla(ids)
+    error = _error_entrega(activos)
+    if error:
+        messages.error(request, error)
+        return _redirect_planilla(ids)
     try:
-        handle = campo.open("rb")
-    except FileNotFoundError as exc:
-        raise Http404("El archivo de la planilla ya no está.") from exc
-    base = os.path.basename(campo.name) or nombre
-    return FileResponse(
-        handle,
-        as_attachment=True,
-        filename=base,
-        content_type="application/pdf",
-    )
-
+        return exportar_asignacion_pdf(
+            activos,
+            entrega_usuario=request.user,
+            observaciones=observaciones,
+        )
+    except Exception as exc:
+        messages.error(request, f"Error al generar la planilla: {exc}")
+        return _redirect_planilla(ids)
 
 
 @requiere_modulo_paldaca
@@ -114,7 +108,7 @@ def generar_nota_entrega(request):
 
 @requiere_modulo_paldaca
 def constancia_asignacion(request):
-    """GET prints; POST also saves the current planilla of each asset."""
+    """Generate the assignment planilla PDF on demand."""
     ids = _ids_desde_request(request)
     if not ids:
         messages.error(
@@ -123,61 +117,20 @@ def constancia_asignacion(request):
         )
         return redirect("activos:activo-list")
 
-    activos = _activos_para_planilla(ids)
-    error = _error_entrega(activos)
-    if error:
-        messages.error(request, error)
-        return _redirect_planilla(ids)
-
     observaciones = ""
     if request.method == "POST":
         observaciones = (request.POST.get("observaciones") or "").strip()
-        try:
-            for activo in activos:
-                guardar_planilla(
-                    activo,
-                    entrega_usuario=request.user,
-                    observaciones=observaciones,
-                )
-        except Exception as exc:
-            messages.error(request, f"Error al guardar la planilla: {exc}")
-            return _redirect_planilla(ids)
-
-    try:
-        return exportar_asignacion_pdf(
-            activos,
-            entrega_usuario=request.user,
-            observaciones=observaciones,
-        )
-    except Exception as exc:
-        messages.error(request, f"Error al generar la planilla: {exc}")
-        return _redirect_planilla(ids)
+    return _respuesta_planilla(request, ids, observaciones)
 
 
 @requiere_modulo_paldaca
 def descargar_planilla_vigente(request, pk):
-    """Serve the current planilla stored on the asset."""
+    """Generate the current assignment planilla for one asset."""
     activo = get_object_or_404(Activo, pk=pk)
-    if not activo.planilla_pdf:
-        messages.error(request, "Este equipo aún no tiene planilla vigente.")
+    if not activo.usuario_asignado_id:
+        messages.error(request, "Este equipo no tiene responsable asignado.")
         return redirect("activos:activo-detail", pk=pk)
-    return _respuesta_archivo_pdf(
-        activo.planilla_pdf,
-        f"planilla_{activo.codigo_inventario}.pdf",
-    )
-
-
-@requiere_modulo_paldaca
-def descargar_planilla_historial(request, pk):
-    """Serve the planilla snapshot attached to a movement."""
-    movimiento = get_object_or_404(
-        HistorialMovimiento.objects.select_related("activo"),
-        pk=pk,
-    )
-    return _respuesta_archivo_pdf(
-        movimiento.archivo_planilla,
-        f"planilla_{movimiento.activo.codigo_inventario}.pdf",
-    )
+    return _respuesta_planilla(request, [pk])
 
 
 @requiere_modulo_paldaca

@@ -1,10 +1,9 @@
-"""Planilla de asignación: generación, vigencia e historial."""
+"""Planilla de asignación: generación bajo demanda."""
 
 import html
 from io import BytesIO
 
 import pytest
-from django.core.files.storage import default_storage
 from django.urls import reverse
 from pypdf import PdfReader
 
@@ -38,7 +37,7 @@ def _crear_activo(catalogo, codigo, usuario=None, serial=""):
 
 
 @pytest.mark.django_db
-def test_reasignar_guarda_planilla_vigente(client_auth, catalogo):
+def test_reasignar_ofrece_constancia_sin_guardar_en_disco(client_auth, catalogo):
     act = _crear_activo(catalogo, "INV-PLAN-1")
     url = reverse("activos:activo-reasignar", args=[act.pk])
     r = client_auth.post(
@@ -46,22 +45,15 @@ def test_reasignar_guarda_planilla_vigente(client_auth, catalogo):
     )
     assert r.status_code == 302
     assert f"constancia={act.pk}" in r.url
-    act.refresh_from_db()
-    assert act.planilla_pdf
-    assert default_storage.exists(act.planilla_pdf.name)
-    reasig = act.historial_movimientos.filter(
-        tipo_movimiento=HistorialMovimiento.TipoMovimiento.REASIGNACION
-    ).first()
-    assert reasig.archivo_planilla
-    assert reasig.archivo_planilla.name == act.planilla_pdf.name
+    assert act.historial_movimientos.filter(
+        tipo_movimiento=HistorialMovimiento.TipoMovimiento.PLANILLA
+    ).count() == 0
 
 
 @pytest.mark.django_db
-def test_perfil_muestra_planilla_vigente(client_auth, catalogo):
-    act = _crear_activo(catalogo, "INV-PLAN-PERFIL")
-    client_auth.post(
-        reverse("activos:activo-reasignar", args=[act.pk]),
-        {"usuario_asignado": catalogo["usuario_a"].pk},
+def test_perfil_muestra_enlace_planilla(client_auth, catalogo):
+    act = _crear_activo(
+        catalogo, "INV-PLAN-PERFIL", usuario=catalogo["usuario_a"]
     )
     r = client_auth.get(
         reverse("usuarios:usuario-profile", args=[catalogo["usuario_a"].pk])
@@ -74,18 +66,10 @@ def test_perfil_muestra_planilla_vigente(client_auth, catalogo):
 
 
 @pytest.mark.django_db
-def test_regenerar_reemplaza_vigente_y_conserva_historial(
-    client_auth, catalogo
-):
-    act = _crear_activo(catalogo, "INV-PLAN-REGEN")
-    client_auth.post(
-        reverse("activos:activo-reasignar", args=[act.pk]),
-        {"usuario_asignado": catalogo["usuario_a"].pk},
+def test_constancia_post_genera_pdf_con_observaciones(client_auth, catalogo):
+    act = _crear_activo(
+        catalogo, "INV-PLAN-REGEN", usuario=catalogo["usuario_a"]
     )
-    act.refresh_from_db()
-    anterior = act.planilla_pdf.name
-    assert anterior
-
     r = client_auth.post(
         reverse("reportes:constancia"),
         {
@@ -100,41 +84,29 @@ def test_regenerar_reemplaza_vigente_y_conserva_historial(
     assert "INV-PLAN-REGEN" in cuerpo_pdf
     assert "Equipo revisado" in cuerpo_pdf
 
-    act.refresh_from_db()
-    assert act.planilla_pdf.name != anterior
-    assert default_storage.exists(anterior)
-    assert default_storage.exists(act.planilla_pdf.name)
 
-    reasig = act.historial_movimientos.get(
-        tipo_movimiento=HistorialMovimiento.TipoMovimiento.REASIGNACION
+@pytest.mark.django_db
+def test_planilla_vigente_genera_pdf_al_vuelo(client_auth, catalogo):
+    act = _crear_activo(
+        catalogo, "INV-PLAN-GET", usuario=catalogo["usuario_a"]
     )
-    planilla = act.historial_movimientos.get(
-        tipo_movimiento=HistorialMovimiento.TipoMovimiento.PLANILLA
-    )
-    assert reasig.archivo_planilla.name == anterior
-    assert planilla.archivo_planilla.name == act.planilla_pdf.name
+    r = client_auth.get(reverse("reportes:planilla-vigente", args=[act.pk]))
+    assert r.status_code == 200
+    assert r["Content-Type"] == "application/pdf"
+    assert "INV-PLAN-GET" in _pdf_texto(r.content)
 
 
 @pytest.mark.django_db
-def test_liberar_limpia_planilla_vigente(client_auth, catalogo):
+def test_liberar_no_ofrece_constancia(client_auth, catalogo):
     act = _crear_activo(
         catalogo, "INV-PLAN-LIB", usuario=catalogo["usuario_a"]
     )
-    client_auth.post(
-        reverse("activos:activo-reasignar", args=[act.pk]),
-        {"usuario_asignado": catalogo["usuario_b"].pk},
-    )
-    act.refresh_from_db()
-    assert act.planilla_pdf
-
     r = client_auth.post(
         reverse("activos:activo-reasignar", args=[act.pk]),
         {"usuario_asignado": ""},
     )
     assert r.status_code == 302
     assert "constancia=" not in r.url
-    act.refresh_from_db()
-    assert not act.planilla_pdf
 
 
 @pytest.mark.django_db
@@ -213,22 +185,15 @@ def test_ficha_con_responsable_muestra_boton_planilla(
 
 
 @pytest.mark.django_db
-def test_get_constancia_descarga_pdf_sin_guardar_otra_vez(
-    client_auth, catalogo
-):
-    act = _crear_activo(catalogo, "INV-GET-PDF")
-    client_auth.post(
-        reverse("activos:activo-reasignar", args=[act.pk]),
-        {"usuario_asignado": catalogo["usuario_a"].pk},
+def test_get_constancia_descarga_pdf(client_auth, catalogo):
+    act = _crear_activo(
+        catalogo, "INV-GET-PDF", usuario=catalogo["usuario_a"]
     )
     r = client_auth.get(
         reverse("reportes:constancia") + f"?activos={act.pk}"
     )
     assert r.status_code == 200
     assert r["Content-Type"] == "application/pdf"
-    assert act.historial_movimientos.filter(
-        tipo_movimiento=HistorialMovimiento.TipoMovimiento.PLANILLA
-    ).count() == 0
 
 
 @pytest.mark.django_db

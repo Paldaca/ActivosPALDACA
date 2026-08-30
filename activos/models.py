@@ -108,12 +108,6 @@ class Activo(models.Model):
 
     fecha_creacion = models.DateTimeField(auto_now_add=True)
     fecha_actualizacion = models.DateTimeField(auto_now=True)
-    planilla_pdf = models.FileField(
-        upload_to="planillas/",
-        blank=True,
-        null=True,
-    )
-    planilla_generada_en = models.DateTimeField(blank=True, null=True)
 
     class Meta:
         db_table = TABLA("activo")
@@ -225,11 +219,6 @@ class HistorialMovimiento(models.Model):
     )
 
     fecha_movimiento = models.DateTimeField(auto_now_add=True)
-    archivo_planilla = models.FileField(
-        upload_to="planillas/",
-        blank=True,
-        null=True,
-    )
 
     class Meta:
         db_table = TABLA("historial_movimiento")

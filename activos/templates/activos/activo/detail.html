@@ -256,12 +256,10 @@
                         {% if activo.usuario_asignado.perfil %}
                         <p class="ax-person-meta mb-2">{{ activo.usuario_asignado.perfil }}</p>
                         {% endif %}
-                        {% if activo.planilla_pdf %}
                         <a href="{% url 'reportes:planilla-vigente' activo.pk %}"
                            class="btn-pastel btn-pastel--durazno btn-pastel--sm mb-2">
                             <i class="bi bi-file-earmark-pdf"></i> Ver planilla
                         </a>
-                        {% endif %}
                         <form method="post" action="{% url 'reportes:constancia' %}" class="mb-3">
                             {% csrf_token %}
                             <input type="hidden" name="activos_seleccionados" value="{{ activo.pk }}">
@@ -322,7 +320,7 @@
                     <div class="ax-card-body ax-form">
                         <p class="ax-hint mt-0 mb-3">
                             Una planilla de este equipo, con firmas de quien entrega
-                            y quien recibe. Regenerar actualiza la vigente del perfil.
+                            y quien recibe. Se genera al momento de descargarla.
                         </p>
                         <form method="post" action="{% url 'reportes:constancia' %}">
                             {% csrf_token %}
@@ -334,7 +332,7 @@
                                           placeholder="Estado, notas…"></textarea>
                             </div>
                             <button type="submit" class="btn-pastel btn-pastel--durazno btn-pastel--block">
-                                <i class="bi bi-file-earmark-pdf"></i> Generar / actualizar planilla
+                                <i class="bi bi-file-earmark-pdf"></i> Generar planilla
                             </button>
                         </form>
                     </div>
