@@ -47,6 +47,19 @@ def _url_con_constancia(url, ids):
     ))
 
 
+def _aplicar_planilla_historial(activo, usuario_nuevo, entrega_usuario, movimiento):
+    """Store an audit snapshot on the movement when someone receives the asset."""
+    if not usuario_nuevo or movimiento is None:
+        return
+    from reportes.services.asignacion import guardar_planilla_en_historial
+
+    guardar_planilla_en_historial(
+        activo,
+        entrega_usuario=entrega_usuario,
+        movimiento=movimiento,
+    )
+
+
 class SinPaginaDeBorradoMixin:
     """El borrado se confirma en un modal, no en una pantalla aparte.
 
@@ -470,7 +483,7 @@ class ActivoUpdateView(ActivoFormContextMixin, ModuloActivoRequiredMixin, Update
     form_class = ActivoForm
     template_name = 'activos/activo/form.html'
     success_url = reverse_lazy('activos:activo-list')
-    
+
     def form_valid(self, form):
         pk = self.object.pk
         activo_original = Activo.objects.select_related(
@@ -490,6 +503,28 @@ class ActivoUpdateView(ActivoFormContextMixin, ModuloActivoRequiredMixin, Update
             activo_actualizado.usuario_asignado,
             self.request.user,
         )
+        usuario_nuevo = activo_actualizado.usuario_asignado
+        if movimiento and usuario_nuevo:
+            try:
+                _aplicar_planilla_historial(
+                    activo_actualizado,
+                    usuario_nuevo,
+                    self.request.user,
+                    movimiento,
+                )
+            except Exception as exc:
+                messages.error(
+                    self.request,
+                    f"Se guardó el cambio, pero no se pudo archivar la planilla: {exc}",
+                )
+            else:
+                messages.success(
+                    self.request, 'Activo actualizado exitosamente.',
+                )
+                return redirect(_url_con_constancia(
+                    reverse('activos:activo-detail', kwargs={'pk': pk}),
+                    [pk],
+                ))
         messages.success(self.request, 'Activo actualizado exitosamente.')
         return response
 
@@ -591,6 +626,19 @@ def reasignar_activo(request, pk):
                 usuario_nuevo,
                 request.user,
             )
+            if usuario_nuevo and movimiento is not None:
+                try:
+                    _aplicar_planilla_historial(
+                        activo_actualizado,
+                        usuario_nuevo,
+                        request.user,
+                        movimiento,
+                    )
+                except Exception as exc:
+                    messages.error(
+                        request,
+                        f"Se reasignó el equipo, pero no se pudo archivar la planilla: {exc}",
+                    )
 
             messages.success(
                 request,
@@ -777,9 +825,20 @@ def acciones_masivas(request):
                 )
                 cambios += 1
                 if usuario:
-                    pendientes.append(activo.pk)
+                    pendientes.append((activo, movimiento))
 
-        ids_constancia = pendientes
+        ids_constancia = []
+        for activo, movimiento in pendientes:
+            try:
+                _aplicar_planilla_historial(
+                    activo, usuario, request.user, movimiento,
+                )
+                ids_constancia.append(activo.pk)
+            except Exception as exc:
+                messages.error(
+                    request,
+                    f"No se pudo archivar la planilla de {activo.codigo_inventario}: {exc}",
+                )
         messages.success(
             request,
             f'{cambios} activo(s) reasignado(s) a {_nombre(usuario)}.'

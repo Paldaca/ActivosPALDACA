@@ -19,4 +19,9 @@ urlpatterns = [
         views.descargar_planilla_vigente,
         name='planilla-vigente',
     ),
+    path(
+        'planilla/historial/<int:pk>/',
+        views.descargar_planilla_historial,
+        name='planilla-historial',
+    ),
 ]

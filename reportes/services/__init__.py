@@ -9,7 +9,7 @@ from .exports import (
 )
 from .filtros import filtros_desde_request, queryset_activos_filtrados
 from .pdf import formatear_fecha, generar_pdf
-from .asignacion import exportar_asignacion_pdf
+from .asignacion import exportar_asignacion_pdf, guardar_planilla_en_historial
 
 __all__ = [
     "exportar_activos_excel",
@@ -18,6 +18,7 @@ __all__ = [
     "exportar_inventario_pdf",
     "exportar_nota_entrega_pdf",
     "exportar_asignacion_pdf",
+    "guardar_planilla_en_historial",
     "filtros_desde_request",
     "formatear_fecha",
     "generar_pdf",

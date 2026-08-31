@@ -1,12 +1,17 @@
-"""Planilla de asignación de equipos: render bajo demanda."""
+"""Planilla de asignación: render bajo demanda y copia en historial."""
 
+import re
 from datetime import datetime
 
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
 from django.http import HttpResponse
 from django.templatetags.static import static
 from django.utils import timezone
 
-from .html_pdf import render_html_pdf
+from activos.models import Activo
+
+from .html_pdf import render_html_pdf, render_html_pdf_bytes
 from .pdf import formatear_fecha
 
 PLANTILLA = "reportes/asignacion_activos.html"
@@ -54,6 +59,49 @@ def contexto_planilla(activos, entrega_usuario, observaciones=""):
 
 def _timestamp() -> str:
     return datetime.now().strftime("%Y%m%d_%H%M%S")
+
+
+def _ruta_planilla_historial(activo) -> str:
+    stamp = timezone.now().strftime("%Y%m%d_%H%M%S_%f")
+    codigo = re.sub(
+        r"[^A-Z0-9._-]",
+        "_",
+        (activo.codigo_inventario or "ACTIVO").upper(),
+    )
+    return f"planillas/historial/{codigo}_{stamp}.pdf"
+
+
+def _activo_con_relaciones(activo) -> Activo:
+    return Activo.objects.select_related(
+        "subcategoria__categoria",
+        "ubicacion",
+        "usuario_asignado__disciplina",
+    ).get(pk=activo.pk)
+
+
+def guardar_planilla_en_historial(
+    activo,
+    entrega_usuario,
+    movimiento,
+    observaciones="",
+):
+    """Render one planilla and attach it to a history movement."""
+    if movimiento is None:
+        return None
+    activo = _activo_con_relaciones(activo)
+    if not activo.usuario_asignado_id:
+        return None
+    pdf_bytes = render_html_pdf_bytes(
+        PLANTILLA,
+        contexto_planilla([activo], entrega_usuario, observaciones),
+    )
+    rel = default_storage.save(
+        _ruta_planilla_historial(activo),
+        ContentFile(pdf_bytes),
+    )
+    movimiento.archivo_planilla = rel
+    movimiento.save(update_fields=["archivo_planilla"])
+    return rel
 
 
 def exportar_asignacion_pdf(

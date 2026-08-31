@@ -228,6 +228,21 @@ def etiqueta_alta(request, token):
             )
             destino = reverse("activos:activo-detail", kwargs={"pk": activo.pk})
             if activo.usuario_asignado_id:
+                try:
+                    from reportes.services.asignacion import (
+                        guardar_planilla_en_historial,
+                    )
+
+                    guardar_planilla_en_historial(
+                        activo,
+                        entrega_usuario=request.user,
+                        movimiento=movimiento_alta,
+                    )
+                except Exception as exc:
+                    messages.error(
+                        request,
+                        f"Se registró el activo, pero no se pudo archivar la planilla: {exc}",
+                    )
                 return redirect(f"{destino}?constancia={activo.pk}")
             return redirect(destino)
     else:

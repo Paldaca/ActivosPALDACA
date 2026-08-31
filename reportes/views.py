@@ -1,8 +1,11 @@
+import os
+
 from django.contrib import messages
+from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404, redirect
 
 from activos.decorators import requiere_modulo_paldaca
-from activos.models import Activo, EtiquetaQR
+from activos.models import Activo, EtiquetaQR, HistorialMovimiento
 
 from .services import (
     exportar_inventario_excel,
@@ -61,6 +64,22 @@ def _redirect_planilla(ids):
     if len(ids) == 1:
         return redirect("activos:activo-detail", pk=ids[0])
     return redirect("activos:activo-list")
+
+
+def _respuesta_archivo_pdf(campo, nombre):
+    if not campo:
+        raise Http404("No hay planilla guardada.")
+    try:
+        handle = campo.open("rb")
+    except FileNotFoundError as exc:
+        raise Http404("El archivo de la planilla ya no está.") from exc
+    base = os.path.basename(campo.name) or nombre
+    return FileResponse(
+        handle,
+        as_attachment=True,
+        filename=base,
+        content_type="application/pdf",
+    )
 
 
 def _respuesta_planilla(request, ids, observaciones=""):
@@ -131,6 +150,19 @@ def descargar_planilla_vigente(request, pk):
         messages.error(request, "Este equipo no tiene responsable asignado.")
         return redirect("activos:activo-detail", pk=pk)
     return _respuesta_planilla(request, [pk])
+
+
+@requiere_modulo_paldaca
+def descargar_planilla_historial(request, pk):
+    """Serve the planilla snapshot attached to a movement."""
+    movimiento = get_object_or_404(
+        HistorialMovimiento.objects.select_related("activo"),
+        pk=pk,
+    )
+    return _respuesta_archivo_pdf(
+        movimiento.archivo_planilla,
+        f"planilla_{movimiento.activo.codigo_inventario}.pdf",
+    )
 
 
 @requiere_modulo_paldaca

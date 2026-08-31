@@ -1,9 +1,10 @@
-"""Planilla de asignación: generación bajo demanda."""
+"""Planilla de asignación: generación bajo demanda e historial auditable."""
 
 import html
 from io import BytesIO
 
 import pytest
+from django.core.files.storage import default_storage
 from django.urls import reverse
 from pypdf import PdfReader
 
@@ -37,7 +38,7 @@ def _crear_activo(catalogo, codigo, usuario=None, serial=""):
 
 
 @pytest.mark.django_db
-def test_reasignar_ofrece_constancia_sin_guardar_en_disco(client_auth, catalogo):
+def test_reasignar_archiva_planilla_en_historial(client_auth, catalogo):
     act = _crear_activo(catalogo, "INV-PLAN-1")
     url = reverse("activos:activo-reasignar", args=[act.pk])
     r = client_auth.post(
@@ -45,9 +46,54 @@ def test_reasignar_ofrece_constancia_sin_guardar_en_disco(client_auth, catalogo)
     )
     assert r.status_code == 302
     assert f"constancia={act.pk}" in r.url
-    assert act.historial_movimientos.filter(
-        tipo_movimiento=HistorialMovimiento.TipoMovimiento.PLANILLA
-    ).count() == 0
+    reasig = act.historial_movimientos.filter(
+        tipo_movimiento=HistorialMovimiento.TipoMovimiento.REASIGNACION
+    ).first()
+    assert reasig.archivo_planilla
+    assert default_storage.exists(reasig.archivo_planilla.name)
+
+
+@pytest.mark.django_db
+def test_editar_formulario_muestra_constancia(client_auth, catalogo):
+    act = _crear_activo(catalogo, "INV-EDIT-FORM")
+    r = client_auth.post(
+        reverse("activos:activo-update", args=[act.pk]),
+        {
+            "subcategoria": act.subcategoria_id,
+            "marca": act.marca,
+            "modelo": act.modelo,
+            "numero_serial": act.numero_serial,
+            "usuario_asignado": catalogo["usuario_a"].pk,
+            "ubicacion": act.ubicacion_id,
+            "observaciones": "",
+            "estado": act.estado,
+        },
+    )
+    assert r.status_code == 302
+    assert f"constancia={act.pk}" in r.url
+    reasig = act.historial_movimientos.filter(
+        tipo_movimiento=HistorialMovimiento.TipoMovimiento.REASIGNACION
+    ).first()
+    assert reasig.archivo_planilla
+
+
+@pytest.mark.django_db
+def test_descargar_planilla_desde_historial(client_auth, catalogo):
+    act = _crear_activo(catalogo, "INV-HIST-DL")
+    client_auth.post(
+        reverse("activos:activo-reasignar", args=[act.pk]),
+        {"usuario_asignado": catalogo["usuario_a"].pk},
+    )
+    movimiento = act.historial_movimientos.filter(
+        tipo_movimiento=HistorialMovimiento.TipoMovimiento.REASIGNACION
+    ).first()
+    r = client_auth.get(
+        reverse("reportes:planilla-historial", args=[movimiento.pk])
+    )
+    assert r.status_code == 200
+    assert r["Content-Type"] == "application/pdf"
+    contenido = b"".join(r.streaming_content)
+    assert "INV-HIST-DL" in _pdf_texto(contenido)
 
 
 @pytest.mark.django_db
@@ -83,6 +129,9 @@ def test_constancia_post_genera_pdf_con_observaciones(client_auth, catalogo):
     cuerpo_pdf = _pdf_texto(r.content)
     assert "INV-PLAN-REGEN" in cuerpo_pdf
     assert "Equipo revisado" in cuerpo_pdf
+    assert act.historial_movimientos.filter(
+        archivo_planilla__isnull=False,
+    ).count() == 0
 
 
 @pytest.mark.django_db
@@ -100,6 +149,10 @@ def test_planilla_vigente_genera_pdf_al_vuelo(client_auth, catalogo):
 def test_liberar_no_ofrece_constancia(client_auth, catalogo):
     act = _crear_activo(
         catalogo, "INV-PLAN-LIB", usuario=catalogo["usuario_a"]
+    )
+    client_auth.post(
+        reverse("activos:activo-reasignar", args=[act.pk]),
+        {"usuario_asignado": catalogo["usuario_b"].pk},
     )
     r = client_auth.post(
         reverse("activos:activo-reasignar", args=[act.pk]),
