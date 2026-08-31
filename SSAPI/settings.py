@@ -312,6 +312,41 @@ handler500 = 'core.views.custom_500_view'
 handler403 = 'core.views.custom_403_view'
 handler400 = 'core.views.custom_400_view'
 
+# Logging: sin esto, 'paldaca.performance' (core/performance.py) hereda el
+# nivel WARNING del root logger de Django y logger.info(...) nunca se emite,
+# pese a que Server-Timing sí llega en la respuesta. Mismo patrón que
+# Calidad/Codigos/HDT.
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'simple': {
+            'format': '{levelname} {asctime} {message}',
+            'style': '{',
+            'datefmt': '%Y-%m-%d %H:%M:%S',
+        },
+    },
+    'handlers': {
+        'console': {
+            'level': 'INFO',
+            'class': 'logging.StreamHandler',
+            'formatter': 'simple',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'paldaca.performance': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+}
+
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
