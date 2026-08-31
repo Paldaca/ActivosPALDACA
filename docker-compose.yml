@@ -19,6 +19,7 @@ services:
       PALDACA_SHELL_PATH: ${PALDACA_SHELL_PATH:-/activos}
       PALDACA_PUBLIC_BASE_URL: ${PALDACA_PUBLIC_BASE_URL:-https://activos.cpaldaca.com}
       DJANGO_LOG_TO_STDOUT: "true"
+      RUNNING_IN_DOCKER: "1"
       PORT: "8082"
     volumes:
       - activos_media:/app/media

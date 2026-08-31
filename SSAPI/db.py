@@ -45,24 +45,11 @@ DATABASEPROD = DATABASESPRODUCCION = _mysql_config(
 )
 
 
-def _is_docker_runtime() -> bool:
-    return os.getenv("RUNNING_IN_DOCKER", "").strip().lower() in (
-        "1",
-        "true",
-        "yes",
-        "on",
-    )
-
-
-def _mysql_fallback() -> dict:
-    return DATABASEDES if _DEV_ENV.exists() else DATABASEPROD
-
-
 def get_databases() -> dict:
-    """Usa DATABASE_URL en Docker/Coolify; en local ignora la URL interna y usa MYSQL_*."""
+    """Usa DATABASE_URL (MySQL compartida en Coolify) si existe; si no, MYSQL_*."""
     database_url = os.getenv("DATABASE_URL", "").strip()
-    if not database_url or not _is_docker_runtime():
-        return _mysql_fallback()
+    if not database_url:
+        return DATABASEDES if _DEV_ENV.exists() else DATABASEPROD
 
     ssl_require = os.getenv("DATABASE_SSL_REQUIRE", "false").lower() == "true"
     conn_max_age = int(os.getenv("DATABASE_CONN_MAX_AGE", "600"))
