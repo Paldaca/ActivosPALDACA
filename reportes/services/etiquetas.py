@@ -1,4 +1,4 @@
-"""Hoja de etiquetas QR para imprimir sobre adhesivo Avery 5160 (Letter).
+"""Hoja de etiquetas QR en rejilla 4×10 sobre papel Letter.
 
 Se dibuja con el `canvas` de ReportLab en lugar de con `platypus` porque aquí
 no hay flujo de texto que repaginar: hay una rejilla de posiciones físicas fijas
@@ -27,30 +27,32 @@ from reportlab.pdfgen import canvas as canvas_pdf
 
 from activos.services import qr as servicio_qr
 
-# --- Geometría Avery 5160 / 5260 sobre hoja Letter --------------------------
-# Medidas del fabricante en pulgadas; se convierten a puntos una sola vez.
+# --- Rejilla 4×10 sobre hoja Letter (8,5" × 11") ----------------------------
+# Márgenes laterales mínimos y sin calle entre columnas para caber 4 QR por fila.
 
-COLUMNAS = 3
+COLUMNAS = 4
 FILAS = 10
 
-MARGEN_IZQUIERDO = 0.1875 * inch
+ANCHO_PAGINA = 8.5 * inch
+MARGEN_HORIZONTAL = 0.125 * inch
+MARGEN_IZQUIERDO = MARGEN_HORIZONTAL
 MARGEN_SUPERIOR = 0.5 * inch
 
-ANCHO_ETIQUETA = 2.625 * inch
+#: Paso = ancho útil / columnas; cada celda usa todo el paso (sin hueco extra).
+PASO_HORIZONTAL = (ANCHO_PAGINA - 2 * MARGEN_HORIZONTAL) / COLUMNAS
+ANCHO_ETIQUETA = PASO_HORIZONTAL
 ALTO_ETIQUETA = 1.0 * inch
-
-#: Distancia entre orígenes de dos etiquetas contiguas. En vertical coincide con
-#: el alto porque este formato no deja calle entre filas.
-PASO_HORIZONTAL = 2.75 * inch
 PASO_VERTICAL = 1.0 * inch
 
 #: Aire interior. Los troqueles se desvían hasta ~0,5 mm entre lotes de papel,
 #: así que nada útil debe acercarse más que esto al borde.
 RESPIRO = 2.2 * mm
 
-#: Lado del QR: ocupa todo el alto útil del adhesivo (sin achicarlo por el texto).
+#: Lado del QR: el mayor cuadrado que cabe en la celda (ancho o alto útil).
 #: Con la URL pública y corrección H el símbolo son 41 módulos (~0,51 mm/módulo).
-LADO_QR = ALTO_ETIQUETA - (2 * RESPIRO)
+_ancho_util = ANCHO_ETIQUETA - (2 * RESPIRO)
+_alto_util = ALTO_ETIQUETA - (2 * RESPIRO)
+LADO_QR = min(_ancho_util, _alto_util)
 
 
 def _cargar_marca():
@@ -185,7 +187,7 @@ def _dibujar_etiqueta(lienzo, etiqueta, plano, marca, x, y):
 
 
 def generar_hoja_etiquetas(etiquetas, filename=None) -> HttpResponse:
-    """PDF con las etiquetas dispuestas en la rejilla Avery 5160.
+    """PDF con las etiquetas dispuestas en la rejilla 4×10 de Letter.
 
     Se rellena por filas (izquierda a derecha, arriba a abajo) siguiendo el
     orden en que se despega una hoja.

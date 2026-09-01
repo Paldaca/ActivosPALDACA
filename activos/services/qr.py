@@ -2,7 +2,7 @@
 
 Único punto donde se decide qué se codifica, con qué parámetros y con qué
 aspecto. Aislarlo importa por dos motivos: los parámetros están atados a una
-restricción física —el adhesivo Avery 5160 mide 66,7 × 25,4 mm— y el mismo
+restricción física —cada celda de la hoja Letter mide ~52 × 25 mm (4 columnas)— y el mismo
 dibujo tiene que salir idéntico en pantalla (SVG) y en papel (ReportLab).
 
 De ahí `plano()`: resuelve la geometría una sola vez y devuelve primitivas que

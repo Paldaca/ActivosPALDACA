@@ -506,7 +506,8 @@ def test_la_hoja_impresa_mantiene_el_qr_a_tamano_completo():
     from reportes.services import etiquetas as servicio
 
     alto_util = servicio.ALTO_ETIQUETA - (2 * servicio.RESPIRO)
-    assert servicio.LADO_QR == alto_util
+    ancho_util = servicio.ANCHO_ETIQUETA - (2 * servicio.RESPIRO)
+    assert servicio.LADO_QR == min(ancho_util, alto_util)
 
 
 def test_la_marca_existe_y_tiene_fondo_transparente():
