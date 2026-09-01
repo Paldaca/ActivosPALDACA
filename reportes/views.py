@@ -5,6 +5,7 @@ from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404, redirect
 
 from activos.decorators import requiere_modulo_paldaca
+from activos.forms import GenerarEtiquetasForm
 from activos.models import Activo, EtiquetaQR, HistorialMovimiento
 
 from .services import (
@@ -165,13 +166,39 @@ def descargar_planilla_historial(request, pk):
     )
 
 
+def _ids_etiquetas_desde_request(request) -> list[str]:
+    """Ids únicos de etiquetas desde `?ids=` (GET) o `ids` (POST)."""
+    if request.method == "POST":
+        crudos = (request.POST.get("ids") or "").strip()
+        if not crudos:
+            crudos = ",".join(request.POST.getlist("ids"))
+    else:
+        crudos = (request.GET.get("ids") or "").strip()
+
+    ids: list[str] = []
+    vistos: set[str] = set()
+    for trozo in crudos.split(","):
+        trozo = trozo.strip()
+        if trozo.isdigit() and trozo not in vistos:
+            vistos.add(trozo)
+            ids.append(trozo)
+    return ids
+
+
 @requiere_modulo_paldaca
 def imprimir_etiquetas(request):
     """Hoja Avery 5160 con las etiquetas cuyos ids llegan en `?ids=1,2,3`."""
-    crudos = (request.GET.get("ids") or "").strip()
-    ids = [trozo for trozo in crudos.split(",") if trozo.isdigit()]
+    max_etiquetas = GenerarEtiquetasForm.MAX_POR_LOTE
+    ids = _ids_etiquetas_desde_request(request)
     if not ids:
         messages.error(request, "No indicaste qué etiquetas imprimir.")
+        return redirect("activos:etiqueta-list")
+
+    if len(ids) > max_etiquetas:
+        messages.error(
+            request,
+            f"Solo puedes imprimir hasta {max_etiquetas} etiquetas por PDF.",
+        )
         return redirect("activos:etiqueta-list")
 
     etiquetas = list(
