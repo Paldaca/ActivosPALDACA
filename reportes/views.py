@@ -76,7 +76,7 @@ def _respuesta_archivo_pdf(campo, nombre):
     base = os.path.basename(campo.name) or nombre
     return FileResponse(
         handle,
-        as_attachment=True,
+        as_attachment=False,
         filename=base,
         content_type="application/pdf",
     )

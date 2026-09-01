@@ -595,7 +595,8 @@
 <div class="modal fade" id="modalNotaEntrega" tabindex="-1" aria-labelledby="modalNotaEntregaTitulo" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <form method="post" action="{% url 'reportes:constancia' %}"
-              class="modal-content ax-form" data-ax-bulk-form="activos_seleccionados">
+              class="modal-content ax-form" data-ax-bulk-form="activos_seleccionados"
+              target="_blank" rel="noopener">
             {% csrf_token %}
             <div class="modal-header">
                 <h5 class="modal-title ax-card-title" id="modalNotaEntregaTitulo">
