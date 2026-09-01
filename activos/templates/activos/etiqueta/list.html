@@ -92,6 +92,12 @@
                         </div>
                     </div>
 
+                    <button type="button"
+                            class="btn-pastel btn-pastel--neutro btn-pastel--sm"
+                            id="axEtiquetaToggleSel">
+                        <i class="bi bi-check2-square"></i> Seleccionar e imprimir
+                    </button>
+
                     <button class="btn-pastel btn-pastel--neutro btn-pastel--sm ms-auto ax-filters-toggle"
                             type="button" data-bs-toggle="collapse" data-bs-target="#axEtiquetaFiltrosAvanzados"
                             aria-expanded="{% if hay_filtros %}true{% else %}false{% endif %}">
@@ -163,10 +169,51 @@
     </section>
 
     {% if etiquetas %}
-    <section class="ax-etiqueta-grid" aria-label="Listado de etiquetas">
+    <div class="ax-etiqueta-sel-mode" id="axEtiquetaSelMode" hidden
+         data-max="{{ max_etiquetas_pdf }}"
+         data-pdf-url="{{ url_etiquetas_pdf }}">
+        <div class="ax-etiqueta-sel-mode__main">
+            <span class="ax-etiqueta-sel-mode__count">
+                <strong id="axEtiquetaSelCount">0</strong>
+                <span>/ {{ max_etiquetas_pdf }}</span>
+            </span>
+            <div class="ax-etiqueta-sel-mode__progress" aria-hidden="true">
+                <div class="ax-etiqueta-sel-mode__progress-fill" id="axEtiquetaSelProgress"></div>
+            </div>
+            <p class="ax-etiqueta-sel-mode__hint" id="axEtiquetaSelHint">
+                Toca las tarjetas para marcarlas. Puedes mezclar subcategorías.
+            </p>
+        </div>
+        <div class="ax-etiqueta-sel-mode__actions">
+            <label class="ax-etiqueta-sel-mode__all">
+                <input type="checkbox" id="axEtiquetaSelAllPage" aria-controls="axEtiquetaGrid">
+                <span>Página completa</span>
+            </label>
+            <button type="button" class="btn-pastel btn-pastel--neutro btn-pastel--sm" id="axEtiquetaSelClear">
+                <i class="bi bi-eraser"></i> Limpiar
+            </button>
+            <button type="button" class="btn-pastel btn-pastel--lila btn-pastel--sm" id="axEtiquetaSelExit">
+                <i class="bi bi-x-lg"></i> Salir
+            </button>
+        </div>
+    </div>
+
+    <section class="ax-etiqueta-grid" id="axEtiquetaGrid" aria-label="Listado de etiquetas">
         {% for etiqueta in etiquetas %}
-        <article class="ax-etiqueta-card ax-etiqueta-card--{{ etiqueta.estado|lower }}{% if etiqueta.estado == 'AN' %} is-muted{% endif %}"
-                 style="--i: {{ forloop.counter0 }}">
+        <article class="ax-etiqueta-card ax-etiqueta-card--{{ etiqueta.estado|lower }}{% if etiqueta.estado == 'AN' %} is-muted{% endif %}{% if etiqueta.estado != 'AN' %} is-selectable{% endif %}"
+                 style="--i: {{ forloop.counter0 }}"
+                 {% if etiqueta.estado != 'AN' %}data-etiqueta-id="{{ etiqueta.pk }}"{% endif %}>
+            {% if etiqueta.estado != 'AN' %}
+            <input type="checkbox"
+                   class="ax-etiqueta-sel visually-hidden"
+                   value="{{ etiqueta.pk }}"
+                   id="ax-etiqueta-sel-{{ etiqueta.pk }}"
+                   data-codigo="{{ etiqueta.codigo_reservado }}"
+                   aria-label="Seleccionar {{ etiqueta.codigo_reservado }} para imprimir">
+            <span class="ax-etiqueta-card__check" aria-hidden="true">
+                <i class="bi bi-check-lg"></i>
+            </span>
+            {% endif %}
             <div class="ax-etiqueta-card__qr" aria-hidden="true">
                 {% qr_svg etiqueta 72 %}
             </div>
@@ -266,6 +313,28 @@
         </article>
         {% endfor %}
     </section>
+
+    <div class="ax-etiqueta-printbar" id="axEtiquetaSelbar"
+         role="region" aria-label="Imprimir etiquetas seleccionadas" hidden>
+        <div class="ax-etiqueta-printbar__status">
+            <span class="ax-etiqueta-printbar__count" id="axEtiquetaSelBadge">0</span>
+            <span class="ax-etiqueta-printbar__label" id="axEtiquetaSelLabel">etiquetas listas</span>
+            <span class="ax-etiqueta-printbar__meta">· máx. {{ max_etiquetas_pdf }}</span>
+        </div>
+        <div class="ax-etiqueta-printbar__actions">
+            <button type="button" class="btn-pastel btn-pastel--neutro btn-pastel--sm" id="axEtiquetaSelCancel">
+                Cancelar
+            </button>
+            <a class="btn-pastel btn-pastel--cielo"
+               id="axEtiquetaImprimirSel"
+               href="#"
+               target="_blank"
+               rel="noopener"
+               aria-disabled="true">
+                <i class="bi bi-printer"></i> Imprimir PDF
+            </a>
+        </div>
+    </div>
 
     {% include 'activos/includes/_paginacion.html' %}
 
@@ -367,46 +436,5 @@
 
 {% block extra_js %}
 <script src="{% static_v 'js/activos-ui.js' %}"></script>
-<script>
-    (function () {
-        var formFiltros = document.getElementById("axEtiquetaFiltros");
-        var hiddenEstado = document.getElementById("axEtiquetaEstadoHidden");
-        var selectEstado = document.getElementById("ax-etiqueta-estado");
-
-        function syncCamposEstado() {
-            if (!hiddenEstado || !selectEstado) return;
-            var esMovil = window.matchMedia("(max-width: 767.98px)").matches;
-            hiddenEstado.disabled = esMovil;
-            selectEstado.disabled = !esMovil;
-        }
-
-        syncCamposEstado();
-        window.addEventListener("resize", syncCamposEstado);
-
-        var catSelect = document.getElementById("id_categoria");
-        if (catSelect && formFiltros) {
-            catSelect.addEventListener("change", function () {
-                var subSelect = document.getElementById("id_subcategoria");
-                if (subSelect) subSelect.value = "";
-                formFiltros.submit();
-            });
-        }
-
-        // El formulario abre el PDF en una pestaña nueva (target="_blank") a
-        // propósito: quien genera un lote lo hace para imprimirlo ya. Pero eso
-        // deja ESTA pestaña intacta — las etiquetas recién creadas no aparecen
-        // hasta recargar. El plazo da tiempo a abrir la pestaña nueva.
-        var form = document.querySelector("#drawerGenerarEtiquetas form");
-        if (!form) return;
-
-        form.addEventListener("submit", function () {
-            var boton = form.querySelector('button[type="submit"]');
-            if (boton) {
-                boton.disabled = true;
-                boton.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Generando…';
-            }
-            setTimeout(function () { window.location.reload(); }, 600);
-        });
-    })();
-</script>
+<script src="{% static_v 'js/etiquetas.js' %}"></script>
 {% endblock %}

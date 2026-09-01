@@ -329,6 +329,45 @@ def test_hoja_de_etiquetas_devuelve_un_pdf(client_auth, subcategoria):
 
 
 @pytest.mark.django_db
+def test_hoja_de_etiquetas_acepta_varias_subcategorias(client_auth, catalogo):
+    sub_a = SubCategoria.objects.create(
+        nombre="Laptops",
+        prefijo="LAP",
+        categoria=catalogo["categoria"],
+    )
+    sub_b = SubCategoria.objects.create(
+        nombre="Monitores",
+        prefijo="MON",
+        categoria=catalogo["categoria"],
+    )
+    ids = []
+    for sub in (sub_a, sub_b):
+        client_auth.post(reverse("activos:etiqueta-generar"), {
+            "subcategoria": sub.pk,
+            "cantidad": 2,
+        })
+        ids.extend(EtiquetaQR.objects.filter(subcategoria=sub).values_list("pk", flat=True))
+
+    r = client_auth.get(f"{reverse('reportes:etiquetas-pdf')}?ids={','.join(map(str, ids))}")
+
+    assert r.status_code == 200
+    assert r["Content-Type"] == "application/pdf"
+
+
+@pytest.mark.django_db
+def test_hoja_de_etiquetas_rechaza_mas_de_80(client_auth, subcategoria):
+    from activos.forms import GenerarEtiquetasForm
+
+    limite = GenerarEtiquetasForm.MAX_POR_LOTE
+    ids = ",".join(str(i) for i in range(1, limite + 2))
+
+    r = client_auth.get(f"{reverse('reportes:etiquetas-pdf')}?ids={ids}")
+
+    assert r.status_code == 302
+    assert reverse("activos:etiqueta-list") in r["Location"]
+
+
+@pytest.mark.django_db
 def test_el_qr_apunta_a_la_url_publica_absoluta(etiqueta, settings):
     from activos.services.qr import url_publica
 

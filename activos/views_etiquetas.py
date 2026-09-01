@@ -108,6 +108,8 @@ class EtiquetaListView(ModuloActivoRequiredMixin, ListView):
             (self.request.GET.get("categoria") or "").strip().isdigit()
             or (self.request.GET.get("subcategoria") or "").strip().isdigit()
         )
+        contexto["max_etiquetas_pdf"] = GenerarEtiquetasForm.MAX_POR_LOTE
+        contexto["url_etiquetas_pdf"] = reverse("reportes:etiquetas-pdf")
         return contexto
 
 
