@@ -67,6 +67,15 @@ LOGO_ESTATICO = "core/img/marca_cp.png"
 #: Lado del patrón de búsqueda, en módulos. Lo fija el estándar.
 OJO = 7
 
+#: Tipografía del código legible sobre el símbolo en la hoja Avery (ver
+#: reportes/services/etiquetas.py). Va en el margen superior, sin achicar el QR.
+TAMANO_FUENTE_CODIGO_PT = 5
+
+
+def codigo_inventario_etiqueta(etiqueta) -> str:
+    """Código de inventario legible para imprimir sobre el QR."""
+    return (etiqueta.codigo_reservado or "").strip().upper()
+
 
 def url_publica(etiqueta) -> str:
     """URL absoluta que se imprime en el QR.

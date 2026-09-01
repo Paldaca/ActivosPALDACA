@@ -609,6 +609,27 @@
         } else {
             mostrar(0);
         }
+
+        initQrSubmitToggle(form);
+    }
+
+    function initQrSubmitToggle(form) {
+        if (!form) return;
+        var toggle = $('#id_generar_etiqueta_qr', form);
+        var boton = $('[data-ax-submit-qr]', form);
+        var etiqueta = $('[data-ax-submit-label]', boton);
+        if (!toggle || !boton || !etiqueta) return;
+
+        function actualizar() {
+            var conQr = toggle.checked;
+            var texto = conQr
+                ? (boton.dataset.axSubmitLabelQr || 'Registrar activo y generar QR')
+                : (boton.dataset.axSubmitLabelPlain || 'Registrar activo');
+            etiqueta.textContent = texto;
+        }
+
+        toggle.addEventListener('change', actualizar);
+        actualizar();
     }
 
     /* -------------------------------------------------------------------------

@@ -12,7 +12,6 @@ from django.utils import timezone
 
 from activos.models import Activo, EtiquetaQR
 
-
 class Command(BaseCommand):
     help = "Crea etiquetas QR para activos ya registrados que aún no tienen una."
 

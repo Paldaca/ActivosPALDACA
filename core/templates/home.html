@@ -36,9 +36,33 @@
                 <a href="{% url 'activos:activo-list' %}" class="btn-pastel btn-pastel--glass">
                     Ver inventario
                 </a>
-                <a href="{% url 'activos:activo-create' %}" class="btn-pastel btn-pastel--cta">
-                    Registrar activo
-                </a>
+                <div class="dropdown">
+                    <button class="btn-pastel btn-pastel--cta dropdown-toggle" type="button"
+                            data-bs-toggle="dropdown" data-bs-display="static"
+                            aria-expanded="false" aria-haspopup="true">
+                        <i class="bi bi-plus-lg"></i> Registrar activo
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow ax-export-menu">
+                        <li>
+                            <a class="dropdown-item ax-export-item" href="{% url 'activos:activo-create' %}">
+                                <span class="ax-export-icon"><i class="bi bi-keyboard"></i></span>
+                                <span class="ax-export-copy">
+                                    <strong>Registrar manualmente</strong>
+                                    <small>Ya sabes qué equipo es y tienes sus datos</small>
+                                </span>
+                            </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item ax-export-item" href="{% url 'activos:etiqueta-list' %}">
+                                <span class="ax-export-icon"><i class="bi bi-qr-code"></i></span>
+                                <span class="ax-export-copy">
+                                    <strong>Generar etiquetas QR</strong>
+                                    <small>Acaban de llegar los equipos y aún no tienes sus datos</small>
+                                </span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
             </div>
         </div>
     </header>

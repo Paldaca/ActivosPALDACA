@@ -49,6 +49,36 @@ def _payload_activo(catalogo, **overrides):
 
 
 @pytest.mark.django_db
+def test_crear_activo_con_generar_qr_redirige_a_pdf(client_auth, catalogo):
+    url = reverse("activos:activo-create")
+    data = _payload_activo(catalogo)
+    data["generar_etiqueta_qr"] = "1"
+    r = client_auth.post(url, data)
+    assert r.status_code == 302
+    assert reverse("reportes:etiquetas-pdf") in r["Location"]
+    act = Activo.objects.get(marca="MarcaPy", modelo="ModeloPy")
+    from activos.models import EtiquetaQR
+
+    etiqueta = EtiquetaQR.objects.get(activo=act)
+    assert etiqueta.estado == EtiquetaQR.EstadoEtiqueta.VINCULADA
+    assert etiqueta.codigo_reservado == act.codigo_inventario
+    assert f"ids={etiqueta.pk}" in r["Location"]
+
+
+@pytest.mark.django_db
+def test_crear_activo_sin_generar_qr_va_a_ficha(client_auth, catalogo):
+    url = reverse("activos:activo-create")
+    data = _payload_activo(catalogo, marca="SinQr", modelo="SinQr")
+    r = client_auth.post(url, data)
+    assert r.status_code == 302
+    act = Activo.objects.get(marca="SinQr")
+    assert r["Location"].endswith(reverse("activos:activo-detail", args=[act.pk]))
+    from activos.models import EtiquetaQR
+
+    assert not EtiquetaQR.objects.filter(activo=act).exists()
+
+
+@pytest.mark.django_db
 def test_crear_activo_exitoso(client_auth, catalogo):
     url = reverse("activos:activo-create")
     data = _payload_activo(catalogo)

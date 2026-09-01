@@ -502,6 +502,13 @@ def test_el_pdf_se_genera_aunque_falte_el_fichero_de_la_marca(etiqueta, monkeypa
     assert respuesta.content.startswith(b"%PDF")
 
 
+def test_la_hoja_impresa_mantiene_el_qr_a_tamano_completo():
+    from reportes.services import etiquetas as servicio
+
+    alto_util = servicio.ALTO_ETIQUETA - (2 * servicio.RESPIRO)
+    assert servicio.LADO_QR == alto_util
+
+
 def test_la_marca_existe_y_tiene_fondo_transparente():
     from PIL import Image
 
