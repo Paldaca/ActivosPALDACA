@@ -464,18 +464,36 @@ class ActivoCreateView(ActivoFormContextMixin, ModuloActivoRequiredMixin, Create
     success_url = reverse_lazy('activos:activo-list')
 
     def form_valid(self, form):
-        response = super().form_valid(form)
+        self.object = form.save()
         messages.success(
             self.request,
             f'Activo {self.object.codigo_inventario} creado exitosamente.',
         )
-        return response
 
-    def get_success_url(self):
-        # "Guardar y registrar otro": alta en serie sin volver al listado.
         if 'guardar_y_nuevo' in self.request.POST:
-            return reverse('activos:activo-create')
-        return reverse('activos:activo-detail', kwargs={'pk': self.object.pk})
+            return redirect('activos:activo-create')
+
+        if self.request.POST.get('generar_etiqueta_qr'):
+            from activos.services.etiquetas import crear_etiqueta_vinculada_para_activo
+
+            etiqueta, creada = crear_etiqueta_vinculada_para_activo(
+                self.object,
+                creada_por=self.request.user,
+            )
+            if creada:
+                messages.info(
+                    self.request,
+                    'Etiqueta QR generada. Se abrirá el PDF para imprimirla.',
+                )
+            else:
+                messages.info(
+                    self.request,
+                    'Este activo ya tenía etiqueta vigente; se reimprime la misma.',
+                )
+            destino = reverse('reportes:etiquetas-pdf')
+            return redirect(f'{destino}?ids={etiqueta.pk}')
+
+        return redirect('activos:activo-detail', pk=self.object.pk)
 
 
 class ActivoUpdateView(ActivoFormContextMixin, ModuloActivoRequiredMixin, UpdateView):

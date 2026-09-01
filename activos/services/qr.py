@@ -2,7 +2,7 @@
 
 Único punto donde se decide qué se codifica, con qué parámetros y con qué
 aspecto. Aislarlo importa por dos motivos: los parámetros están atados a una
-restricción física —el adhesivo Avery 5160 mide 66,7 × 25,4 mm— y el mismo
+restricción física —cada celda de la hoja Letter mide ~52 × 25 mm (4 columnas)— y el mismo
 dibujo tiene que salir idéntico en pantalla (SVG) y en papel (ReportLab).
 
 De ahí `plano()`: resuelve la geometría una sola vez y devuelve primitivas que
@@ -66,6 +66,15 @@ LOGO_ESTATICO = "core/img/marca_cp.png"
 
 #: Lado del patrón de búsqueda, en módulos. Lo fija el estándar.
 OJO = 7
+
+#: Tipografía del código legible sobre el símbolo en la hoja Avery (ver
+#: reportes/services/etiquetas.py). Va en el margen superior, sin achicar el QR.
+TAMANO_FUENTE_CODIGO_PT = 5
+
+
+def codigo_inventario_etiqueta(etiqueta) -> str:
+    """Código de inventario legible para imprimir sobre el QR."""
+    return (etiqueta.codigo_reservado or "").strip().upper()
 
 
 def url_publica(etiqueta) -> str:

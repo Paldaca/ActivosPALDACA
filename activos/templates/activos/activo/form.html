@@ -38,7 +38,7 @@
             Los cambios de responsable y de ubicación quedan registrados automáticamente
             en el historial del activo.
             {% else %}
-            Dos pasos: primero qué equipo es, después dónde está y quién responde por él.
+            Tres pasos: qué equipo es, dónde está y quién responde, y al final la etiqueta QR para pegar en el equipo.
             {% endif %}
         </p>
     </header>
@@ -65,6 +65,12 @@
         <button type="button" class="ax-step">
             <span class="ax-step-num">2</span> Asignación
         </button>
+        {% if not object %}
+        <span class="ax-step-line"></span>
+        <button type="button" class="ax-step">
+            <span class="ax-step-num">3</span> Etiqueta QR
+        </button>
+        {% endif %}
     </nav>
 
     <form method="post" id="axFormActivo" class="ax-form" novalidate>
@@ -244,6 +250,43 @@
             </div>
         </section>
 
+        {% if not object %}
+        {# ================================================================= #}
+        {#  PASO 3 · ETIQUETA QR (solo alta manual)                           #}
+        {# ================================================================= #}
+        <section class="ax-panel" data-ax-panel aria-label="Paso 3: etiqueta QR" hidden>
+            <div class="ax-fieldset">
+                <h2 class="ax-fieldset-legend">
+                    <span class="num">3</span> ¿Generamos la etiqueta QR?
+                </h2>
+
+                <div class="ax-callout mb-3">
+                    <i class="bi bi-qr-code-scan"></i>
+                    <div>
+                        <strong>Último paso del alta manual</strong><br>
+                        Al confirmar, el sistema crea el código de inventario y genera la
+                        etiqueta QR con ese mismo código para imprimirla y pegarla en el equipo.
+                    </div>
+                </div>
+
+                <div class="ax-field" style="--i:0">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="generar_etiqueta_qr"
+                               id="id_generar_etiqueta_qr" value="1" checked
+                               data-ax-toggle-qr-submit>
+                        <label class="form-check-label" for="id_generar_etiqueta_qr">
+                            Generar etiqueta QR al guardar e ir al PDF de impresión
+                        </label>
+                    </div>
+                    <small class="ax-hint">
+                        Desmarca esta opción si solo quieres registrar el activo y pegar la
+                        etiqueta más tarde desde la ficha del equipo.
+                    </small>
+                </div>
+            </div>
+        </section>
+        {% endif %}
+
         {# ================================================================= #}
         {#  BARRA DE ACCIONES                                                #}
         {# ================================================================= #}
@@ -274,9 +317,13 @@
             </button>
             {% endif %}
 
-            <button type="submit" class="btn-pastel btn-pastel--menta" data-ax-step-submit hidden>
+            <button type="submit" class="btn-pastel btn-pastel--menta" data-ax-step-submit hidden
+                    {% if not object %}data-ax-submit-qr data-ax-submit-label-qr="Registrar activo y generar QR"
+                    data-ax-submit-label-plain="Registrar activo"{% endif %}>
                 <i class="bi bi-check2-circle"></i>
-                {% if object %}Guardar cambios{% else %}Registrar activo{% endif %}
+                <span data-ax-submit-label>
+                {% if object %}Guardar cambios{% else %}Registrar activo y generar QR{% endif %}
+                </span>
             </button>
         </div>
     </form>

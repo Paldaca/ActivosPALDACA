@@ -1,4 +1,4 @@
-"""Hoja de etiquetas QR para imprimir sobre adhesivo Avery 5160 (Letter).
+"""Hoja de etiquetas QR en rejilla 4×10 sobre papel Letter.
 
 Se dibuja con el `canvas` de ReportLab en lugar de con `platypus` porque aquí
 no hay flujo de texto que repaginar: hay una rejilla de posiciones físicas fijas
@@ -6,10 +6,8 @@ que tienen que caer sobre unos adhesivos ya troquelados. Colocar cada elemento
 por coordenadas absolutas es lo que permite decir "este QR mide 21 mm" y que
 mida 21 mm en el papel.
 
-Cada etiqueta lleva ÚNICAMENTE el símbolo, centrado en el adhesivo. Sin código
-legible ni texto de acompañamiento: la marca ya integrada en el QR basta para
-identificarlo, y menos elementos es menos que se desalinee entre lotes de
-papel.
+Cada etiqueta lleva el código de inventario en pequeño arriba y el símbolo QR
+a tamaño completo debajo, para identificar lotes sin reducir el código escaneable.
 
 El símbolo se dibuja como vectores, no como una imagen escalada: una imagen
 reescalada por el driver de impresión difumina los bordes, y a medio milímetro
@@ -29,31 +27,32 @@ from reportlab.pdfgen import canvas as canvas_pdf
 
 from activos.services import qr as servicio_qr
 
-# --- Geometría Avery 5160 / 5260 sobre hoja Letter --------------------------
-# Medidas del fabricante en pulgadas; se convierten a puntos una sola vez.
+# --- Rejilla 4×10 sobre hoja Letter (8,5" × 11") ----------------------------
+# Márgenes laterales mínimos y sin calle entre columnas para caber 4 QR por fila.
 
-COLUMNAS = 3
+COLUMNAS = 4
 FILAS = 10
 
-MARGEN_IZQUIERDO = 0.1875 * inch
+ANCHO_PAGINA = 8.5 * inch
+MARGEN_HORIZONTAL = 0.125 * inch
+MARGEN_IZQUIERDO = MARGEN_HORIZONTAL
 MARGEN_SUPERIOR = 0.5 * inch
 
-ANCHO_ETIQUETA = 2.625 * inch
+#: Paso = ancho útil / columnas; cada celda usa todo el paso (sin hueco extra).
+PASO_HORIZONTAL = (ANCHO_PAGINA - 2 * MARGEN_HORIZONTAL) / COLUMNAS
+ANCHO_ETIQUETA = PASO_HORIZONTAL
 ALTO_ETIQUETA = 1.0 * inch
-
-#: Distancia entre orígenes de dos etiquetas contiguas. En vertical coincide con
-#: el alto porque este formato no deja calle entre filas.
-PASO_HORIZONTAL = 2.75 * inch
 PASO_VERTICAL = 1.0 * inch
 
 #: Aire interior. Los troqueles se desvían hasta ~0,5 mm entre lotes de papel,
 #: así que nada útil debe acercarse más que esto al borde.
 RESPIRO = 2.2 * mm
 
-#: Lado del QR. Con la URL pública y corrección H el símbolo son 41 módulos,
-#: lo que deja ~0,51 mm por módulo: verificado decodificando el resultado
-#: rasterizado a 300, 600 y 1200 ppp.
-LADO_QR = ALTO_ETIQUETA - (2 * RESPIRO)
+#: Lado del QR: el mayor cuadrado que cabe en la celda (ancho o alto útil).
+#: Con la URL pública y corrección H el símbolo son 41 módulos (~0,51 mm/módulo).
+_ancho_util = ANCHO_ETIQUETA - (2 * RESPIRO)
+_alto_util = ALTO_ETIQUETA - (2 * RESPIRO)
+LADO_QR = min(_ancho_util, _alto_util)
 
 
 def _cargar_marca():
@@ -155,21 +154,40 @@ def _dibujar_qr(lienzo, p, marca, x, y, lado):
     )
 
 
-def _dibujar_etiqueta(lienzo, etiqueta, plano, marca, x, y):
-    """Una etiqueta: solo el símbolo, centrado en el adhesivo.
+def _dibujar_codigo_inventario(lienzo, etiqueta, x, y):
+    """Código legible centrado en el margen superior del adhesivo."""
+    codigo = servicio_qr.codigo_inventario_etiqueta(etiqueta)
+    if not codigo:
+        return
 
-    Sin código legible ni texto de acompañamiento a propósito: el QR ya lleva
-    la marca y basta por sí solo para identificar y abrir la ficha del
-    activo. Menos elementos también significa menos que se desalinee si el
-    troquel del papel se desvía entre lotes.
-    """
+    tamano = servicio_qr.TAMANO_FUENTE_CODIGO_PT
+    fuente = "Courier"
+    lienzo.setFont(fuente, tamano)
+    lienzo.setFillColor(HexColor(servicio_qr.AZUL))
+
+    ancho_texto = lienzo.stringWidth(codigo, fuente, tamano)
+    if ancho_texto > ANCHO_ETIQUETA - (2 * RESPIRO):
+        tamano = 4.5
+        lienzo.setFont(fuente, tamano)
+        ancho_texto = lienzo.stringWidth(codigo, fuente, tamano)
+
+    texto_x = x + (ANCHO_ETIQUETA - ancho_texto) / 2
+    # Franja superior (RESPIRO): la línea base va en el borde inferior de esa
+    # franja, NO encima del QR — la fórmula anterior caía dentro del símbolo.
+    texto_y = y + ALTO_ETIQUETA - RESPIRO + 0.6
+    lienzo.drawString(texto_x, texto_y, codigo)
+
+
+def _dibujar_etiqueta(lienzo, etiqueta, plano, marca, x, y):
+    """Una etiqueta: código arriba y QR a tamaño completo."""
     centrado_x = x + (ANCHO_ETIQUETA - LADO_QR) / 2
-    centrado_y = y + (ALTO_ETIQUETA - LADO_QR) / 2
-    _dibujar_qr(lienzo, plano, marca, centrado_x, centrado_y, LADO_QR)
+    qr_y = y + RESPIRO
+    _dibujar_qr(lienzo, plano, marca, centrado_x, qr_y, LADO_QR)
+    _dibujar_codigo_inventario(lienzo, etiqueta, x, y)
 
 
 def generar_hoja_etiquetas(etiquetas, filename=None) -> HttpResponse:
-    """PDF con las etiquetas dispuestas en la rejilla Avery 5160.
+    """PDF con las etiquetas dispuestas en la rejilla 4×10 de Letter.
 
     Se rellena por filas (izquierda a derecha, arriba a abajo) siguiendo el
     orden en que se despega una hoja.
