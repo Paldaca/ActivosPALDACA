@@ -249,24 +249,21 @@
                     </div>
                     <div class="ax-card-body text-center">
                         {% if activo.usuario_asignado %}
-                        <span class="ax-avatar ax-avatar--xl ax-avatar--c{{ activo.usuario_asignado|tono_avatar }} mx-auto mb-2">
-                            {{ activo.usuario_asignado|iniciales }}
-                        </span>
-                        <p class="ax-spec-value mb-1">{{ activo.usuario_asignado|nombre_completo }}</p>
+                        <a href="{% url 'usuarios:usuario-profile' activo.usuario_asignado.pk %}"
+                           class="ax-link-plain d-inline-block">
+                            <span class="ax-avatar ax-avatar--xl ax-avatar--c{{ activo.usuario_asignado|tono_avatar }} mx-auto mb-2">
+                                {{ activo.usuario_asignado|iniciales }}
+                            </span>
+                            <p class="ax-spec-value mb-1">{{ activo.usuario_asignado|nombre_completo }}</p>
+                        </a>
                         {% if activo.usuario_asignado.perfil %}
                         <p class="ax-person-meta mb-2">{{ activo.usuario_asignado.perfil }}</p>
                         {% endif %}
                         <a href="{% url 'reportes:planilla-vigente' activo.pk %}"
-                           class="btn-pastel btn-pastel--durazno btn-pastel--sm mb-2">
+                           class="btn-pastel btn-pastel--durazno btn-pastel--block mb-3"
+                           target="_blank" rel="noopener">
                             <i class="bi bi-file-earmark-pdf"></i> Ver planilla
                         </a>
-                        <form method="post" action="{% url 'reportes:constancia' %}" class="mb-3">
-                            {% csrf_token %}
-                            <input type="hidden" name="activos_seleccionados" value="{{ activo.pk }}">
-                            <button type="submit" class="btn-pastel btn-pastel--durazno btn-pastel--block">
-                                <i class="bi bi-file-earmark-pdf"></i> Planilla de asignación
-                            </button>
-                        </form>
                         {% else %}
                         <span class="ax-avatar ax-avatar--xl mx-auto mb-2" style="border-style: dashed;">
                             <i class="bi bi-person-dash"></i>
@@ -322,7 +319,8 @@
                             Una planilla de este equipo, con firmas de quien entrega
                             y quien recibe. Se genera al momento de descargarla.
                         </p>
-                        <form method="post" action="{% url 'reportes:constancia' %}">
+                        <form method="post" action="{% url 'reportes:constancia' %}"
+                              target="_blank" rel="noopener">
                             {% csrf_token %}
                             <input type="hidden" name="activos_seleccionados" value="{{ activo.pk }}">
                             <div class="mb-3">

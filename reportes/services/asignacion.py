@@ -1,7 +1,7 @@
 """Planilla de asignación: render bajo demanda y copia en historial."""
 
 import re
-from datetime import datetime
+import unicodedata
 
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
@@ -57,8 +57,12 @@ def contexto_planilla(activos, entrega_usuario, observaciones=""):
     }
 
 
-def _timestamp() -> str:
-    return datetime.now().strftime("%Y%m%d_%H%M%S")
+def _slug(texto: str) -> str:
+    """ASCII, filename-safe slug: 'Juan Pérez' -> 'juan_perez'."""
+    texto = unicodedata.normalize("NFKD", texto or "")
+    texto = texto.encode("ascii", "ignore").decode("ascii")
+    texto = re.sub(r"[^A-Za-z0-9]+", "_", texto).strip("_").lower()
+    return texto
 
 
 def _ruta_planilla_historial(activo) -> str:
@@ -109,7 +113,9 @@ def exportar_asignacion_pdf(
     entrega_usuario,
     observaciones="",
 ) -> HttpResponse:
-    """Download an N-page PDF (one planilla per asset)."""
+    """Download a single-page PDF listing every asset for one user."""
     context = contexto_planilla(activos, entrega_usuario, observaciones)
-    filename = f"planilla_asignacion_{_timestamp()}.pdf"
-    return render_html_pdf(PLANTILLA, context, filename)
+    nombre = _slug(context["recibe"]["nombre"]) or "sin_asignar"
+    fecha = timezone.now().strftime("%Y%m%d")
+    filename = f"planilla_{nombre}_{fecha}.pdf"
+    return render_html_pdf(PLANTILLA, context, filename, inline=True)

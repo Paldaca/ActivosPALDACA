@@ -47,11 +47,14 @@ def render_html_pdf_bytes(template_name, context) -> bytes:
     return result.getvalue()
 
 
-def render_html_pdf(template_name, context, filename) -> HttpResponse:
-    """Return an attachment HttpResponse with the rendered PDF."""
+def render_html_pdf(
+    template_name, context, filename, *, inline=False
+) -> HttpResponse:
+    """Return an HttpResponse with the rendered PDF."""
     data = render_html_pdf_bytes(template_name, context)
     response = HttpResponse(data, content_type="application/pdf")
+    disposition = "inline" if inline else "attachment"
     response["Content-Disposition"] = (
-        f'attachment; filename="{filename}"'
+        f'{disposition}; filename="{filename}"'
     )
     return response

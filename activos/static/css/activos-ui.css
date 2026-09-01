@@ -1110,6 +1110,19 @@ tr:hover .ax-avatar { transform: scale(1.1); }
 .ax-avatar--lg { width: 46px; height: 46px; font-size: 1rem; }
 .ax-avatar--xl { width: 62px; height: 62px; font-size: 1.3rem; }
 
+.ax-link-plain {
+    color: inherit;
+    text-decoration: none;
+    border-radius: var(--ax-radius-md, 10px);
+    transition: opacity var(--ax-mid) var(--ax-spring);
+}
+.ax-link-plain:hover,
+.ax-link-plain:focus-visible {
+    opacity: 0.8;
+    color: inherit;
+}
+.ax-link-plain:hover .ax-avatar { transform: scale(1.1); }
+
 /* 8 tonos pastel deterministas por persona */
 .ax-avatar--c0 { --a-bg: var(--ax-lila);    --a-ink: var(--ax-lila-ink); }
 .ax-avatar--c1 { --a-bg: var(--ax-menta);   --a-ink: var(--ax-menta-ink); }

@@ -133,7 +133,8 @@
                                     <div class="ax-row-actions justify-content-end">
                                         <a href="{% url 'reportes:planilla-vigente' activo.pk %}"
                                            class="btn-pastel btn-pastel--durazno btn-pastel--icon"
-                                           title="Ver planilla">
+                                           title="Ver planilla"
+                                           target="_blank" rel="noopener">
                                             <i class="bi bi-file-earmark-pdf"></i>
                                             <span class="visually-hidden">Ver planilla de {{ activo.codigo_inventario }}</span>
                                         </a>
@@ -217,7 +218,8 @@
                             Se genera una planilla por equipo marcado, cada una con
                             sus propias firmas. El PDF se crea al momento de descargarlo.
                         </p>
-                        <form id="axFormPlanilla" method="post" action="{% url 'reportes:constancia' %}">
+                        <form id="axFormPlanilla" method="post" action="{% url 'reportes:constancia' %}"
+                              target="_blank" rel="noopener">
                             {% csrf_token %}
                             <div class="mb-3">
                                 <label class="form-label" for="axObsEntrega">Observaciones</label>

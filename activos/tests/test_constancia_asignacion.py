@@ -92,6 +92,8 @@ def test_descargar_planilla_desde_historial(client_auth, catalogo):
     )
     assert r.status_code == 200
     assert r["Content-Type"] == "application/pdf"
+    assert 'inline' in r.get("Content-Disposition", "")
+    assert 'inline' in r.get("Content-Disposition", "")
     contenido = b"".join(r.streaming_content)
     assert "INV-HIST-DL" in _pdf_texto(contenido)
 
@@ -125,6 +127,7 @@ def test_constancia_post_genera_pdf_con_observaciones(client_auth, catalogo):
     )
     assert r.status_code == 200
     assert r["Content-Type"] == "application/pdf"
+    assert 'inline' in r.get("Content-Disposition", "")
     assert r.content.startswith(b"%PDF")
     cuerpo_pdf = _pdf_texto(r.content)
     assert "INV-PLAN-REGEN" in cuerpo_pdf
@@ -142,6 +145,7 @@ def test_planilla_vigente_genera_pdf_al_vuelo(client_auth, catalogo):
     r = client_auth.get(reverse("reportes:planilla-vigente", args=[act.pk]))
     assert r.status_code == 200
     assert r["Content-Type"] == "application/pdf"
+    assert 'inline' in r.get("Content-Disposition", "")
     assert "INV-PLAN-GET" in _pdf_texto(r.content)
 
 
@@ -163,7 +167,7 @@ def test_liberar_no_ofrece_constancia(client_auth, catalogo):
 
 
 @pytest.mark.django_db
-def test_perfil_varios_equipos_una_planilla_por_pagina(
+def test_perfil_varios_equipos_una_sola_planilla(
     client_auth, catalogo
 ):
     a = _crear_activo(
@@ -178,7 +182,8 @@ def test_perfil_varios_equipos_una_planilla_por_pagina(
     )
     assert r.status_code == 200
     assert r["Content-Type"] == "application/pdf"
-    assert _pdf_paginas(r.content) == 2
+    assert 'inline' in r.get("Content-Disposition", "")
+    assert _pdf_paginas(r.content) == 1
     cuerpo_pdf = _pdf_texto(r.content)
     assert "INV-KIT-LAP" in cuerpo_pdf
     assert "INV-KIT-MOU" in cuerpo_pdf
@@ -247,6 +252,7 @@ def test_get_constancia_descarga_pdf(client_auth, catalogo):
     )
     assert r.status_code == 200
     assert r["Content-Type"] == "application/pdf"
+    assert 'inline' in r.get("Content-Disposition", "")
 
 
 @pytest.mark.django_db
