@@ -355,7 +355,7 @@ def test_hoja_de_etiquetas_acepta_varias_subcategorias(client_auth, catalogo):
 
 
 @pytest.mark.django_db
-def test_hoja_de_etiquetas_rechaza_mas_de_80(client_auth, subcategoria):
+def test_hoja_de_etiquetas_rechaza_mas_del_limite(client_auth, subcategoria):
     from activos.forms import GenerarEtiquetasForm
 
     limite = GenerarEtiquetasForm.MAX_POR_LOTE
