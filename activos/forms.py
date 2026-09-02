@@ -253,10 +253,10 @@ class GenerarEtiquetasForm(forms.Form):
     evita frente al alta manual.
     """
 
-    #: Una hoja Letter trae 40 etiquetas (4×10). Se permiten dos hojas por lote:
+    #: Una hoja Letter trae 50 etiquetas (5×10). Se permiten dos hojas por lote:
     #: por encima de eso conviene revisar si de verdad se van a pegar todas,
     #: porque cada etiqueta impresa aparta un código del inventario.
-    MAX_POR_LOTE = 80
+    MAX_POR_LOTE = 100
 
     subcategoria = forms.ModelChoiceField(
         queryset=SubCategoria.objects.select_related("categoria"),
@@ -270,7 +270,7 @@ class GenerarEtiquetasForm(forms.Form):
         max_value=MAX_POR_LOTE,
         initial=1,
         label="Cantidad de etiquetas",
-        help_text=f"Entre 1 y {MAX_POR_LOTE}. Una hoja Letter son 40.",
+        help_text=f"Entre 1 y {MAX_POR_LOTE}. Una hoja Letter son 50.",
         widget=forms.NumberInput(attrs={
             "class": "form-control",
             "inputmode": "numeric",

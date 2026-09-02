@@ -1,4 +1,4 @@
-"""Hoja de etiquetas QR en rejilla 4×10 sobre papel Letter.
+"""Hoja de etiquetas QR en rejilla 5×10 sobre papel Letter.
 
 Se dibuja con el `canvas` de ReportLab en lugar de con `platypus` porque aquí
 no hay flujo de texto que repaginar: hay una rejilla de posiciones físicas fijas
@@ -27,10 +27,12 @@ from reportlab.pdfgen import canvas as canvas_pdf
 
 from activos.services import qr as servicio_qr
 
-# --- Rejilla 4×10 sobre hoja Letter (8,5" × 11") ----------------------------
-# Márgenes laterales mínimos y sin calle entre columnas para caber 4 QR por fila.
+# --- Rejilla 5×10 sobre hoja Letter (8,5" × 11") ----------------------------
+# Márgenes laterales mínimos y sin calle entre columnas para caber 5 QR por fila.
+# ALTO_ETIQUETA y LADO_QR no dependen del número de columnas: el símbolo lo limita
+# la altura del adhesivo, no el ancho de celda.
 
-COLUMNAS = 4
+COLUMNAS = 5
 FILAS = 10
 
 ANCHO_PAGINA = 8.5 * inch
@@ -187,7 +189,7 @@ def _dibujar_etiqueta(lienzo, etiqueta, plano, marca, x, y):
 
 
 def generar_hoja_etiquetas(etiquetas, filename=None) -> HttpResponse:
-    """PDF con las etiquetas dispuestas en la rejilla 4×10 de Letter.
+    """PDF con las etiquetas dispuestas en la rejilla 5×10 de Letter.
 
     Se rellena por filas (izquierda a derecha, arriba a abajo) siguiendo el
     orden en que se despega una hoja.
