@@ -1076,3 +1076,191 @@ body.app-layout.sidebar-drawer-open {
     }
 }
 
+/* =============================================================================
+   Pantallas de error (status pages)
+   ============================================================================= */
+
+body.status-body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: 'Roboto', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    background: #f4f5f9;
+}
+
+.status-shell {
+    display: flex;
+    min-height: 100vh;
+}
+
+.status-brand {
+    flex: 1.05;
+    position: relative;
+    background-color: #141644;
+    background-size: cover;
+    background-position: center;
+    display: flex;
+    align-items: flex-end;
+}
+
+.status-brand::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+        160deg,
+        rgba(20, 22, 68, 0.94) 0%,
+        rgba(50, 64, 123, 0.8) 45%,
+        rgba(20, 22, 68, 0.62) 100%
+    );
+}
+
+.status-brand-overlay {
+    position: relative;
+    z-index: 1;
+    padding: 3rem 3.5rem;
+    color: #fff;
+}
+
+.status-brand-logo {
+    height: 38px;
+    width: auto;
+    margin-bottom: 1.25rem;
+}
+
+.status-brand-tagline {
+    margin: 0;
+    font-size: 1.05rem;
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.status-panel {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #fff;
+    padding: 2.5rem;
+}
+
+.status-panel-inner {
+    width: 100%;
+    max-width: 440px;
+}
+
+.status-eyebrow {
+    display: inline-block;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #8a90a8;
+    margin-bottom: 1rem;
+}
+
+.status-eyebrow--warn { color: #b7791f; }
+.status-eyebrow--danger { color: #ed2546; }
+
+.status-icon {
+    width: 3.5rem;
+    height: 3.5rem;
+    border-radius: 1rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.65rem;
+    margin-bottom: 1.1rem;
+}
+
+.status-icon--warn {
+    background: rgba(237, 37, 70, 0.1);
+    color: #ed2546;
+}
+
+.status-icon--lock {
+    background: rgba(50, 64, 123, 0.12);
+    color: #32407b;
+}
+
+.status-icon--info {
+    background: rgba(50, 64, 123, 0.12);
+    color: #32407b;
+}
+
+.status-title {
+    font-size: 1.55rem;
+    font-weight: 800;
+    color: #141644;
+    margin: 0 0 0.75rem;
+    line-height: 1.3;
+}
+
+.status-summary {
+    color: #5b6178;
+    line-height: 1.55;
+    margin-bottom: 1.25rem;
+}
+
+.status-detail {
+    margin-bottom: 1.25rem;
+    font-size: 0.85rem;
+    color: #5b6178;
+}
+
+.status-detail summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: #32407b;
+}
+
+.status-detail pre {
+    margin: 0.6rem 0 0;
+    padding: 0.75rem 0.9rem;
+    border-radius: 0.6rem;
+    background: #141644;
+    color: #e8ebf7;
+    font-size: 0.75rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.status-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+    margin-top: 0.5rem;
+}
+
+.status-btn-primary {
+    background: #32407b;
+    border-color: #32407b;
+    color: #fff;
+    font-weight: 600;
+    padding: 0.55rem 1.1rem;
+}
+
+.status-btn-primary:hover {
+    background: #141644;
+    border-color: #141644;
+    color: #fff;
+}
+
+.status-btn-secondary {
+    border-color: #d5d9e6;
+    color: #141644;
+    font-weight: 600;
+    padding: 0.55rem 1.1rem;
+}
+
+.status-panel-footer {
+    margin-top: 2rem;
+    font-size: 0.78rem;
+    color: #a0a6bb;
+}
+
+@media (max-width: 900px) {
+    .status-shell { flex-direction: column; }
+    .status-brand { flex: none; min-height: 140px; align-items: center; justify-content: center; text-align: center; }
+    .status-brand-overlay { padding: 1.75rem 1.5rem; }
+    .status-panel { padding: 2rem 1.5rem 3rem; }
+}
+

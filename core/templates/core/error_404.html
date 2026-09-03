@@ -1,148 +1,58 @@
-{% extends 'base.html' %}
 {% load static %}
-
-{% block title %}Página no encontrada - Sistema de Gestión de Activos{% endblock %}
-
-{% block extra_css %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/png" href="{% static 'core/img/logo blanco recortado.png' %}">
+<title>Página no encontrada - Activos PALDACA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+<link rel="stylesheet" href="{% static 'core/css/core.css' %}">
 <style>
-    .error-container {
-        min-height: 70vh;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        text-align: center;
-        padding: 2rem;
-    }
-    
-    .error-content {
-        max-width: 600px;
-        margin: 0 auto;
-    }
-    
-    .error-code {
-        font-size: 8rem;
-        font-weight: 700;
-        color: #32407b;
-        margin-bottom: 1rem;
-        text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
-    }
-    
-    .error-title {
-        font-size: 2.5rem;
-        font-weight: 600;
-        color: #2c3e50;
-        margin-bottom: 1rem;
-    }
-    
-    .error-message {
-        font-size: 1.2rem;
-        color: #7f8c8d;
-        margin-bottom: 2rem;
-        line-height: 1.6;
-    }
-    
-    .error-actions {
-        display: flex;
-        gap: 1rem;
-        justify-content: center;
-        flex-wrap: wrap;
-    }
-    
-    .btn-error {
-        padding: 12px 24px;
-        border-radius: 8px;
-        text-decoration: none;
-        font-weight: 500;
-        transition: all 0.3s ease;
-        border: none;
-        cursor: pointer;
-    }
-    
-    .btn-primary-error {
-        background: linear-gradient(135deg, #32407b 0%, #2980b9 100%);
-        color: white;
-    }
-    
-    .btn-primary-error:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 20px rgba(50, 64, 123, 0.4);
-        color: white;
-    }
-    
-    .btn-secondary-error {
-        background: #f8f9fa;
-        color: #32407b;
-        border: 2px solid #32407b;
-    }
-    
-    .btn-secondary-error:hover {
-        background: #32407b;
-        color: white;
-    }
-    
-    .error-icon {
-        width: 120px;
-        height: 120px;
-        margin: 0 auto 2rem;
-        opacity: 0.7;
-    }
-    
-    @media (max-width: 768px) {
-        .error-code {
-            font-size: 6rem;
-        }
-        
-        .error-title {
-            font-size: 2rem;
-        }
-        
-        .error-actions {
-            flex-direction: column;
-            align-items: center;
-        }
-        
-        .btn-error {
-            width: 100%;
-            max-width: 300px;
-        }
-    }
+.status-animate { animation: errFadeUp 0.6s cubic-bezier(0.22,1,0.36,1) both; }
+.status-eyebrow  { animation-delay: 0.02s; }
+.status-icon     { animation-delay: 0.08s; }
+.status-title    { animation-delay: 0.14s; }
+.status-summary  { animation-delay: 0.20s; }
+.status-actions  { animation-delay: 0.26s; }
+.status-panel-footer { animation-delay: 0.32s; }
+@keyframes errFadeUp { 0%{opacity:0;transform:translateY(12px)} 100%{opacity:1;transform:translateY(0)} }
+@media (prefers-reduced-motion:reduce) { .status-animate { animation:none!important; } }
 </style>
-{% endblock %}
-
-{% block content %}
-<div class="error-container">
-    <div class="error-content">
-        <div class="error-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="10"/>
-                <line x1="15" y1="9" x2="9" y2="15"/>
-                <line x1="9" y1="9" x2="15" y2="15"/>
-            </svg>
+</head>
+<body class="status-body">
+<div class="status-shell">
+    <aside class="status-brand" style="background-image: url('{% static 'core/img/login-fondo.png' %}');">
+        <div class="status-brand-overlay">
+            <img src="{% static 'core/img/logo blanco recortado.png' %}" alt="Consorcio Paldaca" class="status-brand-logo">
+            <p class="status-brand-tagline">Sistema de Gestión de Activos</p>
         </div>
-        
-        <div class="error-code">404</div>
-        <h1 class="error-title">Página no encontrada</h1>
-        <p class="error-message">
-            Lo sentimos, la página que estás buscando no existe o ha sido movida. 
-            Verifica la URL o utiliza los enlaces de navegación para encontrar lo que necesitas.
-        </p>
-        
-        <div class="error-actions">
-            <a href="{% url 'core:home' %}" class="btn-error btn-primary-error">
-                <i class="bi bi-house-door me-2"></i>
-                Ir al Inicio
-            </a>
-            <button onclick="history.back()" class="btn-error btn-secondary-error">
-                <i class="bi bi-arrow-left me-2"></i>
-                Volver Atrás
-            </button>
+    </aside>
+    <main class="status-panel">
+        <div class="status-panel-inner">
+            <span class="status-eyebrow status-animate">Página no encontrada</span>
+            <div class="status-icon status-icon--info status-animate" aria-hidden="true">
+                <i class="bi bi-question-circle"></i>
+            </div>
+            <h1 class="status-title status-animate">No encontramos lo que buscas</h1>
+            <p class="status-summary status-animate">
+                La dirección que ingresaste no existe o fue movida. Verifica la URL o vuelve al inicio.
+            </p>
+            <div class="status-actions status-animate">
+                <a href="/" class="btn status-btn-primary">
+                    <i class="bi bi-house"></i> Ir al inicio
+                </a>
+            </div>
+            <p class="status-panel-footer status-animate">
+                Si el problema persiste, contacta al administrador del sistema.
+                <br>Consorcio Paldaca, C.A. &middot; J-307575832
+            </p>
         </div>
-        
-        <div class="mt-4">
-            <small class="text-muted">
-                Si crees que esto es un error, contacta al administrador del sistema.
-            </small>
-        </div>
-    </div>
+    </main>
 </div>
-{% endblock %}
+</body>
+</html>

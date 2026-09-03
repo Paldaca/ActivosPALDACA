@@ -5,7 +5,6 @@ from activos.models import Activo, Categoria, HistorialMovimiento, Ubicacion
 from mantenimientos.models import Mantenimiento
 from django.db.models import Count, Q
 from django.shortcuts import redirect
-from django.http import HttpResponseNotFound
 import logging
 from activos.decorators import ModuloActivoRequiredMixin
 
@@ -77,8 +76,15 @@ def custom_404_view(request, exception):
 
 def custom_500_view(request):
     """Vista personalizada para error 500"""
+    import sys
     logger.error(f"Error 500 en: {request.path} - Usuario: {request.user if request.user.is_authenticated else 'Anónimo'}")
-    return render(request, 'core/error_500.html', status=500)
+    context = {}
+    if settings.DEBUG:
+        exc_type, exc_value, _ = sys.exc_info()
+        if exc_type:
+            context["exception_type"] = exc_type.__name__
+            context["exception_message"] = str(exc_value)
+    return render(request, 'core/error_500.html', context, status=500)
 
 
 def custom_403_view(request, exception):
@@ -91,28 +97,3 @@ def custom_400_view(request, exception):
     """Vista personalizada para error 400 (Solicitud incorrecta)"""
     logger.warning(f"Error 400: {request.path} - Usuario: {request.user if request.user.is_authenticated else 'Anónimo'}")
     return render(request, 'core/error_400.html', status=400)
-
-
-# ============== VISTAS DE PRUEBA DE ERRORES ==============
-
-def test_404_view(request):
-    """Vista para probar el error 404"""
-    return HttpResponseNotFound("Esta es una prueba de error 404")
-
-
-def test_500_view(request):
-    """Vista para probar el error 500"""
-    # Forzar un error para probar el manejo de errores 500
-    raise Exception("Esta es una prueba de error 500")
-
-
-def test_403_view(request):
-    """Vista para probar el error 403"""
-    from django.core.exceptions import PermissionDenied
-    raise PermissionDenied("Esta es una prueba de error 403")
-
-
-def test_400_view(request):
-    """Vista para probar el error 400"""
-    from django.core.exceptions import BadRequest
-    raise BadRequest("Esta es una prueba de error 400")
