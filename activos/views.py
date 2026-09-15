@@ -18,6 +18,7 @@ from .forms import (
     usuarios_asignables,
 )
 from .decorators import ModuloActivoRequiredMixin, requiere_modulo_paldaca
+from .services.avisos import avisar_activo_creado, avisar_activos_asignados
 
 
 def _url_de_retorno(request, url, fallback='activos:activo-list'):
@@ -473,6 +474,7 @@ class ActivoCreateView(ActivoFormContextMixin, ModuloActivoRequiredMixin, Create
 
     def form_valid(self, form):
         self.object = form.save()
+        avisar_activo_creado(self.object, self.request.user)
         messages.success(
             self.request,
             f'Activo {self.object.codigo_inventario} creado exitosamente.',
@@ -545,6 +547,7 @@ class ActivoUpdateView(ActivoFormContextMixin, ModuloActivoRequiredMixin, Update
         )
         usuario_nuevo = activo_actualizado.usuario_asignado
         if movimiento and usuario_nuevo:
+            avisar_activos_asignados([activo_actualizado], usuario_nuevo, self.request.user)
             try:
                 _aplicar_planilla_historial(
                     activo_actualizado,
@@ -667,6 +670,7 @@ def reasignar_activo(request, pk):
                 request.user,
             )
             if usuario_nuevo and movimiento is not None:
+                avisar_activos_asignados([activo_actualizado], usuario_nuevo, request.user)
                 try:
                     _aplicar_planilla_historial(
                         activo_actualizado,
@@ -867,6 +871,7 @@ def acciones_masivas(request):
                 if usuario:
                     pendientes.append((activo, movimiento))
 
+        avisar_activos_asignados([activo for activo, _ in pendientes], usuario, request.user)
         ids_constancia = []
         for activo, movimiento in pendientes:
             try:

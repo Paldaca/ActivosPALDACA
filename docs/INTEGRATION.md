@@ -167,6 +167,26 @@ Migración a prefijo: `activos/migrations/0004_activos_prefijo_tablas.py`.
 | Nav JS | `{asset_base}/static/paldaca-nav.js` | Sidebar Suite | `core/context_processors.py` |
 | Nav API | `PALDACA_API_BASE` (default `https://api.cpaldaca.com/api`) | Menú / módulos habilitados | `paldaca_nav.html` → `window.__PALDACA_NAV__` |
 | Logos Portal | `{portal_url}/images/logo*.png` | Branding nav | `core/context_processors.py` |
+| Bus de notificaciones | `PALDACA_PORTAL_API_URL` (o `PALDACA_API_BASE`) + `/notificaciones/eventos/` | Avisos en la campana del Portal | `activos/services/notificaciones_portal.py` |
+
+### Bus de notificaciones del Portal
+
+Llamada server-to-server **firmada** (HMAC-SHA256 con clave derivada de `DJANGO_SECRET_KEY`;
+misma función que `backend/notificaciones/firma.py` del Portal). No usa la sesión del
+operador, así que funciona aunque el rol administrador no se aplique en las vistas. Nunca
+lanza y se emite con `transaction.on_commit`: si el Portal no responde, el alta o la
+asignación se guardan igual.
+
+| Evento | Dónde | Destinatarios |
+|--------|-------|---------------|
+| `activos.activo_creado` | `ActivoCreateView`, `etiqueta_alta` | Admins de Activos (Portal) + custodio si ya viene asignado |
+| `activos.activo_asignado` | `ActivoUpdateView`, `reasignar_activo`, `acciones_masivas` | El nuevo custodio. La masiva agrupa: un aviso "Se te asignaron N activos" |
+
+- Alta con custodio emite solo `activo_creado` (no además `activo_asignado`).
+- Reasignar al mismo custodio o dejar sin asignar no avisa. Reubicar tampoco.
+- Lógica en `activos/services/avisos.py`; `PALDACA_NOTIFICACIONES_ACTIVAS=false` la apaga
+  (`SSAPI/settings_test.py` la apaga). Contrato en
+  `Portal-Paldaca/docs/guia-integracion-programas-satelite.md`.
 
 Default producción del bundle nav: **`https://cpaldaca.com`**. Override local: `PALDACA_NAV_ASSET_BASE=http://localhost:8000`.
 

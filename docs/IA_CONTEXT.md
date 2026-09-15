@@ -88,7 +88,7 @@ MODULO_CODIGO = "activos"  # activos/constants.py
 
 | Con | Cómo |
 |-----|------|
-| Portal-Paldaca | SSO, logout API, `paldaca-nav.js/css`, API menú |
+| Portal-Paldaca | SSO, logout API, `paldaca-nav.js/css`, API menú, bus de notificaciones (POST firmado en alta/asignación — `activos/services/avisos.py`) |
 | MySQL compartido | `core_*` + `activos_*` + `django_session` |
 | Calidad/Codigos/HDT | Solo vía BD compartida (`core_*`), sin imports |
 

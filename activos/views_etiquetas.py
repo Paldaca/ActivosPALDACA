@@ -17,6 +17,7 @@ from django.views.generic import ListView
 from .decorators import ModuloActivoRequiredMixin, requiere_modulo_paldaca
 from .forms import AltaDesdeEtiquetaForm, EtiquetaFilterForm, GenerarEtiquetasForm
 from .models import Activo, Categoria, EtiquetaQR, HistorialMovimiento, SubCategoria
+from .services.avisos import avisar_activo_creado
 from .services.codigos import reservar_codigos
 
 _ESTADO_ETIQUETA_LABELS = dict(EtiquetaQR.EstadoEtiqueta.choices)
@@ -223,6 +224,7 @@ def etiqueta_alta(request, token):
                     ),
                     usuario=request.user,
                 )
+                avisar_activo_creado(activo, request.user)
 
             messages.success(
                 request,
