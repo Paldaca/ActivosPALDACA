@@ -1,5 +1,6 @@
 """Avisos al bus de notificaciones del Portal (alta y asignación de activos)."""
 
+import json
 import urllib.error
 from datetime import timedelta
 from io import StringIO
@@ -29,6 +30,7 @@ from activos.services.avisos import (
     CODIGO_MANTENIMIENTO_FINALIZADO,
     CODIGO_MANTENIMIENTO_INICIADO,
     CODIGO_USUARIO_INACTIVO,
+    _umbral_dias,
     asignaciones_sin_planilla,
     avisar_asignaciones_sin_planilla,
     avisar_etiquetas_sin_vincular,
@@ -757,3 +759,103 @@ def test_comando_dry_run_etiqueta_no_envia_nada(catalogo, emitir):
     )
     emitir.assert_not_called()
     assert "se avisaría por 1 etiqueta(s)" in salida.getvalue()
+
+
+# =============================================================================
+# umbral_dias en caliente (GET firmado al Portal, RN-31 en modo lectura)
+# =============================================================================
+
+
+def _respuesta_json(datos):
+    """Mock de contexto de `urlopen` para `obtener_config_tipo`."""
+    contexto = mock.MagicMock()
+    contexto.__enter__.return_value.read.return_value = json.dumps(datos).encode()
+    return contexto
+
+
+@pytest.mark.django_db
+def test_umbral_dias_usa_default_si_notificaciones_apagadas(catalogo, settings):
+    settings.PALDACA_NOTIFICACIONES_ACTIVAS = False
+    with mock.patch.object(notificaciones_portal.urllib.request, "urlopen") as urlopen:
+        assert _umbral_dias(CODIGO_ETIQUETA_SIN_VINCULAR, 30) == 30
+    urlopen.assert_not_called()
+
+
+@pytest.mark.django_db
+def test_umbral_dias_usa_el_valor_del_portal(catalogo, settings):
+    settings.PALDACA_NOTIFICACIONES_ACTIVAS = True
+    settings.PALDACA_PORTAL_API_URL = "http://portal.test/api"
+    with mock.patch.object(
+        notificaciones_portal.urllib.request,
+        "urlopen",
+        return_value=_respuesta_json({"codigo": CODIGO_ETIQUETA_SIN_VINCULAR, "activo": True, "umbral_dias": 5}),
+    ):
+        assert _umbral_dias(CODIGO_ETIQUETA_SIN_VINCULAR, 30) == 5
+
+
+@pytest.mark.django_db
+def test_umbral_dias_cae_al_default_si_el_portal_no_responde(catalogo, settings):
+    settings.PALDACA_NOTIFICACIONES_ACTIVAS = True
+    settings.PALDACA_PORTAL_API_URL = "http://portal.test/api"
+    with mock.patch.object(
+        notificaciones_portal.urllib.request,
+        "urlopen",
+        side_effect=urllib.error.URLError("caido"),
+    ):
+        assert _umbral_dias(CODIGO_ETIQUETA_SIN_VINCULAR, 30) == 30
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("valor", [None, 0, -5, "30", 30.5, True])
+def test_umbral_dias_cae_al_default_si_el_valor_no_es_entero_positivo(catalogo, settings, valor):
+    settings.PALDACA_NOTIFICACIONES_ACTIVAS = True
+    settings.PALDACA_PORTAL_API_URL = "http://portal.test/api"
+    with mock.patch.object(
+        notificaciones_portal.urllib.request,
+        "urlopen",
+        return_value=_respuesta_json({"codigo": CODIGO_ETIQUETA_SIN_VINCULAR, "activo": True, "umbral_dias": valor}),
+    ):
+        assert _umbral_dias(CODIGO_ETIQUETA_SIN_VINCULAR, 30) == 30
+
+
+@pytest.mark.django_db
+def test_umbral_dias_cae_al_default_si_el_tipo_no_es_nuestro(catalogo, settings):
+    """El Portal responde 403 (tipo de otro módulo, o inexistente)."""
+    settings.PALDACA_NOTIFICACIONES_ACTIVAS = True
+    settings.PALDACA_PORTAL_API_URL = "http://portal.test/api"
+    error = urllib.error.HTTPError(
+        url="http://portal.test/api/notificaciones/tipos/x/config/",
+        code=403,
+        msg="Forbidden",
+        hdrs=None,
+        fp=mock.MagicMock(read=lambda: b"{}"),
+    )
+    with mock.patch.object(
+        notificaciones_portal.urllib.request, "urlopen", side_effect=error
+    ):
+        assert _umbral_dias(CODIGO_ETIQUETA_SIN_VINCULAR, 30) == 30
+
+
+@pytest.mark.django_db
+def test_avisar_etiquetas_usa_umbral_del_portal_no_el_local(catalogo, settings, emitir):
+    """Con el Portal diciendo 5 días, una etiqueta de 6 días ya es candidata
+
+    aunque el default local (`ACTIVOS_UMBRAL_ETIQUETA_SIN_VINCULAR_DIAS`) siga
+    en 30 -- confirma que el valor realmente usado es el del Portal, no el
+    fallback, cuando ambos están disponibles y difieren.
+    """
+    settings.PALDACA_NOTIFICACIONES_ACTIVAS = True
+    settings.PALDACA_PORTAL_API_URL = "http://portal.test/api"
+    assert settings.ACTIVOS_UMBRAL_ETIQUETA_SIN_VINCULAR_DIAS == 30
+    _crear_etiqueta(catalogo, "INV-ETQ-PORTAL", dias_atras=6)
+
+    with mock.patch.object(
+        notificaciones_portal.urllib.request,
+        "urlopen",
+        return_value=_respuesta_json({"codigo": CODIGO_ETIQUETA_SIN_VINCULAR, "activo": True, "umbral_dias": 5}),
+    ):
+        incluidas = avisar_etiquetas_sin_vincular()
+
+    assert incluidas == 1
+    [aviso] = _llamadas(emitir, CODIGO_ETIQUETA_SIN_VINCULAR)
+    assert "más de 5 días" in aviso["cuerpo"]

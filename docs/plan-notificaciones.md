@@ -236,20 +236,28 @@ Implementadas en el mismo despachador que `usuario_inactivo_con_equipos`
   (una etiqueta sigue `PENDIENTE`, una reasignación sigue sin planilla) hasta que alguien actúa,
   no se resuelve con el calendario. Se generalizó `AvisoUsuarioInactivo` en un modelo nuevo,
   `AvisoPorUmbral` (`regla` + `objeto_id`), en vez de crear dos tablas casi idénticas.
-- ⚠️ **El umbral real que se evalúa hoy NO es el del Portal.** `TipoNotificacion.umbral_dias`
-  (Fase 2, sección anterior) sigue siendo solo catálogo: Activos no tiene un cliente que lo lea en
-  caliente vía `GET /api/notificaciones/tipos/` (ese endpoint además exige sesión de superadmin,
-  no sirve para un cron sin navegador). El número que de verdad se usa son las variables de
-  entorno `ACTIVOS_UMBRAL_ETIQUETA_SIN_VINCULAR_DIAS` / `ACTIVOS_UMBRAL_ASIGNACION_SIN_PLANILLA_DIAS`
-  (`SSAPI/settings.py`, mismos defaults: 30 / 7 días). Cambiar el valor en
-  `/configuracion/notificaciones` hoy no tiene ningún efecto en Activos — hace falta un endpoint
-  de lectura autenticado por firma de servicio (mismo patrón que la emisión) antes de que ese campo
-  sea la fuente de verdad real, o resignarse a que quede como metadato descriptivo.
-- 18 tests nuevos (`activos/tests/test_notificaciones.py`), verificado en vivo contra el Portal de
-  desarrollo — incluida una corrida real que encontró 9 reasignaciones legítimas ya vencidas en la
-  base compartida de desarrollo (dato real, no de prueba); los marcadores `AvisoPorUmbral`
-  generados se limpiaron después para no dejar el despachador de verdad con episodios ya
-  "avisados" sin que ningún admin real los haya visto.
+- ✅ **`umbral_dias` ya se lee en caliente del Portal** (cerrado el mismo día). Nuevo endpoint
+  `GET /api/notificaciones/tipos/<codigo>/config/` (Portal, `tipo_config_view`), autenticado igual
+  que la emisión — firma de servicio para el cron, cookie de admin del módulo como respaldo — y
+  con el mismo chequeo de pertenencia que `emitir_evento_view` (`tipo.modulo_origen != cliente` →
+  403: un satélite no puede leer la config de otro). Cliente en Activos:
+  `notificaciones_portal.obtener_config_tipo()` + `avisos._umbral_dias()`. Cada corrida del
+  despachador hace un GET firmado antes de evaluar la regla; si el Portal no responde, no está
+  activo, o el valor no es un entero positivo, cae a la variable de entorno local
+  (`ACTIVOS_UMBRAL_ETIQUETA_SIN_VINCULAR_DIAS` / `ACTIVOS_UMBRAL_ASIGNACION_SIN_PLANILLA_DIAS`,
+  mismos defaults 30 / 7 días) — nunca bloquea la regla. Verificado en vivo cambiando el umbral de
+  `etiqueta_sin_vincular` a 3 días en el Portal (muy por debajo del default local de 30) y
+  confirmando que Activos detectó etiquetas de 5 días que el default local no habría detectado;
+  restaurado a 30 después de la prueba.
+- 29 tests nuevos (`activos/tests/test_notificaciones.py`: 18 de detección + 11 de
+  `obtener_config_tipo`/`_umbral_dias`) y 7 más del lado del Portal
+  (`TipoConfigViewTests` en `backend/notificaciones/tests.py`), verificado en vivo contra el
+  Portal de desarrollo dos veces — la corrida de detección encontró 9 reasignaciones legítimas ya
+  vencidas en la base compartida (dato real, no de prueba), y la corrida de wiring del umbral
+  encontró 186 etiquetas reales al bajar el umbral a 3 días (confirmando que el valor sí viene del
+  Portal). En ambos casos: eventos, `BandejaItem` y marcadores `AvisoPorUmbral` generados por la
+  prueba se limpiaron después, sin tocar los datos reales subyacentes (activos, historial,
+  etiquetas) ni el `umbral_dias` restaurado a su valor original.
 
 #### `mantenimiento_estancado` y `resumen_semanal_admins` — pendientes
 
@@ -311,6 +319,7 @@ las trataba como definitivas; como dato con default son triviales.
    #5~~ (desasignado siempre avisa) — **resuelta** al construir la Fase 1.
 5. ~~Fase 2: `etiqueta_sin_vincular`, `asignacion_sin_planilla`~~ — **hechas**. Queda
    `mantenimiento_estancado` (deliberadamente fuera de esta iteración) y `resumen_semanal_admins`.
-6. Cerrar la sincronización real Activos↔Portal de `umbral_dias` (hoy son dos números
-   independientes que dan la casualidad de coincidir en el valor por defecto).
+6. ~~Sincronización real Activos↔Portal de `umbral_dias`~~ — **hecha** (`GET .../tipos/<codigo>/config/`
+   firmado). Editar el umbral en `/configuracion/notificaciones` ya tiene efecto real en la corrida
+   siguiente del despachador, no solo en el catálogo.
 7. Decisiones #6 y #7, y solo entonces evaluar la Fase 3.

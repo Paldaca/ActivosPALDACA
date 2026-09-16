@@ -81,3 +81,39 @@ def emitir_evento(*, codigo, titulo, cuerpo, payload=None, emisor=None) -> bool:
 def emitir_al_confirmar(**kwargs) -> None:
     """Emite cuando la transaccion confirma: un rollback no deja avisos fantasma."""
     transaction.on_commit(lambda: emitir_evento(**kwargs))
+
+
+def obtener_config_tipo(codigo: str) -> dict | None:
+    """Lee la config vigente de un tipo propio (ej. `umbral_dias`) via GET firmado.
+
+    `None` si las notificaciones estan apagadas, el Portal no responde, o el
+    tipo no existe/no es nuestro (403) -- el llamador siempre debe tener un
+    default local para ese caso, esto nunca bloquea la regla que lo usa.
+    """
+    if not settings.PALDACA_NOTIFICACIONES_ACTIVAS:
+        return None
+    cliente = settings.PALDACA_MODULO_CODIGO
+    timestamp = str(int(time.time()))
+    peticion = urllib.request.Request(
+        f"{settings.PALDACA_PORTAL_API_URL}/notificaciones/tipos/{codigo}/config/",
+        method="GET",
+        headers={
+            "X-Paldaca-Client": cliente,
+            "X-Paldaca-Timestamp": timestamp,
+            "X-Paldaca-Signature": firmar(b"", cliente, timestamp),
+        },
+    )
+    try:
+        with urllib.request.urlopen(peticion, timeout=TIMEOUT_SEGUNDOS) as respuesta:
+            return json.loads(respuesta.read())
+    except urllib.error.HTTPError as exc:
+        logger.warning(
+            "CONFIG_TIPO_RECHAZADA | codigo=%s status=%s detalle=%s",
+            codigo,
+            exc.code,
+            exc.read()[:300],
+        )
+        return None
+    except Exception as exc:
+        logger.warning("CONFIG_TIPO_NO_DISPONIBLE | codigo=%s error=%s", codigo, exc)
+        return None

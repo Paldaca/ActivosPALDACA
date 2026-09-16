@@ -287,12 +287,31 @@ def avisar_usuarios_inactivos_con_equipos():
     return len(candidatos)
 
 
+def _umbral_dias(codigo, default):
+    """`umbral_dias` vigente del tipo en el Portal, o `default` si no se pudo leer.
+
+    Cae al `default` local si las notificaciones están apagadas, el Portal no
+    responde, o el valor que trae no es un entero positivo (tipo mal
+    configurado a mano, por ejemplo). El Portal es la fuente de verdad cuando
+    está disponible: cambiar el número en `/configuracion/notificaciones` se
+    refleja en la corrida siguiente del despachador, sin deploy.
+    """
+    config = notificaciones_portal.obtener_config_tipo(codigo)
+    valor = config.get("umbral_dias") if config else None
+    if isinstance(valor, int) and not isinstance(valor, bool) and valor > 0:
+        return valor
+    return default
+
+
 # --- etiqueta_sin_vincular (regla por reloj) --------------------------------
 
 
 def etiquetas_sin_vincular(dias=None):
     """EtiquetaQR en PENDIENTE hace más de N días, sin aviso vigente."""
-    dias = settings.ACTIVOS_UMBRAL_ETIQUETA_SIN_VINCULAR_DIAS if dias is None else dias
+    if dias is None:
+        dias = _umbral_dias(
+            CODIGO_ETIQUETA_SIN_VINCULAR, settings.ACTIVOS_UMBRAL_ETIQUETA_SIN_VINCULAR_DIAS
+        )
     limite = timezone.now() - timedelta(days=dias)
     ya_avisadas = AvisoPorUmbral.objects.filter(
         regla=AvisoPorUmbral.REGLA_ETIQUETA_SIN_VINCULAR
@@ -319,9 +338,8 @@ def _limpiar_avisos_etiqueta_sin_vincular():
             aviso.delete()
 
 
-def _avisar_etiquetas_de(etiquetas, creador):
+def _avisar_etiquetas_de(etiquetas, creador, dias):
     """Un aviso por creador (o `None` para las sin creador registrado)."""
-    dias = settings.ACTIVOS_UMBRAL_ETIQUETA_SIN_VINCULAR_DIAS
     if len(etiquetas) == 1:
         etiqueta = etiquetas[0]
         titulo = f"Etiqueta {etiqueta.codigo_reservado} sigue sin vincular"
@@ -366,8 +384,11 @@ def avisar_etiquetas_sin_vincular():
     Devuelve cuántas etiquetas quedaron incluidas en algún aviso (0 si no
     había candidatas nuevas o el Portal no aceptó nada).
     """
+    dias = _umbral_dias(
+        CODIGO_ETIQUETA_SIN_VINCULAR, settings.ACTIVOS_UMBRAL_ETIQUETA_SIN_VINCULAR_DIAS
+    )
     _limpiar_avisos_etiqueta_sin_vincular()
-    candidatas = etiquetas_sin_vincular()
+    candidatas = etiquetas_sin_vincular(dias=dias)
     if not candidatas:
         return 0
 
@@ -382,9 +403,9 @@ def avisar_etiquetas_sin_vincular():
 
     incluidas = 0
     for creador, etiquetas in por_creador.values():
-        if _avisar_etiquetas_de(etiquetas, creador):
+        if _avisar_etiquetas_de(etiquetas, creador, dias):
             incluidas += len(etiquetas)
-    if sin_creador and _avisar_etiquetas_de(sin_creador, None):
+    if sin_creador and _avisar_etiquetas_de(sin_creador, None, dias):
         incluidas += len(sin_creador)
     return incluidas
 
@@ -394,7 +415,10 @@ def avisar_etiquetas_sin_vincular():
 
 def asignaciones_sin_planilla(dias=None):
     """Reasignaciones sin planilla archivada hace más de N días, sin aviso vigente."""
-    dias = settings.ACTIVOS_UMBRAL_ASIGNACION_SIN_PLANILLA_DIAS if dias is None else dias
+    if dias is None:
+        dias = _umbral_dias(
+            CODIGO_ASIGNACION_SIN_PLANILLA, settings.ACTIVOS_UMBRAL_ASIGNACION_SIN_PLANILLA_DIAS
+        )
     limite = timezone.now() - timedelta(days=dias)
     ya_avisados = AvisoPorUmbral.objects.filter(
         regla=AvisoPorUmbral.REGLA_ASIGNACION_SIN_PLANILLA
@@ -427,12 +451,14 @@ def avisar_asignaciones_sin_planilla():
     Devuelve cuántas se incluyeron (0 si no había candidatas nuevas o el
     Portal no aceptó el aviso).
     """
+    dias = _umbral_dias(
+        CODIGO_ASIGNACION_SIN_PLANILLA, settings.ACTIVOS_UMBRAL_ASIGNACION_SIN_PLANILLA_DIAS
+    )
     _limpiar_avisos_asignacion_sin_planilla()
-    candidatos = asignaciones_sin_planilla()
+    candidatos = asignaciones_sin_planilla(dias=dias)
     if not candidatos:
         return 0
 
-    dias = settings.ACTIVOS_UMBRAL_ASIGNACION_SIN_PLANILLA_DIAS
     if len(candidatos) == 1:
         movimiento = candidatos[0]
         titulo = f"{movimiento.activo.codigo_inventario} sigue sin planilla de entrega"
