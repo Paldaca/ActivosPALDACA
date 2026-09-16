@@ -13,70 +13,157 @@
 <div class="ax-page">
 
     <header class="ax-hero">
-        <div>
-            <span class="ax-hero-eyebrow"><i class="bi bi-person-badge"></i> Mis equipos</span>
-            <h1 class="ax-hero-title">
-                <img src="{% static 'core/img/Iconos/activos.svg' %}" alt="" aria-hidden="true">
-                Mis Activos
-            </h1>
-            <p class="ax-hero-sub">
-                Los activos que tienes asignados hoy. Si algo cambia de responsable,
-                lo verás reflejado aquí y recibirás un aviso en la campana.
-            </p>
+        <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
+            <div class="d-flex align-items-center gap-3 ax-min0">
+                <span class="ax-avatar ax-avatar--xl ax-avatar--c{{ request.user|tono_avatar }}" aria-hidden="true">
+                    {{ request.user|iniciales }}
+                </span>
+                <div class="ax-min0">
+                    <span class="ax-hero-eyebrow">
+                        {{ request.user.perfil.nombre|default:"Sin perfil asignado" }}
+                    </span>
+                    <h1 class="ax-hero-title">{{ request.user|nombre_completo }}</h1>
+                    <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
+                        <span class="ax-estado ax-estado--onhero">
+                            <span class="ax-estado-dot"></span> Activa
+                        </span>
+                        {% if request.user.disciplina %}
+                        <span class="ax-estado ax-estado--onhero">{{ request.user.disciplina.nombre }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
         </div>
     </header>
 
-    {% if activos %}
-    <div class="ax-table-wrap">
-        <table class="ax-table">
-            <thead>
-                <tr>
-                    <th scope="col">Código</th>
-                    <th scope="col">Equipo</th>
-                    <th scope="col">Categoría</th>
-                    <th scope="col">Ubicación</th>
-                    <th scope="col">Estado</th>
-                    <th scope="col" class="ax-col-tight text-end">
-                        <span class="visually-hidden">Ver</span>
-                    </th>
-                </tr>
-            </thead>
-            <tbody data-ax-stagger="12">
-                {% for activo in activos %}
-                <tr>
-                    <td data-label="Código">
-                        <span class="ax-code ax-code--plain">{{ activo.codigo_inventario }}</span>
-                    </td>
-                    <td data-label="Equipo">
-                        <div class="d-flex align-items-center gap-2">
-                            <i class="bi {{ activo|icono_activo }}" aria-hidden="true"></i>
-                            <span>{{ activo.marca }} {{ activo.modelo }}</span>
-                        </div>
-                    </td>
-                    <td data-label="Categoría">{{ activo.subcategoria.categoria.nombre }}</td>
-                    <td data-label="Ubicación">{{ activo.ubicacion.nombre }}</td>
-                    <td data-label="Estado">{% badge_estado activo %}</td>
-                    <td class="text-end ax-col-tight" data-label="Ver">
-                        <a href="{% url 'activos:mis-activos-detail' activo.pk %}"
-                           class="btn-pastel btn-pastel--neutro btn-pastel--icon" title="Ver detalle">
-                            <i class="bi bi-eye"></i>
-                            <span class="visually-hidden">Ver {{ activo.codigo_inventario }}</span>
-                        </a>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-    {% include 'activos/includes/_paginacion.html' %}
-    {% else %}
-    <div class="ax-empty py-5">
-        <div class="ax-empty-icon">
-            <i class="bi bi-person-dash"></i>
+    <div class="row g-3">
+
+        {# ================================================================= #}
+        {#  Activos a cargo                                                  #}
+        {# ================================================================= #}
+        <div class="col-lg-8">
+            <section class="ax-card">
+                <div class="ax-card-head">
+                    <h2 class="ax-card-title">
+                        Mis equipos a cargo
+                        <span class="ax-tag ms-1">{{ paginator.count }}</span>
+                    </h2>
+                </div>
+
+                {% if activos %}
+                <div class="ax-table-wrap">
+                    <table class="ax-table">
+                        <thead>
+                            <tr>
+                                <th scope="col">Código</th>
+                                <th scope="col">Equipo</th>
+                                <th scope="col">Categoría</th>
+                                <th scope="col">Ubicación</th>
+                                <th scope="col">Estado</th>
+                                <th scope="col" class="ax-col-tight text-end">
+                                    <span class="visually-hidden">Ver</span>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody data-ax-stagger="12">
+                            {% for activo in activos %}
+                            <tr>
+                                <td data-label="Código">
+                                    <a href="{% url 'activos:mis-activos-detail' activo.pk %}" class="ax-code">
+                                        {{ activo.codigo_inventario }}
+                                        <i class="bi bi-chevron-right" aria-hidden="true"></i>
+                                    </a>
+                                </td>
+                                <td data-label="Equipo">
+                                    <div class="ax-equipo">
+                                        <span class="ax-type" aria-hidden="true">
+                                            <i class="bi {{ activo|icono_activo }}"></i>
+                                        </span>
+                                        <div class="ax-min0">
+                                            <div class="ax-equipo-main">{{ activo.marca }} {{ activo.modelo }}</div>
+                                            <div class="ax-equipo-sub">
+                                                {% if activo.numero_serial %}
+                                                <span class="ax-serial">{{ activo.numero_serial }}</span>
+                                                {% else %}
+                                                <span class="fst-italic">Sin número de serie</span>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td data-label="Categoría">{{ activo.subcategoria.categoria.nombre }}</td>
+                                <td data-label="Ubicación">
+                                    <span class="ax-meta">
+                                        <i class="bi bi-geo-alt"></i><span>{{ activo.ubicacion.nombre }}</span>
+                                    </span>
+                                </td>
+                                <td data-label="Estado">{% badge_estado activo %}</td>
+                                <td class="text-end ax-col-tight" data-label="Ver">
+                                    <a href="{% url 'activos:mis-activos-detail' activo.pk %}"
+                                       class="btn-pastel btn-pastel--neutro btn-pastel--icon" title="Ver detalle">
+                                        <i class="bi bi-eye"></i>
+                                        <span class="visually-hidden">Ver {{ activo.codigo_inventario }}</span>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% include 'activos/includes/_paginacion.html' %}
+                {% else %}
+                <div class="ax-empty py-4">
+                    <div class="ax-empty-icon" style="width:62px;height:62px;font-size:1.7rem;">
+                        <i class="bi bi-person-dash"></i>
+                    </div>
+                    <h3>No tienes activos asignados</h3>
+                    <p>Cuando te asignen un equipo, aparecerá en esta lista y recibirás un aviso en la campana.</p>
+                </div>
+                {% endif %}
+            </section>
         </div>
-        <h3>No tienes activos asignados</h3>
-        <p>Cuando te asignen un equipo, aparecerá en esta lista y recibirás un aviso.</p>
+
+        {# ================================================================= #}
+        {#  Datos                                                            #}
+        {# ================================================================= #}
+        <div class="col-lg-4">
+            <div class="ax-sticky d-flex flex-column gap-3">
+
+                <section class="ax-card">
+                    <div class="ax-card-head"><h2 class="ax-card-title">Datos de contacto</h2></div>
+                    <div class="ax-card-body">
+                        <div class="ax-spec" data-ax-stagger="6">
+                            <div class="ax-spec-item">
+                                <div class="ax-spec-label">Correo electrónico</div>
+                                <div class="ax-spec-value {% if not request.user.email %}ax-spec-value--muted{% endif %}">
+                                    {{ request.user.email|default:"No registrado" }}
+                                </div>
+                            </div>
+                            <div class="ax-spec-item">
+                                <div class="ax-spec-label">Teléfono</div>
+                                <div class="ax-spec-value {% if not request.user.telefono %}ax-spec-value--muted{% endif %}">
+                                    {{ request.user.telefono|default:"No registrado" }}
+                                </div>
+                            </div>
+                            <div class="ax-spec-item">
+                                <div class="ax-spec-label">Perfil</div>
+                                <div class="ax-spec-value {% if not request.user.perfil %}ax-spec-value--muted{% endif %}">
+                                    {{ request.user.perfil.nombre|default:"Sin perfil asignado" }}
+                                </div>
+                            </div>
+                            <div class="ax-spec-item">
+                                <div class="ax-spec-label">Alta en el sistema</div>
+                                <div class="ax-spec-value">{{ request.user.date_joined|date:"d/m/Y" }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <p class="ax-hint text-center">
+                    ¿Algo no cuadra con tus equipos? Contacta al administrador de Activos.
+                </p>
+            </div>
+        </div>
     </div>
-    {% endif %}
 </div>
 {% endblock %}
