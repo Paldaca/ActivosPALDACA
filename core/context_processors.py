@@ -34,9 +34,13 @@ def paldaca_urls(request):
     # postMessage. Si divergieran, el shell descartaria en silencio todos los
     # mensajes del satelite y el overlay de carga se quedaria colgado.
     portal_url = settings.PALDACA_PORTAL_URL
+    # Default de produccion explicito a cpaldaca.com/api (no api.cpaldaca.com):
+    # el Portal proxea /api/ al mismo origen que el SPA (docs/COOLIFY.md), y ese
+    # alias aparte es opcional -- si no esta en el proxy, el sidebar embebido
+    # pega contra un host que puede no resolver.
     api_base = (
         (os.getenv("PALDACA_API_BASE") or "").strip().rstrip("/")
-        or ("http://localhost:8000/api" if local else "https://api.cpaldaca.com/api")
+        or ("http://localhost:8000/api" if local else "https://cpaldaca.com/api")
     )
     return {
         "paldaca_sso_login_url": settings.PALDACA_SSO_LOGIN_URL,

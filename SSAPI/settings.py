@@ -197,12 +197,15 @@ PALDACA_SHELL_PATH = os.getenv("PALDACA_SHELL_PATH", "/activos")
 
 # Bus de notificaciones del Portal: llamada server-to-server firmada
 # (activos/services/notificaciones_portal.py). Reusa PALDACA_API_BASE del nav si
-# no se define una URL propia.
+# no se define una URL propia. Default de produccion explicito a cpaldaca.com/api
+# (no api.cpaldaca.com): el Portal proxea /api/ al mismo origen que el SPA
+# (docs/COOLIFY.md), y ese alias aparte es opcional -- si no esta configurado en
+# el proxy, la emision y la lectura de umbral_dias fallaban en silencio.
 PALDACA_PORTAL_API_URL = (
     (os.getenv("PALDACA_PORTAL_API_URL") or os.getenv("PALDACA_API_BASE") or "")
     .strip()
     .rstrip("/")
-    or ("http://127.0.0.1:8000/api" if _dev_env.exists() else "https://api.cpaldaca.com/api")
+    or ("http://127.0.0.1:8000/api" if _dev_env.exists() else "https://cpaldaca.com/api")
 )
 PALDACA_NOTIFICACIONES_ACTIVAS = (
     os.getenv("PALDACA_NOTIFICACIONES_ACTIVAS", "true").lower() == "true"

@@ -120,24 +120,20 @@ con los defaults:
 Si por algún motivo se despliega Activos primero, no pasa nada roto: el despachador sigue
 funcionando con los defaults de entorno hasta que el Portal quede arriba.
 
-### 3. Antes de crear el Scheduled Task, confirma la URL del Portal
+### 3. URL del Portal — ya no hace falta fijarla a mano
 
-`PALDACA_PORTAL_API_URL` no aparece hoy en la tabla de variables por satélite de
-`Portal-Paldaca/docs/COOLIFY.md` — Activos cae al default de `SSAPI/settings.py`
-(`https://api.cpaldaca.com/api`), y esa guía marca `api.cpaldaca.com` como **opcional** ("ya no
-hace falta... salvo que quieras conservarlo como alias del Portal"). Si ese alias no está
-configurado en el proxy, **tanto la emisión de eventos como esta lectura de `umbral_dias` fallan
-en silencio** (se loguea `NOTIFICACION_NO_ENVIADA` / `CONFIG_TIPO_NO_DISPONIBLE` y siguen con los
-defaults locales — no tumba nada, pero tampoco avisa a nadie).
-
-Antes de dar por bueno el despliegue, en el recurso de Activos en Coolify:
-
-```env
-PALDACA_PORTAL_API_URL=https://cpaldaca.com/api
-```
-
-(explícito, en vez de depender del default a `api.cpaldaca.com`) — coincide con "el Portal sirve
-el SPA y proxea `/api/` al mismo origen" de `docs/COOLIFY.md`.
+`PALDACA_PORTAL_API_URL` no aparece en la tabla de variables por satélite de
+`Portal-Paldaca/docs/COOLIFY.md`, así que Activos caía al default de `SSAPI/settings.py`. Ese
+default **apuntaba a `https://api.cpaldaca.com/api`**, un alias que esa misma guía marca como
+opcional ("ya no hace falta... salvo que quieras conservarlo") — si no estaba configurado en el
+proxy, tanto la emisión de eventos como esta lectura de `umbral_dias` fallaban en silencio
+(`NOTIFICACION_NO_ENVIADA` / `CONFIG_TIPO_NO_DISPONIBLE` en el log, con los defaults locales
+cubriendo el golpe). **Corregido en código**: el default de producción ahora es
+`https://cpaldaca.com/api` (`SSAPI/settings.py` y `core/context_processors.py`, este último para
+el sidebar embebido del navegador, no solo el cliente server-to-server) — coincide con "el Portal
+sirve el SPA y proxea `/api/` al mismo origen" de `docs/COOLIFY.md`. No hace falta ninguna
+variable de entorno nueva en Coolify para esto; `PALDACA_PORTAL_API_URL`/`PALDACA_API_BASE` siguen
+disponibles si algún día hay que apuntar a otro lado.
 
 ### 4. Crear (o confirmar) el Scheduled Task
 
