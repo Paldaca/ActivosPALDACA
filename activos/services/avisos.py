@@ -19,6 +19,10 @@ from .notificaciones_portal import emitir_al_confirmar, url_en_portal
 
 CODIGO_ACTIVO_CREADO = "activos.activo_creado"
 CODIGO_ACTIVO_ASIGNADO = "activos.activo_asignado"
+CODIGO_ACTIVO_DESASIGNADO = "activos.activo_desasignado"
+CODIGO_MANTENIMIENTO_INICIADO = "activos.mantenimiento_iniciado"
+CODIGO_MANTENIMIENTO_FINALIZADO = "activos.mantenimiento_finalizado"
+CODIGO_ACTIVO_BAJA = "activos.activo_baja"
 CODIGO_USUARIO_INACTIVO = "activos.usuario_inactivo_con_equipos"
 
 
@@ -87,6 +91,113 @@ def avisar_activos_asignados(activos, usuario, emisor):
             "url": url,
             "activo_ids": [a.pk for a in activos],
         },
+        emisor=emisor,
+    )
+
+
+def avisar_activos_desasignados(activos, usuario, emisor):
+    """Al custodio ANTERIOR que pierde uno o varios equipos (incluye "dejar sin asignar").
+
+    Espejo de `avisar_activos_asignados`, pero el deep link nunca puede ir a la
+    ficha del activo: esa persona ya no lo tiene, así que `mis-activos-detail`
+    le daría 404. Va siempre a su propio listado.
+    """
+    if usuario is None or not activos:
+        return
+    if len(activos) == 1:
+        activo = activos[0]
+        titulo = f"Ya no tienes a tu cargo el activo {activo.codigo_inventario}"
+        cuerpo = f"{_nombre(emisor)} te quitó {_descripcion(activo)}."
+    else:
+        titulo = f"Ya no tienes a tu cargo {len(activos)} activos"
+        codigos = ", ".join(a.codigo_inventario for a in activos[:5])
+        resto = f" y {len(activos) - 5} más" if len(activos) > 5 else ""
+        cuerpo = f"{_nombre(emisor)} te quitó {codigos}{resto}."
+    emitir_al_confirmar(
+        codigo=CODIGO_ACTIVO_DESASIGNADO,
+        titulo=titulo,
+        cuerpo=cuerpo,
+        payload={
+            "usuario_ids": [usuario.pk],
+            "url": url_en_portal(reverse("activos:mis-activos-list")),
+            "activo_ids": [a.pk for a in activos],
+        },
+        emisor=emisor,
+    )
+
+
+def avisar_mantenimiento_iniciado(mantenimiento, emisor):
+    """El activo entra a mantenimiento. Sin custodio, no hay a quién avisar."""
+    activo = mantenimiento.activo
+    usuario = activo.usuario_asignado
+    if usuario is None:
+        return
+    emitir_al_confirmar(
+        codigo=CODIGO_MANTENIMIENTO_INICIADO,
+        titulo=f"{activo.codigo_inventario} entró a mantenimiento",
+        cuerpo=(
+            f"{_nombre(emisor)} registró un mantenimiento para {_descripcion(activo)}. "
+            "Puede no estar disponible por un tiempo."
+        ),
+        payload={
+            "usuario_ids": [usuario.pk],
+            "url": _url_ficha_propia(activo),
+            "activo_id": activo.pk,
+            "mantenimiento_id": mantenimiento.pk,
+        },
+        emisor=emisor,
+    )
+
+
+def avisar_mantenimiento_finalizado(mantenimiento, emisor):
+    """Se cerró el último mantenimiento en proceso y el activo vuelve a servicio."""
+    activo = mantenimiento.activo
+    usuario = activo.usuario_asignado
+    if usuario is None:
+        return
+    emitir_al_confirmar(
+        codigo=CODIGO_MANTENIMIENTO_FINALIZADO,
+        titulo=f"{activo.codigo_inventario} volvió de mantenimiento",
+        cuerpo=f"{_descripcion(activo)} ya está disponible de nuevo.",
+        payload={
+            "usuario_ids": [usuario.pk],
+            "url": _url_ficha_propia(activo),
+            "activo_id": activo.pk,
+            "mantenimiento_id": mantenimiento.pk,
+        },
+        emisor=emisor,
+    )
+
+
+def avisar_activo_baja(activo, emisor, *, eliminado=False):
+    """El activo pasa a `IN` o se elimina. Llega al custodio (si tenía) y a admins.
+
+    `eliminado=True` cuando la ficha ya no va a existir (DELETE): el deep link
+    no puede apuntar a `activo-detail`/`mis-activos-detail` (404 seguro), así
+    que va al listado. Los textos se arman aquí mismo, antes de que
+    `ActivoDeleteView` borre la fila (BR-ACT-12): `emitir_al_confirmar` solo
+    difiere la llamada HTTP, no la lectura de `activo`.
+    """
+    if eliminado:
+        titulo = f"Se eliminó el activo {activo.codigo_inventario}"
+        cuerpo = f"{_nombre(emisor)} eliminó {_descripcion(activo)}."
+        url = url_en_portal(reverse("activos:activo-list"))
+    else:
+        titulo = f"{activo.codigo_inventario} fue dado de baja"
+        cuerpo = f"{_nombre(emisor)} dio de baja a {_descripcion(activo)}."
+        url = _url_ficha_admin(activo)
+    payload = {
+        "url": url,
+        "activo_id": activo.pk,
+        "codigo_activo": activo.codigo_inventario,
+    }
+    if activo.usuario_asignado_id:
+        payload["usuario_ids"] = [activo.usuario_asignado_id]
+    emitir_al_confirmar(
+        codigo=CODIGO_ACTIVO_BAJA,
+        titulo=titulo,
+        cuerpo=cuerpo,
+        payload=payload,
         emisor=emisor,
     )
 

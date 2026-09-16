@@ -20,7 +20,16 @@ Ya integrado y en producción desde la Fase 3 del plan del Portal:
 | `activos.activo_creado` | `ActivoCreateView.form_valid()`, `etiqueta_alta()` | Admins de Activos (Portal) + custodio si ya viene asignado |
 | `activos.activo_asignado` | `ActivoUpdateView.form_valid()`, `reasignar_activo()`, `acciones_masivas()` | El nuevo custodio (la masiva agrupa en un solo aviso) |
 
-Y desde este mismo plan (adelantado de la Fase 2, ver abajo):
+Y desde este mismo plan, Fase 1 completa:
+
+| Evento | Dónde se emite | Audiencia |
+|--------|-----------------|-----------|
+| `activos.mantenimiento_iniciado` | `MantenimientoCreateView.form_valid()` | Custodio (si tiene) |
+| `activos.mantenimiento_finalizado` | `finalizar_mantenimiento()` | Custodio |
+| `activos.activo_desasignado` | `_registrar_reasignacion_en_historial()` (`ActivoUpdateView`, `reasignar_activo`, `acciones_masivas`) | Custodio **anterior** (la masiva agrupa por cada anterior distinto) |
+| `activos.activo_baja` | `ActivoUpdateView.form_valid()` (cambio a `IN`), `ActivoDeleteView.form_valid()` (antes de borrar) | Custodio (si tenía) + admins |
+
+Y adelantado de la Fase 2 (ver abajo):
 
 | Evento | Dónde se emite | Audiencia |
 |--------|-----------------|-----------|
@@ -132,26 +141,47 @@ serio (ver sección 5).
 ### Fase 0 — Ya hecho
 `activo_creado`, `activo_asignado`. Sin acción.
 
-### Fase 1 — Avisos de hecho (mantenimiento, pérdida de custodia, baja)
+### Fase 1 — Avisos de hecho (mantenimiento, pérdida de custodia, baja) ✅ hecha (septiembre 2026)
 
 **Objetivo:** cubrir los cuatro avisos de la sección 3.1, mismo patrón que los hooks de HDT
 (`avisos.py` + llamada desde la vista/servicio donde ocurre el cambio, `transaction.on_commit`).
 
-Trabajo:
+Trabajo hecho:
 
-- `activos/services/avisos.py`: agregar `avisar_mantenimiento_iniciado()`,
-  `avisar_mantenimiento_finalizado()`, `avisar_activo_desasignado()`, `avisar_activo_baja()`.
-- Enganchar en `mantenimientos/views.py` (`MantenimientoCreateView`, `finalizar_mantenimiento`)
-  y `activos/views.py` (`ActivoUpdateView`, `ActivoDeleteView`,
-  `_registrar_reasignacion_en_historial`).
-- Seed de los 4 tipos en el Portal (migración nueva en `backend/notificaciones/`), audiencia
-  `payload.usuario_ids` (Activos resuelve al destinatario, igual que ya hace con
-  `activo_asignado`) salvo `activo_baja`, que además suma `modulo.admins`.
-- Tests en `activos/tests/test_notificaciones.py`, mismo estilo que los de la Fase 0.
+- `activos/services/avisos.py`: `avisar_mantenimiento_iniciado()`,
+  `avisar_mantenimiento_finalizado()`, `avisar_activos_desasignados()` (plural: agrupa varios
+  activos del mismo custodio anterior en un solo aviso, igual que `avisar_activos_asignados`),
+  `avisar_activo_baja()`.
+- Enganchado en `mantenimientos/views.py` (`MantenimientoCreateView.form_valid()`,
+  `finalizar_mantenimiento()`) y `activos/views.py` (`ActivoUpdateView.form_valid()`,
+  `ActivoDeleteView.form_valid()`, `reasignar_activo()`, `acciones_masivas()` —
+  las tres últimas comparten el hook de `_registrar_reasignacion_en_historial()` para saber si
+  hubo `usuario_anterior`).
+- Seed de los 4 tipos en el Portal (`backend/notificaciones/migrations/0010_seed_tipos_activos_fase1.py`):
+  `payload.usuario_ids` para los tres primeros; `activo_baja` suma `modulo.admins`, igual que
+  `activo_creado`.
+- 10 tests nuevos en `activos/tests/test_notificaciones.py` (183 → 193 en el repo).
 
-**Criterio de salida:** los cuatro eventos de la sección 3.1, verificados con tests y con una
-prueba end-to-end contra el Portal de desarrollo (mismo procedimiento que se usó para
-`activo_creado`/`activo_asignado`).
+Decisiones tomadas al implementar (no estaban en el plan original):
+
+- `activo_desasignado` en `acciones_masivas` agrupa por custodio anterior, no por activo: si una
+  masiva mueve equipos de 2 personas distintas a una tercera, salen 2 avisos (uno por persona que
+  pierde equipo), no uno por activo — mismo criterio anti-ruido que ya usa `activo_asignado`.
+- El deep link de `activo_desasignado` va siempre a `mis-activos-list`, nunca a la ficha del
+  activo: el custodio anterior ya no lo puede ver (`mis-activos-detail` filtra por dueño) y le
+  daría 404.
+- El deep link de `activo_baja` por eliminación va al listado (`activo-list`), no a la ficha: la
+  fila ya no existe. Por estado→`IN` sí puede ir a la ficha (`activo-detail`), porque el registro
+  sigue vivo.
+- `MantenimientoUpdateView` (editar un mantenimiento existente, incluido cambiar su `estado` a
+  mano desde el formulario) **no** dispara ningún aviso — solo `MantenimientoCreateView` y
+  `finalizar_mantenimiento()`, tal como estaba scopeado. Es la misma asimetría que ya existe en
+  `activo_asignado` (edición genérica no notifica, solo los flujos dedicados).
+
+**Criterio de salida — cumplido:** los cuatro eventos, verificados con tests y con una corrida
+real contra el Portal de desarrollo (`Evento` + `BandejaItem` para cada uno, incluido
+`activo_baja` llegando tanto al admin como al custodio en el mismo evento). Datos de prueba
+eliminados después.
 
 ### Fase 2 — Despachador por reloj
 
@@ -236,10 +266,9 @@ esquema de `Activo` y/o `SubCategoria`. Una vez resuelta, sigue el mismo patrón
 ## 7. Orden de trabajo recomendado
 
 1. ⚠️ **Decisión #1 (admins en el Portal) — sigue pendiente**, no es código, se puede resolver
-   hoy. Bloquea el valor real de todo lo que ya está implementado con audiencia "admins",
-   incluido `usuario_inactivo_con_equipos`.
-2. Fase 1 (4 avisos de hecho) — sin decisiones pendientes, mismo patrón ya probado en HDT. Sigue
-   sin empezar.
+   hoy. Bloquea el valor real de todo lo que ya está implementado con audiencia "admins":
+   `activo_creado` sin custodio, `activo_baja` y `usuario_inactivo_con_equipos`.
+2. ~~Fase 1 (4 avisos de hecho)~~ — **hecha**.
 3. ~~Fase 2: `usuario_inactivo_con_equipos`~~ — **hecho**, adelantado del resto de la Fase 2 (ver
    sección 4). No esperó a la Fase 1 porque no comparte código con ella.
 4. Decisiones #2, #3, #4, #5.

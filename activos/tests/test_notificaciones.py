@@ -13,11 +13,16 @@ from activos.models import Activo, AvisoUsuarioInactivo
 from activos.services import notificaciones_portal
 from activos.services.avisos import (
     CODIGO_ACTIVO_ASIGNADO,
+    CODIGO_ACTIVO_BAJA,
     CODIGO_ACTIVO_CREADO,
+    CODIGO_ACTIVO_DESASIGNADO,
+    CODIGO_MANTENIMIENTO_FINALIZADO,
+    CODIGO_MANTENIMIENTO_INICIADO,
     CODIGO_USUARIO_INACTIVO,
     avisar_usuarios_inactivos_con_equipos,
     usuarios_inactivos_con_equipos,
 )
+from mantenimientos.models import Mantenimiento
 from activos.tests.test_activo_flow import _payload_activo
 
 
@@ -81,7 +86,7 @@ def test_alta_sin_custodio_solo_llega_a_admins(
 
 
 @pytest.mark.django_db
-def test_reasignar_avisa_al_nuevo_custodio(
+def test_reasignar_avisa_al_nuevo_custodio_y_desasigna_al_anterior(
     client_auth, catalogo, emitir, django_capture_on_commit_callbacks
 ):
     act = _crear_activo(catalogo, "INV-NOTIF-1", catalogo["usuario_a"])
@@ -96,17 +101,35 @@ def test_reasignar_avisa_al_nuevo_custodio(
     assert "Luis" not in aviso["cuerpo"]  # el cuerpo nombra a quien asigna, no al custodio
     assert aviso["payload"]["url"].endswith(f"/activos/mis-activos/{act.pk}/")
 
+    [desaviso] = _llamadas(emitir, CODIGO_ACTIVO_DESASIGNADO)
+    assert desaviso["payload"]["usuario_ids"] == [catalogo["usuario_a"].pk]
+    assert "INV-NOTIF-1" in desaviso["titulo"]
+    assert desaviso["payload"]["url"].endswith("/activos/mis-activos/")
+
 
 @pytest.mark.django_db
-def test_reasignar_al_mismo_custodio_o_desasignar_no_avisa(
+def test_reasignar_al_mismo_custodio_no_avisa_nada(
     client_auth, catalogo, emitir, django_capture_on_commit_callbacks
 ):
     act = _crear_activo(catalogo, "INV-NOTIF-2", catalogo["usuario_a"])
     url = reverse("activos:activo-reasignar", args=[act.pk])
     with django_capture_on_commit_callbacks(execute=True):
         client_auth.post(url, {"usuario_asignado": catalogo["usuario_a"].pk})
+    assert _llamadas(emitir, CODIGO_ACTIVO_ASIGNADO) == []
+    assert _llamadas(emitir, CODIGO_ACTIVO_DESASIGNADO) == []
+
+
+@pytest.mark.django_db
+def test_reasignar_a_vacio_avisa_desasignado_al_anterior(
+    client_auth, catalogo, emitir, django_capture_on_commit_callbacks
+):
+    act = _crear_activo(catalogo, "INV-NOTIF-2b", catalogo["usuario_a"])
+    url = reverse("activos:activo-reasignar", args=[act.pk])
+    with django_capture_on_commit_callbacks(execute=True):
         client_auth.post(url, {"usuario_asignado": ""})
     assert _llamadas(emitir, CODIGO_ACTIVO_ASIGNADO) == []
+    [desaviso] = _llamadas(emitir, CODIGO_ACTIVO_DESASIGNADO)
+    assert desaviso["payload"]["usuario_ids"] == [catalogo["usuario_a"].pk]
 
 
 @pytest.mark.django_db
@@ -132,6 +155,37 @@ def test_asignacion_masiva_agrupa_en_un_aviso(
 
 
 @pytest.mark.django_db
+def test_asignacion_masiva_agrupa_desasignados_por_custodio_anterior(
+    client_auth, catalogo, emitir, django_capture_on_commit_callbacks
+):
+    """Dos activos de usuario_a y uno de usuario_b, todos van a un tercero.
+
+    Deben salir dos avisos de "ya no tienes a tu cargo": uno para usuario_a
+    (agrupando sus 2 equipos) y otro para usuario_b (1 equipo) — no uno por
+    activo.
+    """
+    de_a = [_crear_activo(catalogo, f"INV-LOTE-A{i}", catalogo["usuario_a"]) for i in range(2)]
+    de_b = [_crear_activo(catalogo, "INV-LOTE-B1", catalogo["usuario_b"])]
+    with django_capture_on_commit_callbacks(execute=True):
+        client_auth.post(
+            reverse("activos:activo-acciones-masivas"),
+            {
+                "accion": "reasignar",
+                "activos": [a.pk for a in de_a + de_b],
+                "destino": catalogo["usuario_b"].pk,
+            },
+        )
+    avisos = _llamadas(emitir, CODIGO_ACTIVO_DESASIGNADO)
+    assert len(avisos) == 1
+    [aviso_a] = avisos
+    assert aviso_a["payload"]["usuario_ids"] == [catalogo["usuario_a"].pk]
+    assert sorted(aviso_a["payload"]["activo_ids"]) == sorted(a.pk for a in de_a)
+    assert aviso_a["titulo"] == "Ya no tienes a tu cargo 2 activos"
+    # usuario_b no se desasigna nada: ya tenía INV-LOTE-B1 y sigue siendo el
+    # destino de la masiva, así que ese activo no cambia de dueño.
+
+
+@pytest.mark.django_db
 def test_portal_caido_no_impide_el_alta(
     client_auth, catalogo, settings, django_capture_on_commit_callbacks
 ):
@@ -147,6 +201,154 @@ def test_portal_caido_no_impide_el_alta(
     assert r.status_code == 302
     assert Activo.objects.filter(marca="MarcaPy").exists()
     urlopen.assert_called_once()
+
+
+# =============================================================================
+# Fase 1: mantenimiento, baja y eliminación (avisos de hecho)
+# =============================================================================
+
+
+def _crear_mantenimiento(activo, estado=Mantenimiento.EstadoMantenimiento.EN_PROCESO):
+    return Mantenimiento.objects.create(
+        activo=activo,
+        tecnico="Técnico Pytest",
+        telefono="000-0000",
+        descripcion="Revisión de rutina",
+        costo="10.00",
+        estado=estado,
+    )
+
+
+@pytest.mark.django_db
+def test_mantenimiento_iniciado_avisa_al_custodio(
+    client_auth, catalogo, emitir, django_capture_on_commit_callbacks
+):
+    act = _crear_activo(catalogo, "INV-MNT-1", catalogo["usuario_a"])
+    with django_capture_on_commit_callbacks(execute=True):
+        client_auth.post(
+            reverse("mantenimientos:mantenimiento-create"),
+            {
+                "activo": act.pk,
+                "tecnico": "Juan Técnico",
+                "telefono": "555-1234",
+                "descripcion": "Cambio de pantalla",
+                "costo": "50.00",
+                "estado": Mantenimiento.EstadoMantenimiento.EN_PROCESO,
+            },
+        )
+    [aviso] = _llamadas(emitir, CODIGO_MANTENIMIENTO_INICIADO)
+    assert aviso["payload"]["usuario_ids"] == [catalogo["usuario_a"].pk]
+    assert aviso["payload"]["url"].endswith(f"/activos/mis-activos/{act.pk}/")
+    assert "INV-MNT-1" in aviso["titulo"]
+
+
+@pytest.mark.django_db
+def test_mantenimiento_sin_custodio_no_avisa(
+    client_auth, catalogo, emitir, django_capture_on_commit_callbacks
+):
+    act = _crear_activo(catalogo, "INV-MNT-2")
+    with django_capture_on_commit_callbacks(execute=True):
+        client_auth.post(
+            reverse("mantenimientos:mantenimiento-create"),
+            {
+                "activo": act.pk,
+                "tecnico": "Juan Técnico",
+                "telefono": "555-1234",
+                "descripcion": "Cambio de pantalla",
+                "costo": "50.00",
+                "estado": Mantenimiento.EstadoMantenimiento.EN_PROCESO,
+            },
+        )
+    assert _llamadas(emitir, CODIGO_MANTENIMIENTO_INICIADO) == []
+
+
+@pytest.mark.django_db
+def test_finalizar_mantenimiento_avisa_al_custodio(
+    client_auth, catalogo, emitir, django_capture_on_commit_callbacks
+):
+    act = _crear_activo(catalogo, "INV-MNT-3", catalogo["usuario_a"])
+    mant = _crear_mantenimiento(act)
+    with django_capture_on_commit_callbacks(execute=True):
+        client_auth.post(reverse("mantenimientos:mantenimiento-finalizar", args=[mant.pk]))
+    [aviso] = _llamadas(emitir, CODIGO_MANTENIMIENTO_FINALIZADO)
+    assert aviso["payload"]["usuario_ids"] == [catalogo["usuario_a"].pk]
+    assert aviso["payload"]["url"].endswith(f"/activos/mis-activos/{act.pk}/")
+    assert "INV-MNT-3" in aviso["titulo"]
+
+
+@pytest.mark.django_db
+def test_finalizar_mantenimiento_ya_finalizado_no_avisa_de_nuevo(
+    client_auth, catalogo, emitir, django_capture_on_commit_callbacks
+):
+    act = _crear_activo(catalogo, "INV-MNT-4", catalogo["usuario_a"])
+    mant = _crear_mantenimiento(act, estado=Mantenimiento.EstadoMantenimiento.FINALIZADO)
+    with django_capture_on_commit_callbacks(execute=True):
+        client_auth.post(reverse("mantenimientos:mantenimiento-finalizar", args=[mant.pk]))
+    assert _llamadas(emitir, CODIGO_MANTENIMIENTO_FINALIZADO) == []
+
+
+@pytest.mark.django_db
+def test_editar_a_inactivo_avisa_baja_a_custodio(
+    client_auth, catalogo, emitir, django_capture_on_commit_callbacks
+):
+    act = _crear_activo(catalogo, "INV-BAJA-1", catalogo["usuario_a"])
+    data = _payload_activo(
+        catalogo,
+        codigo_inventario="INV-BAJA-1",
+        usuario_asignado=catalogo["usuario_a"].pk,
+        estado=Activo.EstadoActivo.INACTIVO,
+    )
+    with django_capture_on_commit_callbacks(execute=True):
+        client_auth.post(reverse("activos:activo-update", args=[act.pk]), data)
+    [aviso] = _llamadas(emitir, CODIGO_ACTIVO_BAJA)
+    assert aviso["payload"]["usuario_ids"] == [catalogo["usuario_a"].pk]
+    assert aviso["payload"]["activo_id"] == act.pk
+    assert "INV-BAJA-1" in aviso["titulo"]
+    assert aviso["payload"]["url"].endswith(f"/activos/activos/{act.pk}/")
+
+
+@pytest.mark.django_db
+def test_editar_sin_cambiar_estado_no_avisa_baja(
+    client_auth, catalogo, emitir, django_capture_on_commit_callbacks
+):
+    act = _crear_activo(catalogo, "INV-BAJA-2", catalogo["usuario_a"])
+    data = _payload_activo(
+        catalogo,
+        codigo_inventario="INV-BAJA-2",
+        usuario_asignado=catalogo["usuario_a"].pk,
+        marca="Marca actualizada",
+        estado=Activo.EstadoActivo.ACTIVO,
+    )
+    with django_capture_on_commit_callbacks(execute=True):
+        client_auth.post(reverse("activos:activo-update", args=[act.pk]), data)
+    assert _llamadas(emitir, CODIGO_ACTIVO_BAJA) == []
+
+
+@pytest.mark.django_db
+def test_eliminar_activo_avisa_antes_de_borrar_la_fila(
+    client_auth, catalogo, emitir, django_capture_on_commit_callbacks
+):
+    act = _crear_activo(catalogo, "INV-BAJA-3", catalogo["usuario_a"])
+    pk = act.pk
+    with django_capture_on_commit_callbacks(execute=True):
+        client_auth.post(reverse("activos:activo-delete", args=[pk]))
+    assert not Activo.objects.filter(pk=pk).exists()
+    [aviso] = _llamadas(emitir, CODIGO_ACTIVO_BAJA)
+    assert aviso["payload"]["usuario_ids"] == [catalogo["usuario_a"].pk]
+    assert aviso["payload"]["activo_id"] == pk
+    assert aviso["payload"]["codigo_activo"] == "INV-BAJA-3"
+    assert aviso["payload"]["url"].endswith("/activos/activos/")
+
+
+@pytest.mark.django_db
+def test_eliminar_activo_sin_custodio_no_incluye_usuario_ids(
+    client_auth, catalogo, emitir, django_capture_on_commit_callbacks
+):
+    act = _crear_activo(catalogo, "INV-BAJA-4")
+    with django_capture_on_commit_callbacks(execute=True):
+        client_auth.post(reverse("activos:activo-delete", args=[act.pk]))
+    [aviso] = _llamadas(emitir, CODIGO_ACTIVO_BAJA)
+    assert "usuario_ids" not in aviso["payload"]
 
 
 # =============================================================================

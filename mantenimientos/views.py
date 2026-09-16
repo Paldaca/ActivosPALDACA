@@ -14,6 +14,11 @@ from activos.decorators import (
     requiere_admin_activo,
     requiere_modulo_paldaca,
 )
+from activos.services.avisos import (
+    avisar_mantenimiento_finalizado,
+    avisar_mantenimiento_iniciado,
+)
+
 from .models import Mantenimiento
 from .forms import MantenimientoForm, MantenimientoFilterForm
 
@@ -133,6 +138,7 @@ class MantenimientoCreateView(AdminActivoRequiredMixin, CreateView):
     
     def form_valid(self, form):
         response = super().form_valid(form)
+        avisar_mantenimiento_iniciado(self.object, self.request.user)
         messages.success(
             self.request,
             f'Mantenimiento registrado para {self.object.activo.codigo_inventario}.',
@@ -188,6 +194,7 @@ def finalizar_mantenimiento(request, pk):
     if mantenimiento.estado == Mantenimiento.EstadoMantenimiento.EN_PROCESO:
         mantenimiento.estado = Mantenimiento.EstadoMantenimiento.FINALIZADO
         mantenimiento.save()
+        avisar_mantenimiento_finalizado(mantenimiento, request.user)
         messages.success(
             request,
             f'Mantenimiento de {mantenimiento.activo.codigo_inventario} finalizado. '

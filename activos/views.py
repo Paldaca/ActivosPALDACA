@@ -23,7 +23,12 @@ from .decorators import (
     requiere_admin_activo,
     requiere_modulo_paldaca,
 )
-from .services.avisos import avisar_activo_creado, avisar_activos_asignados
+from .services.avisos import (
+    avisar_activo_baja,
+    avisar_activo_creado,
+    avisar_activos_asignados,
+    avisar_activos_desasignados,
+)
 
 
 def _url_de_retorno(request, url, fallback='activos:activo-list'):
@@ -544,13 +549,21 @@ class ActivoUpdateView(ActivoFormContextMixin, AdminActivoRequiredMixin, UpdateV
             activo_actualizado.ubicacion,
             self.request.user,
         )
+        usuario_anterior = activo_original.usuario_asignado
         movimiento = _registrar_reasignacion_en_historial(
             activo_actualizado,
-            activo_original.usuario_asignado,
+            usuario_anterior,
             activo_actualizado.usuario_asignado,
             self.request.user,
         )
+        if (
+            activo_actualizado.estado == Activo.EstadoActivo.INACTIVO
+            and activo_original.estado != Activo.EstadoActivo.INACTIVO
+        ):
+            avisar_activo_baja(activo_actualizado, self.request.user)
         usuario_nuevo = activo_actualizado.usuario_asignado
+        if movimiento and usuario_anterior:
+            avisar_activos_desasignados([activo_actualizado], usuario_anterior, self.request.user)
         if movimiento and usuario_nuevo:
             avisar_activos_asignados([activo_actualizado], usuario_nuevo, self.request.user)
             try:
@@ -592,6 +605,9 @@ class ActivoDeleteView(SinPaginaDeBorradoMixin, AdminActivoRequiredMixin, Delete
         return reverse('activos:activo-detail', kwargs={'pk': self.kwargs['pk']})
 
     def form_valid(self, form):
+        # Textos y payload se arman ahora, con la fila todavía en pie
+        # (BR-ACT-12: el historial se borra en cascada al eliminar).
+        avisar_activo_baja(self.object, self.request.user, eliminado=True)
         messages.success(
             self.request,
             f'Activo {self.object.codigo_inventario} eliminado exitosamente.',
@@ -674,6 +690,8 @@ def reasignar_activo(request, pk):
                 usuario_nuevo,
                 request.user,
             )
+            if usuario_anterior and movimiento is not None:
+                avisar_activos_desasignados([activo_actualizado], usuario_anterior, request.user)
             if usuario_nuevo and movimiento is not None:
                 avisar_activos_asignados([activo_actualizado], usuario_nuevo, request.user)
                 try:
@@ -862,6 +880,7 @@ def acciones_masivas(request):
                 return redirect(volver)
 
         pendientes = []
+        desasignados_por_anterior = {}
         with transaction.atomic():
             for activo in activos:
                 if activo.usuario_asignado_id == (usuario.pk if usuario else None):
@@ -873,9 +892,13 @@ def acciones_masivas(request):
                     activo, anterior, usuario, request.user,
                 )
                 cambios += 1
+                if anterior:
+                    desasignados_por_anterior.setdefault(anterior.pk, (anterior, []))[1].append(activo)
                 if usuario:
                     pendientes.append((activo, movimiento))
 
+        for anterior, sus_activos in desasignados_por_anterior.values():
+            avisar_activos_desasignados(sus_activos, anterior, request.user)
         avisar_activos_asignados([activo for activo, _ in pendientes], usuario, request.user)
         ids_constancia = []
         for activo, movimiento in pendientes:
