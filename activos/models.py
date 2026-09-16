@@ -440,3 +440,44 @@ class AvisoUsuarioInactivo(models.Model):
 
     def __str__(self):
         return f"Aviso pendiente de {self.usuario_id}"
+
+
+class AvisoPorUmbral(models.Model):
+    """Marca que ya se avisó sobre un registro que cruzó un umbral de días.
+
+    Generaliza `AvisoUsuarioInactivo` a las reglas por reloj que evalúan un
+    registro concreto (una etiqueta, una reasignación) en vez de un usuario:
+    ambas condiciones persisten hasta que alguien actúa (vincular la
+    etiqueta, archivar la planilla), así que sin este marcador el
+    despachador diario repetiría el aviso cada día. `regla` + `objeto_id`
+    identifican el caso puntual; se borra en cuanto deja de cumplirse, para
+    poder volver a avisar si recae (ej. una etiqueta que se desvincula y
+    vuelve a quedar pendiente).
+    """
+
+    REGLA_ETIQUETA_SIN_VINCULAR = "etiqueta_sin_vincular"
+    REGLA_ASIGNACION_SIN_PLANILLA = "asignacion_sin_planilla"
+    REGLAS = (
+        (REGLA_ETIQUETA_SIN_VINCULAR, "Etiqueta sin vincular"),
+        (REGLA_ASIGNACION_SIN_PLANILLA, "Asignación sin planilla"),
+    )
+
+    regla = models.CharField(max_length=32, choices=REGLAS)
+    objeto_id = models.PositiveIntegerField(
+        help_text="pk de EtiquetaQR o HistorialMovimiento, según la regla."
+    )
+    enviado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = TABLA("aviso_por_umbral")
+        verbose_name = "Aviso por umbral"
+        verbose_name_plural = "Avisos por umbral"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["regla", "objeto_id"],
+                name="activos_aviso_por_umbral_unico",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.regla}:{self.objeto_id}"

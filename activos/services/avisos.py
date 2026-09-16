@@ -10,10 +10,15 @@ Dos mecanismos, a propósito (mismo patrón híbrido que HDT):
   despachador `enviar_notificaciones_activos`, vía `emitir_evento` directo.
 """
 
-from django.contrib.auth import get_user_model
-from django.urls import reverse
+from datetime import timedelta
 
-from ..models import Activo, AvisoUsuarioInactivo
+from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.db.models import Q
+from django.urls import reverse
+from django.utils import timezone
+
+from ..models import Activo, AvisoPorUmbral, AvisoUsuarioInactivo, EtiquetaQR, HistorialMovimiento
 from . import notificaciones_portal
 from .notificaciones_portal import emitir_al_confirmar, url_en_portal
 
@@ -24,6 +29,8 @@ CODIGO_MANTENIMIENTO_INICIADO = "activos.mantenimiento_iniciado"
 CODIGO_MANTENIMIENTO_FINALIZADO = "activos.mantenimiento_finalizado"
 CODIGO_ACTIVO_BAJA = "activos.activo_baja"
 CODIGO_USUARIO_INACTIVO = "activos.usuario_inactivo_con_equipos"
+CODIGO_ETIQUETA_SIN_VINCULAR = "activos.etiqueta_sin_vincular"
+CODIGO_ASIGNACION_SIN_PLANILLA = "activos.asignacion_sin_planilla"
 
 
 def _nombre(usuario):
@@ -276,5 +283,186 @@ def avisar_usuarios_inactivos_con_equipos():
         return 0
     AvisoUsuarioInactivo.objects.bulk_create(
         [AvisoUsuarioInactivo(usuario=u) for u in candidatos]
+    )
+    return len(candidatos)
+
+
+# --- etiqueta_sin_vincular (regla por reloj) --------------------------------
+
+
+def etiquetas_sin_vincular(dias=None):
+    """EtiquetaQR en PENDIENTE hace más de N días, sin aviso vigente."""
+    dias = settings.ACTIVOS_UMBRAL_ETIQUETA_SIN_VINCULAR_DIAS if dias is None else dias
+    limite = timezone.now() - timedelta(days=dias)
+    ya_avisadas = AvisoPorUmbral.objects.filter(
+        regla=AvisoPorUmbral.REGLA_ETIQUETA_SIN_VINCULAR
+    ).values_list("objeto_id", flat=True)
+    return list(
+        EtiquetaQR.objects.filter(
+            estado=EtiquetaQR.EstadoEtiqueta.PENDIENTE,
+            fecha_creacion__lte=limite,
+        )
+        .exclude(pk__in=ya_avisadas)
+        .select_related("creada_por")
+        .order_by("fecha_creacion")
+    )
+
+
+def _limpiar_avisos_etiqueta_sin_vincular():
+    """Libera el marcador de etiquetas que ya se vincularon o se anularon."""
+    for aviso in AvisoPorUmbral.objects.filter(
+        regla=AvisoPorUmbral.REGLA_ETIQUETA_SIN_VINCULAR
+    ):
+        if not EtiquetaQR.objects.filter(
+            pk=aviso.objeto_id, estado=EtiquetaQR.EstadoEtiqueta.PENDIENTE
+        ).exists():
+            aviso.delete()
+
+
+def _avisar_etiquetas_de(etiquetas, creador):
+    """Un aviso por creador (o `None` para las sin creador registrado)."""
+    dias = settings.ACTIVOS_UMBRAL_ETIQUETA_SIN_VINCULAR_DIAS
+    if len(etiquetas) == 1:
+        etiqueta = etiquetas[0]
+        titulo = f"Etiqueta {etiqueta.codigo_reservado} sigue sin vincular"
+        cuerpo = (
+            f"Se imprimió hace más de {dias} días y ningún activo la usa todavía."
+        )
+    else:
+        titulo = f"{len(etiquetas)} etiquetas siguen sin vincular"
+        codigos = ", ".join(e.codigo_reservado for e in etiquetas[:5])
+        resto = f" y {len(etiquetas) - 5} más" if len(etiquetas) > 5 else ""
+        cuerpo = f"Llevan más de {dias} días impresas sin vincular: {codigos}{resto}."
+
+    payload = {
+        "url": url_en_portal(reverse("activos:etiqueta-list")),
+        "etiqueta_ids": [e.pk for e in etiquetas],
+    }
+    if creador is not None:
+        payload["usuario_ids"] = [creador.pk]
+
+    enviado = notificaciones_portal.emitir_evento(
+        codigo=CODIGO_ETIQUETA_SIN_VINCULAR,
+        titulo=titulo,
+        cuerpo=cuerpo,
+        payload=payload,
+    )
+    if not enviado:
+        return False
+    AvisoPorUmbral.objects.bulk_create(
+        [
+            AvisoPorUmbral(
+                regla=AvisoPorUmbral.REGLA_ETIQUETA_SIN_VINCULAR, objeto_id=e.pk
+            )
+            for e in etiquetas
+        ]
+    )
+    return True
+
+
+def avisar_etiquetas_sin_vincular():
+    """Un aviso por creador (agrupa sus etiquetas); siempre llega también a admins.
+
+    Devuelve cuántas etiquetas quedaron incluidas en algún aviso (0 si no
+    había candidatas nuevas o el Portal no aceptó nada).
+    """
+    _limpiar_avisos_etiqueta_sin_vincular()
+    candidatas = etiquetas_sin_vincular()
+    if not candidatas:
+        return 0
+
+    por_creador = {}
+    sin_creador = []
+    for etiqueta in candidatas:
+        if etiqueta.creada_por_id:
+            grupo = por_creador.setdefault(etiqueta.creada_por_id, (etiqueta.creada_por, []))
+            grupo[1].append(etiqueta)
+        else:
+            sin_creador.append(etiqueta)
+
+    incluidas = 0
+    for creador, etiquetas in por_creador.values():
+        if _avisar_etiquetas_de(etiquetas, creador):
+            incluidas += len(etiquetas)
+    if sin_creador and _avisar_etiquetas_de(sin_creador, None):
+        incluidas += len(sin_creador)
+    return incluidas
+
+
+# --- asignacion_sin_planilla (regla por reloj) ------------------------------
+
+
+def asignaciones_sin_planilla(dias=None):
+    """Reasignaciones sin planilla archivada hace más de N días, sin aviso vigente."""
+    dias = settings.ACTIVOS_UMBRAL_ASIGNACION_SIN_PLANILLA_DIAS if dias is None else dias
+    limite = timezone.now() - timedelta(days=dias)
+    ya_avisados = AvisoPorUmbral.objects.filter(
+        regla=AvisoPorUmbral.REGLA_ASIGNACION_SIN_PLANILLA
+    ).values_list("objeto_id", flat=True)
+    return list(
+        HistorialMovimiento.objects.filter(
+            tipo_movimiento=HistorialMovimiento.TipoMovimiento.REASIGNACION,
+            fecha_movimiento__lte=limite,
+        )
+        .filter(Q(archivo_planilla="") | Q(archivo_planilla__isnull=True))
+        .exclude(pk__in=ya_avisados)
+        .select_related("activo")
+        .order_by("fecha_movimiento")
+    )
+
+
+def _limpiar_avisos_asignacion_sin_planilla():
+    """Libera el marcador de reasignaciones a las que ya se les archivó la planilla."""
+    for aviso in AvisoPorUmbral.objects.filter(
+        regla=AvisoPorUmbral.REGLA_ASIGNACION_SIN_PLANILLA
+    ):
+        movimiento = HistorialMovimiento.objects.filter(pk=aviso.objeto_id).first()
+        if movimiento is None or movimiento.archivo_planilla:
+            aviso.delete()
+
+
+def avisar_asignaciones_sin_planilla():
+    """Un solo aviso a los admins por corrida, listando las reasignaciones sin planilla.
+
+    Devuelve cuántas se incluyeron (0 si no había candidatas nuevas o el
+    Portal no aceptó el aviso).
+    """
+    _limpiar_avisos_asignacion_sin_planilla()
+    candidatos = asignaciones_sin_planilla()
+    if not candidatos:
+        return 0
+
+    dias = settings.ACTIVOS_UMBRAL_ASIGNACION_SIN_PLANILLA_DIAS
+    if len(candidatos) == 1:
+        movimiento = candidatos[0]
+        titulo = f"{movimiento.activo.codigo_inventario} sigue sin planilla de entrega"
+        cuerpo = (
+            f"Se reasignó hace más de {dias} días y no tiene planilla firmada archivada."
+        )
+        url = _url_ficha_admin(movimiento.activo)
+    else:
+        titulo = f"{len(candidatos)} reasignaciones siguen sin planilla de entrega"
+        codigos = ", ".join(m.activo.codigo_inventario for m in candidatos[:5])
+        resto = f" y {len(candidatos) - 5} más" if len(candidatos) > 5 else ""
+        cuerpo = (
+            f"Llevan más de {dias} días sin planilla archivada: {codigos}{resto}."
+        )
+        url = url_en_portal(reverse("activos:activo-list"))
+
+    enviado = notificaciones_portal.emitir_evento(
+        codigo=CODIGO_ASIGNACION_SIN_PLANILLA,
+        titulo=titulo,
+        cuerpo=cuerpo,
+        payload={"url": url, "movimiento_ids": [m.pk for m in candidatos]},
+    )
+    if not enviado:
+        return 0
+    AvisoPorUmbral.objects.bulk_create(
+        [
+            AvisoPorUmbral(
+                regla=AvisoPorUmbral.REGLA_ASIGNACION_SIN_PLANILLA, objeto_id=m.pk
+            )
+            for m in candidatos
+        ]
     )
     return len(candidatos)

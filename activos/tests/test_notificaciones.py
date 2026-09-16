@@ -1,25 +1,39 @@
 """Avisos al bus de notificaciones del Portal (alta y asignación de activos)."""
 
 import urllib.error
+from datetime import timedelta
 from io import StringIO
 from unittest import mock
 
 import pytest
+from django.core.files.base import ContentFile
 from django.core.management import call_command
 from django.urls import reverse
 from django.utils import timezone
 
-from activos.models import Activo, AvisoUsuarioInactivo
+from activos.models import (
+    Activo,
+    AvisoPorUmbral,
+    AvisoUsuarioInactivo,
+    EtiquetaQR,
+    HistorialMovimiento,
+)
 from activos.services import notificaciones_portal
 from activos.services.avisos import (
     CODIGO_ACTIVO_ASIGNADO,
     CODIGO_ACTIVO_BAJA,
     CODIGO_ACTIVO_CREADO,
     CODIGO_ACTIVO_DESASIGNADO,
+    CODIGO_ASIGNACION_SIN_PLANILLA,
+    CODIGO_ETIQUETA_SIN_VINCULAR,
     CODIGO_MANTENIMIENTO_FINALIZADO,
     CODIGO_MANTENIMIENTO_INICIADO,
     CODIGO_USUARIO_INACTIVO,
+    asignaciones_sin_planilla,
+    avisar_asignaciones_sin_planilla,
+    avisar_etiquetas_sin_vincular,
     avisar_usuarios_inactivos_con_equipos,
+    etiquetas_sin_vincular,
     usuarios_inactivos_con_equipos,
 )
 from mantenimientos.models import Mantenimiento
@@ -499,3 +513,247 @@ def test_comando_respeta_el_horario_salvo_con_ahora(catalogo, settings, emitir):
 
     call_command("enviar_notificaciones_activos", "--regla", "usuario_inactivo_con_equipos", "--ahora")
     emitir.assert_called_once()
+
+
+# =============================================================================
+# etiqueta_sin_vincular (regla por reloj)
+# =============================================================================
+
+
+def _crear_etiqueta(catalogo, codigo, *, creada_por=None, dias_atras=0, estado=None):
+    etiqueta = EtiquetaQR.objects.create(
+        codigo_reservado=codigo,
+        subcategoria=catalogo["subcategoria"],
+        creada_por=creada_por,
+        estado=estado or EtiquetaQR.EstadoEtiqueta.PENDIENTE,
+    )
+    if dias_atras:
+        EtiquetaQR.objects.filter(pk=etiqueta.pk).update(
+            fecha_creacion=timezone.now() - timedelta(days=dias_atras)
+        )
+        etiqueta.refresh_from_db()
+    return etiqueta
+
+
+@pytest.mark.django_db
+def test_etiqueta_reciente_no_es_candidata(catalogo):
+    _crear_etiqueta(catalogo, "INV-ETQ-1", dias_atras=1)
+    assert etiquetas_sin_vincular(dias=30) == []
+
+
+@pytest.mark.django_db
+def test_etiqueta_vieja_pendiente_es_candidata(catalogo):
+    etiqueta = _crear_etiqueta(catalogo, "INV-ETQ-2", dias_atras=31)
+    assert etiquetas_sin_vincular(dias=30) == [etiqueta]
+
+
+@pytest.mark.django_db
+def test_etiqueta_vinculada_no_es_candidata(catalogo):
+    _crear_etiqueta(
+        catalogo, "INV-ETQ-3", dias_atras=31, estado=EtiquetaQR.EstadoEtiqueta.VINCULADA
+    )
+    assert etiquetas_sin_vincular(dias=30) == []
+
+
+@pytest.mark.django_db
+def test_avisa_etiqueta_con_creador_incluye_su_id(catalogo, emitir):
+    _crear_etiqueta(catalogo, "INV-ETQ-4", creada_por=catalogo["usuario_a"], dias_atras=31)
+
+    incluidas = avisar_etiquetas_sin_vincular()
+
+    assert incluidas == 1
+    [aviso] = _llamadas(emitir, CODIGO_ETIQUETA_SIN_VINCULAR)
+    assert aviso["payload"]["usuario_ids"] == [catalogo["usuario_a"].pk]
+    assert "INV-ETQ-4" in aviso["titulo"]
+    assert aviso["payload"]["url"].endswith("/activos/etiquetas/")
+
+
+@pytest.mark.django_db
+def test_etiqueta_sin_creador_no_incluye_usuario_ids(catalogo, emitir):
+    _crear_etiqueta(catalogo, "INV-ETQ-5", dias_atras=31)
+
+    avisar_etiquetas_sin_vincular()
+
+    [aviso] = _llamadas(emitir, CODIGO_ETIQUETA_SIN_VINCULAR)
+    assert "usuario_ids" not in aviso["payload"]
+
+
+@pytest.mark.django_db
+def test_avisa_etiquetas_agrupa_por_creador_en_eventos_separados(catalogo, emitir):
+    _crear_etiqueta(catalogo, "INV-ETQ-6", creada_por=catalogo["usuario_a"], dias_atras=31)
+    _crear_etiqueta(catalogo, "INV-ETQ-7", creada_por=catalogo["usuario_a"], dias_atras=31)
+    _crear_etiqueta(catalogo, "INV-ETQ-8", creada_por=catalogo["usuario_b"], dias_atras=31)
+
+    incluidas = avisar_etiquetas_sin_vincular()
+
+    assert incluidas == 3
+    avisos = _llamadas(emitir, CODIGO_ETIQUETA_SIN_VINCULAR)
+    assert len(avisos) == 2
+    por_usuario = {a["payload"]["usuario_ids"][0]: a for a in avisos}
+    assert len(por_usuario[catalogo["usuario_a"].pk]["payload"]["etiqueta_ids"]) == 2
+    assert len(por_usuario[catalogo["usuario_b"].pk]["payload"]["etiqueta_ids"]) == 1
+
+
+@pytest.mark.django_db
+def test_no_repite_aviso_etiqueta_mientras_sigue_pendiente(catalogo, emitir):
+    _crear_etiqueta(catalogo, "INV-ETQ-9", dias_atras=31)
+
+    assert avisar_etiquetas_sin_vincular() == 1
+    assert avisar_etiquetas_sin_vincular() == 0
+    assert len(_llamadas(emitir, CODIGO_ETIQUETA_SIN_VINCULAR)) == 1
+
+
+@pytest.mark.django_db
+def test_deja_de_avisar_etiqueta_si_se_vincula(catalogo, emitir):
+    etiqueta = _crear_etiqueta(catalogo, "INV-ETQ-10", dias_atras=31)
+    assert avisar_etiquetas_sin_vincular() == 1
+
+    etiqueta.estado = EtiquetaQR.EstadoEtiqueta.VINCULADA
+    etiqueta.save(update_fields=["estado"])
+
+    assert AvisoPorUmbral.objects.filter(
+        regla=AvisoPorUmbral.REGLA_ETIQUETA_SIN_VINCULAR, objeto_id=etiqueta.pk
+    ).exists()
+    assert avisar_etiquetas_sin_vincular() == 0
+    assert not AvisoPorUmbral.objects.filter(
+        regla=AvisoPorUmbral.REGLA_ETIQUETA_SIN_VINCULAR, objeto_id=etiqueta.pk
+    ).exists()
+
+
+# =============================================================================
+# asignacion_sin_planilla (regla por reloj)
+# =============================================================================
+
+
+def _crear_movimiento_reasignacion(activo, *, con_planilla=False, dias_atras=0):
+    movimiento = HistorialMovimiento.objects.create(
+        activo=activo,
+        tipo_movimiento=HistorialMovimiento.TipoMovimiento.REASIGNACION,
+        descripcion="Reasignación de prueba",
+    )
+    if con_planilla:
+        movimiento.archivo_planilla.save(
+            "planilla.pdf", ContentFile(b"%PDF-1.4"), save=True
+        )
+    if dias_atras:
+        HistorialMovimiento.objects.filter(pk=movimiento.pk).update(
+            fecha_movimiento=timezone.now() - timedelta(days=dias_atras)
+        )
+        movimiento.refresh_from_db()
+    return movimiento
+
+
+@pytest.mark.django_db
+def test_reasignacion_reciente_no_es_candidata(catalogo):
+    act = _crear_activo(catalogo, "INV-PLA-1", catalogo["usuario_a"])
+    _crear_movimiento_reasignacion(act, dias_atras=1)
+    assert asignaciones_sin_planilla(dias=7) == []
+
+
+@pytest.mark.django_db
+def test_reasignacion_vieja_sin_planilla_es_candidata(catalogo):
+    act = _crear_activo(catalogo, "INV-PLA-2", catalogo["usuario_a"])
+    movimiento = _crear_movimiento_reasignacion(act, dias_atras=8)
+    assert asignaciones_sin_planilla(dias=7) == [movimiento]
+
+
+@pytest.mark.django_db
+def test_reasignacion_con_planilla_no_es_candidata(catalogo):
+    act = _crear_activo(catalogo, "INV-PLA-3", catalogo["usuario_a"])
+    _crear_movimiento_reasignacion(act, dias_atras=8, con_planilla=True)
+    assert asignaciones_sin_planilla(dias=7) == []
+
+
+@pytest.mark.django_db
+def test_avisa_una_reasignacion_con_deep_link_a_ficha_admin(catalogo, emitir):
+    act = _crear_activo(catalogo, "INV-PLA-4", catalogo["usuario_a"])
+    _crear_movimiento_reasignacion(act, dias_atras=8)
+
+    avisados = avisar_asignaciones_sin_planilla()
+
+    assert avisados == 1
+    [aviso] = _llamadas(emitir, CODIGO_ASIGNACION_SIN_PLANILLA)
+    assert "INV-PLA-4" in aviso["titulo"]
+    assert aviso["payload"]["url"].endswith(f"/activos/activos/{act.pk}/")
+    assert "usuario_ids" not in aviso["payload"]
+
+
+@pytest.mark.django_db
+def test_avisa_varias_reasignaciones_en_un_solo_evento(catalogo, emitir):
+    act1 = _crear_activo(catalogo, "INV-PLA-5", catalogo["usuario_a"])
+    act2 = _crear_activo(catalogo, "INV-PLA-6", catalogo["usuario_b"])
+    _crear_movimiento_reasignacion(act1, dias_atras=8)
+    _crear_movimiento_reasignacion(act2, dias_atras=8)
+
+    avisados = avisar_asignaciones_sin_planilla()
+
+    assert avisados == 2
+    [aviso] = _llamadas(emitir, CODIGO_ASIGNACION_SIN_PLANILLA)
+    assert len(aviso["payload"]["movimiento_ids"]) == 2
+    assert aviso["payload"]["url"].endswith("/activos/")
+
+
+@pytest.mark.django_db
+def test_no_repite_aviso_planilla_mientras_no_se_archive(catalogo, emitir):
+    act = _crear_activo(catalogo, "INV-PLA-7", catalogo["usuario_a"])
+    _crear_movimiento_reasignacion(act, dias_atras=8)
+
+    assert avisar_asignaciones_sin_planilla() == 1
+    assert avisar_asignaciones_sin_planilla() == 0
+    assert len(_llamadas(emitir, CODIGO_ASIGNACION_SIN_PLANILLA)) == 1
+
+
+@pytest.mark.django_db
+def test_deja_de_avisar_planilla_si_se_archiva(catalogo, emitir):
+    act = _crear_activo(catalogo, "INV-PLA-8", catalogo["usuario_a"])
+    movimiento = _crear_movimiento_reasignacion(act, dias_atras=8)
+    assert avisar_asignaciones_sin_planilla() == 1
+
+    movimiento.archivo_planilla.save("planilla.pdf", ContentFile(b"%PDF-1.4"), save=True)
+
+    assert AvisoPorUmbral.objects.filter(
+        regla=AvisoPorUmbral.REGLA_ASIGNACION_SIN_PLANILLA, objeto_id=movimiento.pk
+    ).exists()
+    assert avisar_asignaciones_sin_planilla() == 0
+    assert not AvisoPorUmbral.objects.filter(
+        regla=AvisoPorUmbral.REGLA_ASIGNACION_SIN_PLANILLA, objeto_id=movimiento.pk
+    ).exists()
+
+
+# =============================================================================
+# Despachador: las dos reglas nuevas
+# =============================================================================
+
+
+@pytest.mark.django_db
+def test_comando_ejecuta_etiqueta_sin_vincular(catalogo, emitir):
+    _crear_etiqueta(catalogo, "INV-ETQ-CMD", dias_atras=31)
+    call_command(
+        "enviar_notificaciones_activos", "--regla", "etiqueta_sin_vincular", "--ahora"
+    )
+    assert len(_llamadas(emitir, CODIGO_ETIQUETA_SIN_VINCULAR)) == 1
+
+
+@pytest.mark.django_db
+def test_comando_ejecuta_asignacion_sin_planilla(catalogo, emitir):
+    act = _crear_activo(catalogo, "INV-PLA-CMD", catalogo["usuario_a"])
+    _crear_movimiento_reasignacion(act, dias_atras=8)
+    call_command(
+        "enviar_notificaciones_activos", "--regla", "asignacion_sin_planilla", "--ahora"
+    )
+    assert len(_llamadas(emitir, CODIGO_ASIGNACION_SIN_PLANILLA)) == 1
+
+
+@pytest.mark.django_db
+def test_comando_dry_run_etiqueta_no_envia_nada(catalogo, emitir):
+    _crear_etiqueta(catalogo, "INV-ETQ-CMD2", dias_atras=31)
+    salida = StringIO()
+    call_command(
+        "enviar_notificaciones_activos",
+        "--regla", "etiqueta_sin_vincular",
+        "--ahora",
+        "--dry-run",
+        stdout=salida,
+    )
+    emitir.assert_not_called()
+    assert "se avisaría por 1 etiqueta(s)" in salida.getvalue()

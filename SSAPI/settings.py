@@ -208,6 +208,18 @@ PALDACA_NOTIFICACIONES_ACTIVAS = (
     os.getenv("PALDACA_NOTIFICACIONES_ACTIVAS", "true").lower() == "true"
 )
 
+# Umbrales de las reglas por reloj (enviar_notificaciones_activos). Mismos
+# defaults que el catalogo sembrado en el Portal (TipoNotificacion.umbral_dias,
+# editable ahi sin deploy) -- Activos todavia no lee ese valor en caliente via
+# API, asi que por ahora el numero real que se evalua es este. Cambiarlo aqui
+# solo requiere una variable de entorno, no tocar codigo.
+ACTIVOS_UMBRAL_ETIQUETA_SIN_VINCULAR_DIAS = int(
+    os.getenv("ACTIVOS_UMBRAL_ETIQUETA_SIN_VINCULAR_DIAS", "30")
+)
+ACTIVOS_UMBRAL_ASIGNACION_SIN_PLANILLA_DIAS = int(
+    os.getenv("ACTIVOS_UMBRAL_ASIGNACION_SIN_PLANILLA_DIAS", "7")
+)
+
 # Quien puede enmarcar este satelite. Sustituye a X-Frame-Options, que no
 # admite lista de origenes (SAMEORIGIN no vale: son origenes distintos).
 _frame_ancestors = ["'self'", PALDACA_PORTAL_URL]

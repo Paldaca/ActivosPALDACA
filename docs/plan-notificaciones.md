@@ -34,6 +34,8 @@ Y adelantado de la Fase 2 (ver abajo):
 | Evento | Dónde se emite | Audiencia |
 |--------|-----------------|-----------|
 | `activos.usuario_inactivo_con_equipos` | `enviar_notificaciones_activos` (despachador diario, 08:00) | Admins de Activos |
+| `activos.etiqueta_sin_vincular` | `enviar_notificaciones_activos` (despachador diario, 09:00) | Quien creó la etiqueta (si se registró) + admins |
+| `activos.asignacion_sin_planilla` | `enviar_notificaciones_activos` (despachador diario, 10:00) | Admins de Activos |
 
 Implementación: `activos/services/avisos.py`, `activos/services/notificaciones_portal.py` (cliente
 firmado, idéntico al de HDT y Códigos). Tests: `activos/tests/test_notificaciones.py`. Cron:
@@ -220,27 +222,41 @@ de Activos temporal creado a mano para la prueba, porque hoy nadie tiene ese rol
 bloqueante en sección 1): el aviso funciona, pero en producción no le llega a nadie hasta que se
 asigne el rol.
 
-#### Resto de la Fase 2 — pendiente
+#### `etiqueta_sin_vincular` / `asignacion_sin_planilla` — hechas (septiembre 2026)
 
-Ya no bloqueado por las decisiones #2-#4 (ver sección 5): `activos.mantenimiento_estancado`,
-`activos.etiqueta_sin_vincular` y `activos.asignacion_sin_planilla` están sembrados en el Portal
-con `umbral_dias` por defecto (15 / 30 / 7 días, editable en `/configuracion/notificaciones` sin
-deploy — Portal, migraciones `0011_tipo_umbral_dias`/`0012_seed_tipos_activos_fase2_umbral`).
+Implementadas en el mismo despachador que `usuario_inactivo_con_equipos`
+(`enviar_notificaciones_activos`, diario a las 09:00 y 10:00 respectivamente).
 
-Lo que falta es la lógica de **detección** en este repo, que el catálogo del Portal no resuelve
-por sí solo:
+- `activos/services/avisos.py`: `etiquetas_sin_vincular()` / `avisar_etiquetas_sin_vincular()`
+  (agrupa por `creada_por`: un aviso por creador — así el creador solo ve sus propias etiquetas,
+  no las de otros — que además siempre llega a admins vía la audiencia del tipo) y
+  `asignaciones_sin_planilla()` / `avisar_asignaciones_sin_planilla()` (un solo aviso agregado por
+  corrida, solo admins).
+- Dedup: **sí necesitaron marcador**, a diferencia de las reglas de HDT — la condición persiste
+  (una etiqueta sigue `PENDIENTE`, una reasignación sigue sin planilla) hasta que alguien actúa,
+  no se resuelve con el calendario. Se generalizó `AvisoUsuarioInactivo` en un modelo nuevo,
+  `AvisoPorUmbral` (`regla` + `objeto_id`), en vez de crear dos tablas casi idénticas.
+- ⚠️ **El umbral real que se evalúa hoy NO es el del Portal.** `TipoNotificacion.umbral_dias`
+  (Fase 2, sección anterior) sigue siendo solo catálogo: Activos no tiene un cliente que lo lea en
+  caliente vía `GET /api/notificaciones/tipos/` (ese endpoint además exige sesión de superadmin,
+  no sirve para un cron sin navegador). El número que de verdad se usa son las variables de
+  entorno `ACTIVOS_UMBRAL_ETIQUETA_SIN_VINCULAR_DIAS` / `ACTIVOS_UMBRAL_ASIGNACION_SIN_PLANILLA_DIAS`
+  (`SSAPI/settings.py`, mismos defaults: 30 / 7 días). Cambiar el valor en
+  `/configuracion/notificaciones` hoy no tiene ningún efecto en Activos — hace falta un endpoint
+  de lectura autenticado por firma de servicio (mismo patrón que la emisión) antes de que ese campo
+  sea la fuente de verdad real, o resignarse a que quede como metadato descriptivo.
+- 18 tests nuevos (`activos/tests/test_notificaciones.py`), verificado en vivo contra el Portal de
+  desarrollo — incluida una corrida real que encontró 9 reasignaciones legítimas ya vencidas en la
+  base compartida de desarrollo (dato real, no de prueba); los marcadores `AvisoPorUmbral`
+  generados se limpiaron después para no dejar el despachador de verdad con episodios ya
+  "avisados" sin que ningún admin real los haya visto.
 
-- `activos/services/avisos.py`: `mantenimientos_estancados()`, `etiquetas_sin_vincular()`,
-  `asignaciones_sin_planilla()` (cada una debe leer su propio `umbral_dias` — no hay todavía un
-  cliente en Activos que consulte `TipoNotificacion` del Portal; la forma más simple es que
-  `enviar_notificaciones_activos` lo traiga vía `GET /api/notificaciones/tipos/` firmado, o que
-  el umbral se pase como argumento del comando hasta que haga falta algo más fino) y sus
-  `avisar_*`.
-- Agregar esas tres reglas más `resumen_semanal_admins` (cada una a su horario, ver `HORARIOS` en
-  `enviar_notificaciones_activos`) al mismo despachador.
-- Dedup: a diferencia de `usuario_inactivo_con_equipos`, estas tres SÍ tienen una ventana natural
-  (el umbral en sí) — evaluar si necesitan el mismo patrón de marcador (`AvisoUsuarioInactivo`)
-  o si alcanza con re-emitir mientras la condición siga vigente.
+#### `mantenimiento_estancado` y `resumen_semanal_admins` — pendientes
+
+`mantenimiento_estancado` deliberadamente no se implementó en esta iteración. Trabajo restante
+para las dos: `activos/services/avisos.py` → `mantenimientos_estancados()` + `avisar_*`;
+`resumen_semanal_admins` (una vez por semana, agrega altas/reasignaciones/mantenimientos de los
+últimos 7 días); sumar ambas reglas a `HORARIOS` en `enviar_notificaciones_activos`.
 
 ### Fase 3 — Mantenimiento preventivo y garantía (solo si se decide el modelo)
 
@@ -286,11 +302,15 @@ las trataba como definitivas; como dato con default son triviales.
 
 1. ⚠️ **Decisión #1 (admins en el Portal) — sigue pendiente**, no es código, se puede resolver
    hoy. Bloquea el valor real de todo lo que ya está implementado con audiencia "admins":
-   `activo_creado` sin custodio, `activo_baja` y `usuario_inactivo_con_equipos`.
+   `activo_creado` sin custodio, `activo_baja`, `usuario_inactivo_con_equipos`,
+   `etiqueta_sin_vincular` y `asignacion_sin_planilla`.
 2. ~~Fase 1 (4 avisos de hecho)~~ — **hecha**.
 3. ~~Fase 2: `usuario_inactivo_con_equipos`~~ — **hecho**, adelantado del resto de la Fase 2 (ver
    sección 4). No esperó a la Fase 1 porque no comparte código con ella.
-4. Decisiones #2, #3, #4, #5.
-5. Fase 2: resto del despachador (`mantenimiento_estancado`, `etiqueta_sin_vincular`,
-   `asignacion_sin_planilla`, `resumen_semanal_admins`).
-6. Decisiones #6 y #7, y solo entonces evaluar la Fase 3.
+4. ~~Decisiones #2, #3, #4~~ (umbrales) — **resueltas** como configuración (sección 5). ~~Decisión
+   #5~~ (desasignado siempre avisa) — **resuelta** al construir la Fase 1.
+5. ~~Fase 2: `etiqueta_sin_vincular`, `asignacion_sin_planilla`~~ — **hechas**. Queda
+   `mantenimiento_estancado` (deliberadamente fuera de esta iteración) y `resumen_semanal_admins`.
+6. Cerrar la sincronización real Activos↔Portal de `umbral_dias` (hoy son dos números
+   independientes que dan la casualidad de coincidir en el valor por defecto).
+7. Decisiones #6 y #7, y solo entonces evaluar la Fase 3.
