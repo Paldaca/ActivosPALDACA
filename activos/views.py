@@ -969,6 +969,11 @@ class MisActivosListView(ModuloActivoRequiredMixin, ListView):
             .order_by('-fecha_actualizacion')
         )
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['en_mantenimiento'] = self.get_queryset().filter(estado='EM').count()
+        return context
+
 
 class MisActivoDetailView(ModuloActivoRequiredMixin, DetailView):
     """Ficha de solo lectura de un activo propio.

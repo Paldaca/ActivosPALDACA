@@ -12,31 +12,78 @@
 {% block content %}
 <div class="ax-page">
 
-    <header class="ax-hero">
-        <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
-            <div class="d-flex align-items-center gap-3 ax-min0">
-                <span class="ax-avatar ax-avatar--xl ax-avatar--c{{ request.user|tono_avatar }}" aria-hidden="true">
-                    {{ request.user|iniciales }}
-                </span>
-                <div class="ax-min0">
-                    <span class="ax-hero-eyebrow">
-                        {{ request.user.perfil.nombre|default:"Sin perfil asignado" }}
-                    </span>
-                    <h1 class="ax-hero-title">{{ request.user|nombre_completo }}</h1>
-                    <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
-                        <span class="ax-estado ax-estado--onhero">
-                            <span class="ax-estado-dot"></span> Activa
+    <div class="row g-3">
+
+        {# ================================================================= #}
+        {#  Tarjeta de perfil (fija a la izquierda)                          #}
+        {# ================================================================= #}
+        <div class="col-lg-4">
+            <div class="ax-sticky d-flex flex-column gap-3">
+
+                <section class="ax-card">
+                    <div class="ax-card-body text-center">
+                        <span class="ax-avatar ax-avatar--xl ax-avatar--c{{ request.user|tono_avatar }} mx-auto"
+                              aria-hidden="true">
+                            {{ request.user|iniciales }}
                         </span>
-                        {% if request.user.disciplina %}
-                        <span class="ax-estado ax-estado--onhero">{{ request.user.disciplina.nombre }}</span>
-                        {% endif %}
+                        <h1 class="ax-hero-title mt-3 mb-1" style="font-size:1.35rem;">
+                            {{ request.user|nombre_completo }}
+                        </h1>
+                        <p class="ax-hero-sub mb-2">
+                            {{ request.user.perfil.nombre|default:"Sin perfil asignado" }}
+                        </p>
+                        <div class="d-flex flex-wrap justify-content-center align-items-center gap-2">
+                            <span class="ax-estado ax-estado--disponible">
+                                <span class="ax-estado-dot"></span> Activa
+                            </span>
+                            {% if request.user.disciplina %}
+                            <span class="ax-estado">{{ request.user.disciplina.nombre }}</span>
+                            {% endif %}
+                        </div>
+
+                        <hr class="ax-divider">
+
+                        <div class="d-flex justify-content-center gap-4">
+                            <div>
+                                <div class="ax-hero-title" style="font-size:1.5rem;">{{ paginator.count }}</div>
+                                <div class="ax-spec-label">Equipos</div>
+                            </div>
+                            <div>
+                                <div class="ax-hero-title" style="font-size:1.5rem;">{{ en_mantenimiento }}</div>
+                                <div class="ax-spec-label">En mantenimiento</div>
+                            </div>
+                        </div>
                     </div>
-                </div>
+
+                    <hr class="ax-divider mx-3 my-0">
+
+                    <div class="ax-card-body">
+                        <div class="ax-spec" data-ax-stagger="6">
+                            <div class="ax-spec-item">
+                                <div class="ax-spec-label">Correo electrónico</div>
+                                <div class="ax-spec-value {% if not request.user.email %}ax-spec-value--muted{% endif %}">
+                                    {{ request.user.email|default:"No registrado" }}
+                                </div>
+                            </div>
+                            <div class="ax-spec-item">
+                                <div class="ax-spec-label">Teléfono</div>
+                                <div class="ax-spec-value {% if not request.user.telefono %}ax-spec-value--muted{% endif %}">
+                                    {{ request.user.telefono|default:"No registrado" }}
+                                </div>
+                            </div>
+                            <div class="ax-spec-item">
+                                <div class="ax-spec-label">Alta en el sistema</div>
+                                <div class="ax-spec-value">{{ request.user.date_joined|date:"d/m/Y" }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <p class="ax-hint text-center">
+                    ¿Algo no cuadra con tus equipos? Contacta al administrador de Activos.
+                </p>
             </div>
         </div>
-    </header>
-
-    <div class="row g-3">
 
         {# ================================================================= #}
         {#  Activos a cargo                                                  #}
@@ -121,48 +168,6 @@
                 </div>
                 {% endif %}
             </section>
-        </div>
-
-        {# ================================================================= #}
-        {#  Datos                                                            #}
-        {# ================================================================= #}
-        <div class="col-lg-4">
-            <div class="ax-sticky d-flex flex-column gap-3">
-
-                <section class="ax-card">
-                    <div class="ax-card-head"><h2 class="ax-card-title">Datos de contacto</h2></div>
-                    <div class="ax-card-body">
-                        <div class="ax-spec" data-ax-stagger="6">
-                            <div class="ax-spec-item">
-                                <div class="ax-spec-label">Correo electrónico</div>
-                                <div class="ax-spec-value {% if not request.user.email %}ax-spec-value--muted{% endif %}">
-                                    {{ request.user.email|default:"No registrado" }}
-                                </div>
-                            </div>
-                            <div class="ax-spec-item">
-                                <div class="ax-spec-label">Teléfono</div>
-                                <div class="ax-spec-value {% if not request.user.telefono %}ax-spec-value--muted{% endif %}">
-                                    {{ request.user.telefono|default:"No registrado" }}
-                                </div>
-                            </div>
-                            <div class="ax-spec-item">
-                                <div class="ax-spec-label">Perfil</div>
-                                <div class="ax-spec-value {% if not request.user.perfil %}ax-spec-value--muted{% endif %}">
-                                    {{ request.user.perfil.nombre|default:"Sin perfil asignado" }}
-                                </div>
-                            </div>
-                            <div class="ax-spec-item">
-                                <div class="ax-spec-label">Alta en el sistema</div>
-                                <div class="ax-spec-value">{{ request.user.date_joined|date:"d/m/Y" }}</div>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-
-                <p class="ax-hint text-center">
-                    ¿Algo no cuadra con tus equipos? Contacta al administrador de Activos.
-                </p>
-            </div>
         </div>
     </div>
 </div>
