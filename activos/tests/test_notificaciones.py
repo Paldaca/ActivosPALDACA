@@ -85,6 +85,7 @@ def test_reasignar_avisa_al_nuevo_custodio(
     assert aviso["payload"]["usuario_ids"] == [catalogo["usuario_b"].pk]
     assert "INV-NOTIF-1" in aviso["titulo"]
     assert "Luis" not in aviso["cuerpo"]  # el cuerpo nombra a quien asigna, no al custodio
+    assert aviso["payload"]["url"].endswith(f"/activos/mis-activos/{act.pk}/")
 
 
 @pytest.mark.django_db
@@ -116,7 +117,9 @@ def test_asignacion_masiva_agrupa_en_un_aviso(
     [aviso] = _llamadas(emitir, CODIGO_ACTIVO_ASIGNADO)
     assert aviso["titulo"] == "Se te asignaron 3 activos"
     assert sorted(aviso["payload"]["activo_ids"]) == sorted(a.pk for a in activos)
-    assert f"usuario_asignado={catalogo['usuario_b'].pk}" in aviso["payload"]["url"]
+    # Deep link a "Mis Activos": el custodio puede no ser administrador y no
+    # tiene por qué poder abrir el listado general filtrado por query param.
+    assert aviso["payload"]["url"].endswith("/activos/mis-activos/")
 
 
 @pytest.mark.django_db

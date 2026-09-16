@@ -17,7 +17,12 @@ from .forms import (
     ActivoForm, ActivoFilterForm, ReasignarActivoForm, ReubicarActivoForm,
     usuarios_asignables,
 )
-from .decorators import ModuloActivoRequiredMixin, requiere_modulo_paldaca
+from .decorators import (
+    AdminActivoRequiredMixin,
+    ModuloActivoRequiredMixin,
+    requiere_admin_activo,
+    requiere_modulo_paldaca,
+)
 from .services.avisos import avisar_activo_creado, avisar_activos_asignados
 
 
@@ -92,7 +97,7 @@ def _resumen_inventario():
     )
 
 # ============== VISTAS DE CATEGORÍA ==============
-class CategoriaListView(ModuloActivoRequiredMixin, ListView):
+class CategoriaListView(AdminActivoRequiredMixin, ListView):
     model = Categoria
     template_name = 'activos/categoria/list.html'
     context_object_name = 'categorias'
@@ -108,7 +113,7 @@ class CategoriaListView(ModuloActivoRequiredMixin, ListView):
         ).order_by('nombre')
 
 
-class CategoriaCreateView(ModuloActivoRequiredMixin, CreateView):
+class CategoriaCreateView(AdminActivoRequiredMixin, CreateView):
     model = Categoria
     form_class = CategoriaForm
     template_name = 'activos/categoria/form.html'
@@ -119,7 +124,7 @@ class CategoriaCreateView(ModuloActivoRequiredMixin, CreateView):
         return super().form_valid(form)
 
 
-class CategoriaUpdateView(ModuloActivoRequiredMixin, UpdateView):
+class CategoriaUpdateView(AdminActivoRequiredMixin, UpdateView):
     model = Categoria
     form_class = CategoriaForm
     template_name = 'activos/categoria/form.html'
@@ -130,7 +135,7 @@ class CategoriaUpdateView(ModuloActivoRequiredMixin, UpdateView):
         return super().form_valid(form)
 
 
-class CategoriaDeleteView(SinPaginaDeBorradoMixin, ModuloActivoRequiredMixin, DeleteView):
+class CategoriaDeleteView(SinPaginaDeBorradoMixin, AdminActivoRequiredMixin, DeleteView):
     model = Categoria
     success_url = reverse_lazy('activos:categoria-list')
 
@@ -152,7 +157,7 @@ class CategoriaDeleteView(SinPaginaDeBorradoMixin, ModuloActivoRequiredMixin, De
 
 # ============== VISTAS DE SUBCATEGORÍA ==============
 
-class SubCategoriaListView(ModuloActivoRequiredMixin, ListView):
+class SubCategoriaListView(AdminActivoRequiredMixin, ListView):
     model = SubCategoria
     template_name = 'activos/subcategoria/list.html'
     context_object_name = 'subcategorias'
@@ -173,7 +178,7 @@ class SubCategoriaListView(ModuloActivoRequiredMixin, ListView):
         return context
 
 
-class SubCategoriaCreateView(ModuloActivoRequiredMixin, CreateView):
+class SubCategoriaCreateView(AdminActivoRequiredMixin, CreateView):
     model = SubCategoria
     form_class = SubCategoriaForm
     template_name = 'activos/subcategoria/form.html'
@@ -184,7 +189,7 @@ class SubCategoriaCreateView(ModuloActivoRequiredMixin, CreateView):
         return super().form_valid(form)
 
 
-class SubCategoriaUpdateView(ModuloActivoRequiredMixin, UpdateView):
+class SubCategoriaUpdateView(AdminActivoRequiredMixin, UpdateView):
     model = SubCategoria
     form_class = SubCategoriaForm
     template_name = 'activos/subcategoria/form.html'
@@ -195,7 +200,7 @@ class SubCategoriaUpdateView(ModuloActivoRequiredMixin, UpdateView):
         return super().form_valid(form)
 
 
-class SubCategoriaDeleteView(SinPaginaDeBorradoMixin, ModuloActivoRequiredMixin, DeleteView):
+class SubCategoriaDeleteView(SinPaginaDeBorradoMixin, AdminActivoRequiredMixin, DeleteView):
     model = SubCategoria
     success_url = reverse_lazy('activos:subcategoria-list')
     
@@ -214,7 +219,7 @@ class SubCategoriaDeleteView(SinPaginaDeBorradoMixin, ModuloActivoRequiredMixin,
 
 # ============== VISTAS DE UBICACIÓN ==============
 
-class UbicacionListView(ModuloActivoRequiredMixin, ListView):
+class UbicacionListView(AdminActivoRequiredMixin, ListView):
     model = Ubicacion
     template_name = 'activos/ubicacion/list.html'
     context_object_name = 'ubicaciones'
@@ -226,7 +231,7 @@ class UbicacionListView(ModuloActivoRequiredMixin, ListView):
         ).order_by('nombre')
 
 
-class UbicacionCreateView(ModuloActivoRequiredMixin, CreateView):
+class UbicacionCreateView(AdminActivoRequiredMixin, CreateView):
     model = Ubicacion
     form_class = UbicacionForm
     template_name = 'activos/ubicacion/form.html'
@@ -237,7 +242,7 @@ class UbicacionCreateView(ModuloActivoRequiredMixin, CreateView):
         return super().form_valid(form)
 
 
-class UbicacionUpdateView(ModuloActivoRequiredMixin, UpdateView):
+class UbicacionUpdateView(AdminActivoRequiredMixin, UpdateView):
     model = Ubicacion
     form_class = UbicacionForm
     template_name = 'activos/ubicacion/form.html'
@@ -248,7 +253,7 @@ class UbicacionUpdateView(ModuloActivoRequiredMixin, UpdateView):
         return super().form_valid(form)
 
 
-class UbicacionDeleteView(SinPaginaDeBorradoMixin, ModuloActivoRequiredMixin, DeleteView):
+class UbicacionDeleteView(SinPaginaDeBorradoMixin, AdminActivoRequiredMixin, DeleteView):
     model = Ubicacion
     success_url = reverse_lazy('activos:ubicacion-list')
     
@@ -267,7 +272,7 @@ class UbicacionDeleteView(SinPaginaDeBorradoMixin, ModuloActivoRequiredMixin, De
 
 # ============== VISTAS DE ACTIVO ==============
 
-class ActivoListView(ModuloActivoRequiredMixin, ListView):
+class ActivoListView(AdminActivoRequiredMixin, ListView):
     model = Activo
     template_name = 'activos/activo/list.html'
     context_object_name = 'activos'
@@ -388,7 +393,7 @@ class ActivoListView(ModuloActivoRequiredMixin, ListView):
 
 
 @require_GET
-@requiere_modulo_paldaca
+@requiere_admin_activo
 def buscar_usuarios_asignables(request):
     """Return a small, searchable page of assignable people."""
     query = (request.GET.get('q') or '').strip()[:80]
@@ -416,7 +421,7 @@ def buscar_usuarios_asignables(request):
     })
 
 
-class ActivoDetailView(ModuloActivoRequiredMixin, DetailView):
+class ActivoDetailView(AdminActivoRequiredMixin, DetailView):
     model = Activo
     template_name = 'activos/activo/detail.html'
     context_object_name = 'activo'
@@ -466,7 +471,7 @@ class ActivoFormContextMixin:
         return context
 
 
-class ActivoCreateView(ActivoFormContextMixin, ModuloActivoRequiredMixin, CreateView):
+class ActivoCreateView(ActivoFormContextMixin, AdminActivoRequiredMixin, CreateView):
     model = Activo
     form_class = ActivoForm
     template_name = 'activos/activo/form.html'
@@ -520,7 +525,7 @@ class ActivoCreateView(ActivoFormContextMixin, ModuloActivoRequiredMixin, Create
         return redirect(destino)
 
 
-class ActivoUpdateView(ActivoFormContextMixin, ModuloActivoRequiredMixin, UpdateView):
+class ActivoUpdateView(ActivoFormContextMixin, AdminActivoRequiredMixin, UpdateView):
     model = Activo
     form_class = ActivoForm
     template_name = 'activos/activo/form.html'
@@ -572,7 +577,7 @@ class ActivoUpdateView(ActivoFormContextMixin, ModuloActivoRequiredMixin, Update
         return response
 
 
-class ActivoDeleteView(SinPaginaDeBorradoMixin, ModuloActivoRequiredMixin, DeleteView):
+class ActivoDeleteView(SinPaginaDeBorradoMixin, AdminActivoRequiredMixin, DeleteView):
     model = Activo
     success_url = reverse_lazy('activos:activo-list')
 
@@ -635,7 +640,7 @@ def _registrar_reasignacion_en_historial(activo, usuario_anterior, usuario_nuevo
 
 # ============== VISTAS ESPECIALES DE ACTIVO ==============
 
-@requiere_modulo_paldaca
+@requiere_admin_activo
 def reasignar_activo(request, pk):
     """Reasigna un activo a otra persona.
 
@@ -710,7 +715,7 @@ def reasignar_activo(request, pk):
     })
 
 
-@requiere_modulo_paldaca
+@requiere_admin_activo
 def reubicar_activo(request, pk):
     """Reubica un activo. Mismo contrato que `reasignar_activo`."""
     activo = get_object_or_404(
@@ -766,7 +771,7 @@ def _nombre(usuario):
 
 
 @require_POST
-@requiere_modulo_paldaca
+@requiere_admin_activo
 def crear_rapido(request, tipo):
     """Alta express de catálogo sin abandonar el formulario de activos.
 
@@ -829,7 +834,7 @@ def crear_rapido(request, tipo):
 
 
 @require_POST
-@requiere_modulo_paldaca
+@requiere_admin_activo
 def acciones_masivas(request):
     """Reasigna o reubica varios activos en un solo envío.
 
@@ -920,7 +925,7 @@ def acciones_masivas(request):
     return redirect(volver)
 
 
-class ActivoHistorialView(ModuloActivoRequiredMixin, DetailView):
+class ActivoHistorialView(AdminActivoRequiredMixin, DetailView):
     """Vista para mostrar el historial de movimientos de un activo"""
     model = Activo
     template_name = 'activos/activo/historial.html'
@@ -937,5 +942,66 @@ class ActivoHistorialView(ModuloActivoRequiredMixin, DetailView):
             self.object.historial_movimientos
             .select_related('usuario')
             .order_by('-fecha_movimiento')
+        )
+        return context
+
+
+# ============== "MIS ACTIVOS" — vista propia del usuario dueño ==============
+#
+# A diferencia de todo lo anterior, estas dos vistas exigen solo acceso al
+# módulo (ModuloActivoRequiredMixin), no rol administrador: son la única
+# ventana al inventario que tiene un usuario sin ese rol, y muestran
+# exclusivamente lo que tiene asignado (nunca el inventario completo).
+
+
+class MisActivosListView(ModuloActivoRequiredMixin, ListView):
+    """Los activos asignados al usuario que hace la petición. Nada más."""
+
+    model = Activo
+    template_name = 'activos/mis_activos/list.html'
+    context_object_name = 'activos'
+    paginate_by = 20
+
+    def get_queryset(self):
+        return (
+            Activo.objects.filter(usuario_asignado=self.request.user)
+            .select_related('subcategoria__categoria', 'ubicacion')
+            .order_by('-fecha_actualizacion')
+        )
+
+
+class MisActivoDetailView(ModuloActivoRequiredMixin, DetailView):
+    """Ficha de solo lectura de un activo propio.
+
+    El queryset ya filtra por dueño: pedir el detalle de un activo ajeno da
+    404, igual que si no existiera — no se distingue "no es tuyo" de "no
+    existe" para no confirmar la existencia de códigos de otras personas.
+    """
+
+    model = Activo
+    template_name = 'activos/mis_activos/detail.html'
+    context_object_name = 'activo'
+
+    def get_queryset(self):
+        return (
+            Activo.objects.filter(usuario_asignado=self.request.user)
+            .select_related('subcategoria__categoria', 'ubicacion')
+        )
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['movimientos_recientes'] = (
+            self.object.historial_movimientos.order_by('-fecha_movimiento')[:6]
+        )
+        context['mantenimientos_recientes'] = list(
+            self.object.mantenimientos.order_by('-fecha')[:10]
+        )
+        from activos.models import EtiquetaQR
+
+        context['etiqueta_vigente'] = (
+            self.object.etiquetas
+            .filter(estado=EtiquetaQR.EstadoEtiqueta.VINCULADA)
+            .order_by('-fecha_vinculacion')
+            .first()
         )
         return context

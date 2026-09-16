@@ -15,6 +15,7 @@ def usuario_activos_admin(db, client):
         password="test-pass-123",
         first_name="Admin",
         last_name="Activos",
+        rol=UserModel.ROL_ADMINISTRADOR,
     )
     modulo, _ = Modulo.objects.get_or_create(
         codigo="activos", defaults={"nombre": "Activos"}

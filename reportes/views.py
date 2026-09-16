@@ -4,7 +4,13 @@ from django.contrib import messages
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404, redirect
 
-from activos.decorators import requiere_modulo_paldaca
+from django.http import HttpResponseForbidden
+
+from activos.decorators import (
+    requiere_admin_activo,
+    requiere_modulo_paldaca,
+    usuario_es_admin_activos,
+)
 from activos.forms import GenerarEtiquetasForm
 from activos.models import Activo, EtiquetaQR, HistorialMovimiento
 
@@ -61,10 +67,15 @@ def _error_entrega(activos):
     return None
 
 
-def _redirect_planilla(ids):
+_es_admin_activos = usuario_es_admin_activos
+
+
+def _redirect_planilla(request, ids):
+    admin = _es_admin_activos(request)
     if len(ids) == 1:
-        return redirect("activos:activo-detail", pk=ids[0])
-    return redirect("activos:activo-list")
+        destino = "activos:activo-detail" if admin else "activos:mis-activos-detail"
+        return redirect(destino, pk=ids[0])
+    return redirect("activos:activo-list" if admin else "activos:mis-activos-list")
 
 
 def _respuesta_archivo_pdf(campo, nombre):
@@ -88,7 +99,7 @@ def _respuesta_planilla(request, ids, observaciones=""):
     error = _error_entrega(activos)
     if error:
         messages.error(request, error)
-        return _redirect_planilla(ids)
+        return _redirect_planilla(request, ids)
     try:
         return exportar_asignacion_pdf(
             activos,
@@ -97,10 +108,10 @@ def _respuesta_planilla(request, ids, observaciones=""):
         )
     except Exception as exc:
         messages.error(request, f"Error al generar la planilla: {exc}")
-        return _redirect_planilla(ids)
+        return _redirect_planilla(request, ids)
 
 
-@requiere_modulo_paldaca
+@requiere_admin_activo
 def generar_reporte_activos(request):
     """PDF del inventario filtrado (template reportes/reporte_activos.html)."""
     try:
@@ -110,7 +121,7 @@ def generar_reporte_activos(request):
         return redirect("activos:activo-list")
 
 
-@requiere_modulo_paldaca
+@requiere_admin_activo
 def exportar_activos_excel(request):
     """Excel del inventario con los mismos filtros del listado."""
     try:
@@ -120,13 +131,13 @@ def exportar_activos_excel(request):
         return redirect("activos:activo-list")
 
 
-@requiere_modulo_paldaca
+@requiere_admin_activo
 def generar_nota_entrega(request):
     """Compatibilidad: la nota de entrega ahora es la planilla."""
     return constancia_asignacion(request)
 
 
-@requiere_modulo_paldaca
+@requiere_admin_activo
 def constancia_asignacion(request):
     """Generate the assignment planilla PDF on demand."""
     ids = _ids_desde_request(request)
@@ -143,23 +154,37 @@ def constancia_asignacion(request):
     return _respuesta_planilla(request, ids, observaciones)
 
 
+def _puede_ver_planilla_de(request, activo):
+    """Admin, o el custodio actual del equipo. Nadie más, aunque tenga el módulo."""
+    return _es_admin_activos(request) or activo.usuario_asignado_id == request.user.pk
+
+
 @requiere_modulo_paldaca
 def descargar_planilla_vigente(request, pk):
     """Generate the current assignment planilla for one asset."""
     activo = get_object_or_404(Activo, pk=pk)
+    if not _puede_ver_planilla_de(request, activo):
+        return HttpResponseForbidden("No tienes acceso a este documento.")
     if not activo.usuario_asignado_id:
         messages.error(request, "Este equipo no tiene responsable asignado.")
-        return redirect("activos:activo-detail", pk=pk)
+        return _redirect_planilla(request, [pk])
     return _respuesta_planilla(request, [pk])
 
 
 @requiere_modulo_paldaca
 def descargar_planilla_historial(request, pk):
-    """Serve the planilla snapshot attached to a movement."""
+    """Serve the planilla snapshot attached to a movement.
+
+    El dueño elegible es el custodio ACTUAL del activo, no quien lo tenía en el
+    momento de ese movimiento — mismo criterio simple que el resto de "Mis
+    Activos": solo lo que tienes asignado hoy.
+    """
     movimiento = get_object_or_404(
         HistorialMovimiento.objects.select_related("activo"),
         pk=pk,
     )
+    if not _puede_ver_planilla_de(request, movimiento.activo):
+        return HttpResponseForbidden("No tienes acceso a este documento.")
     return _respuesta_archivo_pdf(
         movimiento.archivo_planilla,
         f"planilla_{movimiento.activo.codigo_inventario}.pdf",
@@ -185,7 +210,7 @@ def _ids_etiquetas_desde_request(request) -> list[str]:
     return ids
 
 
-@requiere_modulo_paldaca
+@requiere_admin_activo
 def imprimir_etiquetas(request):
     """Hoja Avery 5160 con las etiquetas cuyos ids llegan en `?ids=1,2,3`."""
     max_etiquetas = GenerarEtiquetasForm.MAX_POR_LOTE

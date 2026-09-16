@@ -3,6 +3,8 @@ from pathlib import Path
 
 from django.conf import settings
 
+from activos.decorators import usuario_es_admin_activos
+
 from .embed import is_embedded
 
 
@@ -48,4 +50,5 @@ def paldaca_urls(request):
         "paldaca_nav_logo_compact": f"{portal_url}/images/logo%20blanco%20recortado.png",
         "paldaca_nav_current_app": settings.PALDACA_MODULO_CODIGO,
         "paldaca_embedded": is_embedded(request),
+        "es_admin_activos": usuario_es_admin_activos(request),
     }

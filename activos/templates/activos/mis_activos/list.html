@@ -1,0 +1,82 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load cache_bust %}
+{% load activo_filters %}
+
+{% block title %}Mis Activos - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static_v 'css/activos-ui.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="ax-page">
+
+    <header class="ax-hero">
+        <div>
+            <span class="ax-hero-eyebrow"><i class="bi bi-person-badge"></i> Mis equipos</span>
+            <h1 class="ax-hero-title">
+                <img src="{% static 'core/img/Iconos/activos.svg' %}" alt="" aria-hidden="true">
+                Mis Activos
+            </h1>
+            <p class="ax-hero-sub">
+                Los activos que tienes asignados hoy. Si algo cambia de responsable,
+                lo verás reflejado aquí y recibirás un aviso en la campana.
+            </p>
+        </div>
+    </header>
+
+    {% if activos %}
+    <div class="ax-table-wrap">
+        <table class="ax-table">
+            <thead>
+                <tr>
+                    <th scope="col">Código</th>
+                    <th scope="col">Equipo</th>
+                    <th scope="col">Categoría</th>
+                    <th scope="col">Ubicación</th>
+                    <th scope="col">Estado</th>
+                    <th scope="col" class="ax-col-tight text-end">
+                        <span class="visually-hidden">Ver</span>
+                    </th>
+                </tr>
+            </thead>
+            <tbody data-ax-stagger="12">
+                {% for activo in activos %}
+                <tr>
+                    <td data-label="Código">
+                        <span class="ax-code ax-code--plain">{{ activo.codigo_inventario }}</span>
+                    </td>
+                    <td data-label="Equipo">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="bi {{ activo|icono_activo }}" aria-hidden="true"></i>
+                            <span>{{ activo.marca }} {{ activo.modelo }}</span>
+                        </div>
+                    </td>
+                    <td data-label="Categoría">{{ activo.subcategoria.categoria.nombre }}</td>
+                    <td data-label="Ubicación">{{ activo.ubicacion.nombre }}</td>
+                    <td data-label="Estado">{% badge_estado activo %}</td>
+                    <td class="text-end ax-col-tight" data-label="Ver">
+                        <a href="{% url 'activos:mis-activos-detail' activo.pk %}"
+                           class="btn-pastel btn-pastel--neutro btn-pastel--icon" title="Ver detalle">
+                            <i class="bi bi-eye"></i>
+                            <span class="visually-hidden">Ver {{ activo.codigo_inventario }}</span>
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% include 'activos/includes/_paginacion.html' %}
+    {% else %}
+    <div class="ax-empty py-5">
+        <div class="ax-empty-icon">
+            <i class="bi bi-person-dash"></i>
+        </div>
+        <h3>No tienes activos asignados</h3>
+        <p>Cuando te asignen un equipo, aparecerá en esta lista y recibirás un aviso.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

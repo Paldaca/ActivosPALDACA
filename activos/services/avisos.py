@@ -22,8 +22,14 @@ def _descripcion(activo):
     return f"{equipo} · {activo.ubicacion.nombre}" if activo.ubicacion_id else equipo
 
 
-def _url_ficha(activo):
+def _url_ficha_admin(activo):
+    """Ficha de gestión: solo la ven administradores de Activos."""
     return url_en_portal(reverse("activos:activo-detail", args=[activo.pk]))
+
+
+def _url_ficha_propia(activo):
+    """Ficha de solo lectura del custodio: lo único que puede abrir sin ser admin."""
+    return url_en_portal(reverse("activos:mis-activos-detail", args=[activo.pk]))
 
 
 def avisar_activo_creado(activo, emisor):
@@ -32,7 +38,7 @@ def avisar_activo_creado(activo, emisor):
     Con custodio no se emite además `activo_asignado`: el mismo aviso lo cubre.
     """
     payload = {
-        "url": _url_ficha(activo),
+        "url": _url_ficha_admin(activo),
         "activo_id": activo.pk,
         "codigo_activo": activo.codigo_inventario,
     }
@@ -55,15 +61,13 @@ def avisar_activos_asignados(activos, usuario, emisor):
         activo = activos[0]
         titulo = f"Se te asignó el activo {activo.codigo_inventario}"
         cuerpo = f"{_nombre(emisor)} te asignó {_descripcion(activo)}."
-        url = _url_ficha(activo)
+        url = _url_ficha_propia(activo)
     else:
         titulo = f"Se te asignaron {len(activos)} activos"
         codigos = ", ".join(a.codigo_inventario for a in activos[:5])
         resto = f" y {len(activos) - 5} más" if len(activos) > 5 else ""
         cuerpo = f"{_nombre(emisor)} te asignó {codigos}{resto}."
-        url = url_en_portal(
-            f"{reverse('activos:activo-list')}?usuario_asignado={usuario.pk}"
-        )
+        url = url_en_portal(reverse("activos:mis-activos-list"))
     emitir_al_confirmar(
         codigo=CODIGO_ACTIVO_ASIGNADO,
         titulo=titulo,

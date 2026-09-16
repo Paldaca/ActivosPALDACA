@@ -6,7 +6,11 @@ from django.urls import reverse
 from django.views.decorators.http import require_POST
 from django.views.generic import CreateView, DetailView, ListView, UpdateView
 
-from activos.decorators import ModuloActivoRequiredMixin, requiere_modulo_paldaca
+from activos.decorators import (
+    AdminActivoRequiredMixin,
+    requiere_admin_activo,
+    requiere_modulo_paldaca,
+)
 
 from .forms import UsuarioForm
 
@@ -30,7 +34,7 @@ def _usuarios_gestion_queryset():
     )
 
 
-class UsuarioSearchView(ModuloActivoRequiredMixin, ListView):
+class UsuarioSearchView(AdminActivoRequiredMixin, ListView):
     """Buscador de personas asignables (core_usuario)."""
 
     model = UserModel
@@ -96,7 +100,7 @@ class UsuarioSearchView(ModuloActivoRequiredMixin, ListView):
         return context
 
 
-class UsuarioProfileView(ModuloActivoRequiredMixin, DetailView):
+class UsuarioProfileView(AdminActivoRequiredMixin, DetailView):
     """Perfil con los activos bajo responsabilidad de la persona."""
 
     model = UserModel
@@ -123,7 +127,7 @@ class UsuarioProfileView(ModuloActivoRequiredMixin, DetailView):
         return context
 
 
-class UsuarioCreateView(ModuloActivoRequiredMixin, CreateView):
+class UsuarioCreateView(AdminActivoRequiredMixin, CreateView):
     model = UserModel
     form_class = UsuarioForm
     template_name = "usuarios/usuario_form.html"
@@ -141,7 +145,7 @@ class UsuarioCreateView(ModuloActivoRequiredMixin, CreateView):
         return reverse("usuarios:usuario-profile", kwargs={"pk": self.object.pk})
 
 
-class UsuarioUpdateView(ModuloActivoRequiredMixin, UpdateView):
+class UsuarioUpdateView(AdminActivoRequiredMixin, UpdateView):
     model = UserModel
     form_class = UsuarioForm
     template_name = "usuarios/usuario_form.html"
@@ -159,7 +163,7 @@ class UsuarioUpdateView(ModuloActivoRequiredMixin, UpdateView):
 
 
 @require_POST
-@requiere_modulo_paldaca
+@requiere_admin_activo
 def cambiar_estado_usuario(request, pk):
     """Activa o desactiva a una persona. NUNCA borra la fila de core_usuario.
 

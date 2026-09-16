@@ -34,7 +34,9 @@ def test_presupuesto_listado_usuarios(client_auth, catalogo):
     _assert_query_budget(
         client_auth,
         reverse("usuarios:usuario-search"),
-        maximum=9,
+        # +1: AdminActivoRequiredMixin confirma rol administrador ademas del
+        # acceso al modulo (activos/decorators.py).
+        maximum=10,
     )
 
 
@@ -57,7 +59,9 @@ def test_presupuesto_perfil_usuario(client_auth, catalogo):
             "usuarios:usuario-profile",
             args=[catalogo["usuario_a"].pk],
         ),
-        maximum=8,
+        # +1: AdminActivoRequiredMixin confirma rol administrador ademas del
+        # acceso al modulo (activos/decorators.py).
+        maximum=9,
     )
 
 
@@ -66,7 +70,9 @@ def test_presupuesto_listado_activos(client_auth, catalogo):
     _assert_query_budget(
         client_auth,
         reverse("activos:activo-list"),
-        maximum=16,
+        # +1: AdminActivoRequiredMixin confirma rol administrador ademas del
+        # acceso al modulo (activos/decorators.py).
+        maximum=17,
     )
 
 

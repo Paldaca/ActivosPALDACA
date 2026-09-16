@@ -28,6 +28,30 @@ Solo reglas **identificadas en el código**. Cada entrada indica dónde se imple
 - **Implementación:** `core/middleware.py` → `PaldacaSessionMiddleware`; hash en `core/models.py` → `get_auth_revision()`.
 - **Configuración:** `PALDACA_STRICT_SESSION_CONSISTENCY` (default `"true"` en `SSAPI/settings.py`).
 
+### BR-ACC-04b — `rol=administrador` sí se aplica en Activos: gestión vs "Mis Activos"
+
+- **Regla:** Un usuario con acceso al módulo pero `rol=usuario` (no administrador, ni
+  superuser) **solo** puede ver los activos que tiene asignados (`usuario_asignado`),
+  en `activos:mis-activos-list` / `activos:mis-activos-detail`. Todo lo demás —
+  inventario general, catálogos, mantenimientos, personas, reportes, etiquetas QR —
+  exige `es_administrador_en_modulo("activos")`.
+- **Implementación:** `activos/decorators.py` → `AdminActivoRequiredMixin`,
+  `requiere_admin_activo()`, `usuario_es_admin_activos()` (cacheada en el `request`:
+  el dispatch de la vista, el mixin padre y el context processor del footer la piden
+  en la misma petición). `core/views.py` → `HomeView.get()` manda a quien no es admin
+  directo a `mis-activos-list`.
+- **Excepciones deliberadas** (no exigen admin, solo acceso al módulo):
+  - `activos:etiqueta-alta` (`/q/<token>/alta/`) — alta desde QR escaneado en móvil;
+    vive fuera del shell del Portal y no se tocó.
+  - `reportes:planilla-vigente` / `reportes:planilla-historial` — el custodio
+    **actual** del activo puede descargar su propia planilla, no solo un admin
+    (`reportes/views.py` → `_puede_ver_planilla_de()`).
+- **Deep link de notificaciones:** `activos.activo_creado` sigue apuntando a la ficha
+  de gestión (`activos:activo-detail`, solo admins la abren); `activos.activo_asignado`
+  apunta a `activos:mis-activos-detail` / `-list`, porque el destinatario es siempre
+  el custodio y puede no ser admin (`activos/services/avisos.py`).
+- **Tests:** `activos/tests/test_permisos_admin.py`.
+
 ### BR-ACC-04 — Roles globales PALDACA (catálogo, no enforcement en vistas Activos)
 
 - **Regla:** `UsuarioPaldaca.rol` ∈ `{usuario, administrador}`. Superuser tiene acceso global.
@@ -284,6 +308,5 @@ Solo reglas **identificadas en el código**. Cada entrada indica dónde se imple
 
 | Expectativa (documentación Suite) | Estado en Activos |
 |-----------------------------------|-------------------|
-| Permisos elevados para `rol=administrador` dentro del módulo | Método existe en modelo; **vistas no lo usan** |
 | Registro de reportes generados | Modelo existe; **vistas no persisten** |
 | Asignación de módulo al crear usuario desde Activos | **No implementado** en `UsuarioForm` |
