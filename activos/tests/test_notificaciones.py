@@ -1,14 +1,23 @@
 """Avisos al bus de notificaciones del Portal (alta y asignación de activos)."""
 
 import urllib.error
+from io import StringIO
 from unittest import mock
 
 import pytest
+from django.core.management import call_command
 from django.urls import reverse
+from django.utils import timezone
 
-from activos.models import Activo
+from activos.models import Activo, AvisoUsuarioInactivo
 from activos.services import notificaciones_portal
-from activos.services.avisos import CODIGO_ACTIVO_ASIGNADO, CODIGO_ACTIVO_CREADO
+from activos.services.avisos import (
+    CODIGO_ACTIVO_ASIGNADO,
+    CODIGO_ACTIVO_CREADO,
+    CODIGO_USUARIO_INACTIVO,
+    avisar_usuarios_inactivos_con_equipos,
+    usuarios_inactivos_con_equipos,
+)
 from activos.tests.test_activo_flow import _payload_activo
 
 
@@ -138,3 +147,153 @@ def test_portal_caido_no_impide_el_alta(
     assert r.status_code == 302
     assert Activo.objects.filter(marca="MarcaPy").exists()
     urlopen.assert_called_once()
+
+
+# =============================================================================
+# usuario_inactivo_con_equipos (regla por reloj — enviar_notificaciones_activos)
+# =============================================================================
+
+
+def _desactivar(usuario):
+    usuario.is_active = False
+    usuario.save(update_fields=["is_active"])
+
+
+@pytest.mark.django_db
+def test_usuario_activo_con_equipos_no_es_candidato(catalogo):
+    _crear_activo(catalogo, "INV-INACT-1", catalogo["usuario_a"])
+    assert usuarios_inactivos_con_equipos() == []
+
+
+@pytest.mark.django_db
+def test_usuario_inactivo_sin_equipos_no_es_candidato(catalogo):
+    _desactivar(catalogo["usuario_a"])
+    assert usuarios_inactivos_con_equipos() == []
+
+
+@pytest.mark.django_db
+def test_usuario_inactivo_con_equipos_es_candidato(catalogo):
+    _crear_activo(catalogo, "INV-INACT-2", catalogo["usuario_a"])
+    _desactivar(catalogo["usuario_a"])
+    assert usuarios_inactivos_con_equipos() == [catalogo["usuario_a"]]
+
+
+@pytest.mark.django_db
+def test_avisa_un_solo_usuario_con_deep_link_a_su_ficha(catalogo, emitir):
+    _crear_activo(catalogo, "INV-INACT-3", catalogo["usuario_a"])
+    _crear_activo(catalogo, "INV-INACT-4", catalogo["usuario_a"])
+    _desactivar(catalogo["usuario_a"])
+
+    avisados = avisar_usuarios_inactivos_con_equipos()
+
+    assert avisados == 1
+    [aviso] = _llamadas(emitir, CODIGO_USUARIO_INACTIVO)
+    assert aviso["payload"]["usuario_ids"] == [catalogo["usuario_a"].pk]
+    assert aviso["payload"]["url"].endswith(f"/usuarios/{catalogo['usuario_a'].pk}/perfil/")
+    assert "2 equipos" in aviso["titulo"]
+    assert AvisoUsuarioInactivo.objects.filter(usuario=catalogo["usuario_a"]).exists()
+
+
+@pytest.mark.django_db
+def test_avisa_varios_usuarios_en_un_solo_evento(catalogo, emitir):
+    _crear_activo(catalogo, "INV-INACT-5", catalogo["usuario_a"])
+    _crear_activo(catalogo, "INV-INACT-6", catalogo["usuario_b"])
+    _desactivar(catalogo["usuario_a"])
+    _desactivar(catalogo["usuario_b"])
+
+    avisados = avisar_usuarios_inactivos_con_equipos()
+
+    assert avisados == 2
+    [aviso] = _llamadas(emitir, CODIGO_USUARIO_INACTIVO)
+    assert sorted(aviso["payload"]["usuario_ids"]) == sorted(
+        [catalogo["usuario_a"].pk, catalogo["usuario_b"].pk]
+    )
+    assert aviso["payload"]["url"].endswith("/usuarios/")
+
+
+@pytest.mark.django_db
+def test_no_repite_el_aviso_mientras_sigue_inactivo(catalogo, emitir):
+    _crear_activo(catalogo, "INV-INACT-7", catalogo["usuario_a"])
+    _desactivar(catalogo["usuario_a"])
+
+    assert avisar_usuarios_inactivos_con_equipos() == 1
+    assert avisar_usuarios_inactivos_con_equipos() == 0
+    assert len(_llamadas(emitir, CODIGO_USUARIO_INACTIVO)) == 1
+
+
+@pytest.mark.django_db
+def test_vuelve_a_avisar_si_se_reactiva_y_recae(catalogo, emitir):
+    """El marcador se libera en la corrida que ve al usuario ya reactivado.
+
+    Si la reactivación y la nueva baja ocurren entre dos corridas del
+    despachador (sin ninguna corrida en medio que la detecte), el sistema no
+    tiene forma de saberlo: solo ve el estado actual. Por eso esta prueba
+    simula la corrida diaria que sí alcanza a ver la reactivación.
+    """
+    _crear_activo(catalogo, "INV-INACT-8", catalogo["usuario_a"])
+    _desactivar(catalogo["usuario_a"])
+    assert avisar_usuarios_inactivos_con_equipos() == 1
+
+    catalogo["usuario_a"].is_active = True
+    catalogo["usuario_a"].save(update_fields=["is_active"])
+    # Corrida intermedia: limpia el marcador (usuario activo, sin candidatos).
+    assert avisar_usuarios_inactivos_con_equipos() == 0
+    assert not AvisoUsuarioInactivo.objects.filter(usuario=catalogo["usuario_a"]).exists()
+
+    _desactivar(catalogo["usuario_a"])
+
+    assert avisar_usuarios_inactivos_con_equipos() == 1
+    assert len(_llamadas(emitir, CODIGO_USUARIO_INACTIVO)) == 2
+
+
+@pytest.mark.django_db
+def test_deja_de_avisar_si_pierde_todo_el_equipo(catalogo, emitir):
+    activo = _crear_activo(catalogo, "INV-INACT-9", catalogo["usuario_a"])
+    _desactivar(catalogo["usuario_a"])
+    assert avisar_usuarios_inactivos_con_equipos() == 1
+
+    activo.usuario_asignado = None
+    activo.save(update_fields=["usuario_asignado"])
+
+    assert AvisoUsuarioInactivo.objects.filter(usuario=catalogo["usuario_a"]).exists()
+    assert avisar_usuarios_inactivos_con_equipos() == 0
+    assert not AvisoUsuarioInactivo.objects.filter(usuario=catalogo["usuario_a"]).exists()
+
+
+@pytest.mark.django_db
+def test_sin_candidatos_no_llama_al_portal(catalogo, emitir):
+    assert avisar_usuarios_inactivos_con_equipos() == 0
+    emitir.assert_not_called()
+
+
+@pytest.mark.django_db
+def test_comando_dry_run_no_envia_nada(catalogo, emitir):
+    _crear_activo(catalogo, "INV-INACT-10", catalogo["usuario_a"])
+    _desactivar(catalogo["usuario_a"])
+
+    salida = StringIO()
+    call_command(
+        "enviar_notificaciones_activos",
+        "--dry-run",
+        "--ahora",
+        stdout=salida,
+    )
+    emitir.assert_not_called()
+    assert "se avisaría por 1 usuario" in salida.getvalue()
+
+
+@pytest.mark.django_db
+def test_comando_respeta_el_horario_salvo_con_ahora(catalogo, settings, emitir):
+    _crear_activo(catalogo, "INV-INACT-11", catalogo["usuario_a"])
+    _desactivar(catalogo["usuario_a"])
+
+    hora_equivocada = (timezone.localtime().hour + 1) % 24
+    with mock.patch(
+        "activos.management.commands.enviar_notificaciones_activos.timezone.localtime"
+    ) as localtime:
+        localtime.return_value = timezone.localtime().replace(hour=hora_equivocada)
+        call_command("enviar_notificaciones_activos")
+    emitir.assert_not_called()
+
+    call_command("enviar_notificaciones_activos", "--regla", "usuario_inactivo_con_equipos", "--ahora")
+    emitir.assert_called_once()

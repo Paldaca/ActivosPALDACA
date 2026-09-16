@@ -92,7 +92,7 @@ MODULO_CODIGO = "activos"  # activos/constants.py
 
 | Con | Cómo |
 |-----|------|
-| Portal-Paldaca | SSO, logout API, `paldaca-nav.js/css`, API menú, bus de notificaciones (POST firmado en alta/asignación — `activos/services/avisos.py`) |
+| Portal-Paldaca | SSO, logout API, `paldaca-nav.js/css`, API menú, bus de notificaciones: POST firmado al hecho (alta/asignación) y por reloj (`usuario_inactivo_con_equipos`, diario) — `activos/services/avisos.py`, `enviar_notificaciones_activos` |
 | MySQL compartido | `core_*` + `activos_*` + `django_session` |
 | Calidad/Codigos/HDT | Solo vía BD compartida (`core_*`), sin imports |
 
@@ -177,6 +177,7 @@ python manage.py migrate
 python manage.py seed_core_modulos
 python manage.py seed_activos_pal          # datos demo
 python manage.py etiquetar_activos --dry-run  # etiquetas QR para inventario existente
+python manage.py enviar_notificaciones_activos --dry-run  # avisos por reloj, ver CRON_ENDPOINT.md
 pytest                                      # SSAPI/settings_test
 python manage.py runserver 8001            # puerto oficial Suite (Portal .env.development)
 ```

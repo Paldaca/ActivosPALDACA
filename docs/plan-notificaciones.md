@@ -20,22 +20,31 @@ Ya integrado y en producción desde la Fase 3 del plan del Portal:
 | `activos.activo_creado` | `ActivoCreateView.form_valid()`, `etiqueta_alta()` | Admins de Activos (Portal) + custodio si ya viene asignado |
 | `activos.activo_asignado` | `ActivoUpdateView.form_valid()`, `reasignar_activo()`, `acciones_masivas()` | El nuevo custodio (la masiva agrupa en un solo aviso) |
 
+Y desde este mismo plan (adelantado de la Fase 2, ver abajo):
+
+| Evento | Dónde se emite | Audiencia |
+|--------|-----------------|-----------|
+| `activos.usuario_inactivo_con_equipos` | `enviar_notificaciones_activos` (despachador diario, 08:00) | Admins de Activos |
+
 Implementación: `activos/services/avisos.py`, `activos/services/notificaciones_portal.py` (cliente
-firmado, idéntico al de HDT y Códigos). Tests: `activos/tests/test_notificaciones.py`.
+firmado, idéntico al de HDT y Códigos). Tests: `activos/tests/test_notificaciones.py`. Cron:
+`CRON_ENDPOINT.md`.
 
 ### ⚠️ Bloqueante a resolver antes de sumar audiencia "admins"
 
-`activos.activo_creado` incluye a los **administradores del módulo Activos según el Portal**
-(`rol=administrador` + acceso a `activos`). Pero Activos **no aplica ese rol en sus vistas**
-(gap ya documentado en `docs/BUSINESS_RULES.md` → "Reglas NO implementadas": *"Permisos elevados
-para `rol=administrador` dentro del módulo: método existe en modelo; vistas no lo usan"*).
-Cualquiera con acceso al módulo puede dar de alta y asignar activos hoy.
+**Mitad resuelto.** `activos.activo_creado` incluye a los **administradores del módulo Activos
+según el Portal** (`rol=administrador` + acceso a `activos`). El gap de *enforcement* que este
+párrafo señalaba (Activos no aplicaba ese rol en sus vistas) ya se cerró: ver BR-ACC-04b en
+`docs/BUSINESS_RULES.md` — gestión ahora exige `AdminActivoRequiredMixin` /
+`@requiere_admin_activo`, y solo queda abierto a cualquiera con el módulo "Mis Activos".
 
-Si en el Portal nadie tiene ese rol en Activos, **todos** los avisos que este plan dirige a
-"admins" (usuario desactivado con equipos, mantenimiento estancado, etc.) no le llegan a nadie.
-**Acción previa a la Fase 2:** confirmar en `/configuracion/notificaciones` del Portal quiénes
-son `rol=administrador` en el módulo `activos`, o asignarlo a quien corresponda (típicamente
-quien hoy gestiona el inventario). No requiere cambios de código, solo datos.
+Lo que **sigue sin resolver** es la parte de datos: en la base compartida de desarrollo, a la
+fecha de este párrafo, **ningún usuario tiene `rol=administrador` en el módulo `activos`**
+(confirmado directamente contra la BD al implementar `usuario_inactivo_con_equipos`). Mientras
+eso no cambie, **todos** los avisos que este plan dirige a "admins" — incluido el que ya está en
+producción — no le llegan a nadie; es silencioso, no da error. **Acción pendiente, no es
+código:** asignar `rol=administrador` en el módulo `activos` a quien corresponda (típicamente
+quien hoy gestiona el inventario), desde el panel de superadmin del Portal.
 
 ---
 
@@ -147,28 +156,49 @@ prueba end-to-end contra el Portal de desarrollo (mismo procedimiento que se us�
 ### Fase 2 — Despachador por reloj
 
 **Objetivo:** los cinco avisos de la sección 3.2, con `enviar_notificaciones_activos` como
-Scheduled Task de Coolify — cada hora, igual que `enviar_notificaciones_hdt`.
+Scheduled Task de Coolify.
 
-Requisitos previos (bloqueantes, ver sección 1 y 5):
+#### `usuario_inactivo_con_equipos` — hecho
 
-- Admins de Activos definidos en el Portal.
-- Umbrales de días decididos (ver sección 5).
+Implementado adelantado del resto de la Fase 2 (era, con diferencia, el de mayor valor — ver
+sección 3.2). Diferencias con lo que este documento planificaba originalmente:
 
-Trabajo:
+- **Diario (08:00), no cada hora.** No es un chequeo calendario como los de HDT (que solo son
+  verdad una hora a la semana); es un estado que persiste hasta que alguien reasigna. Correr el
+  despachador cada hora sin más habría re-avisado en cada corrida mientras nadie actuara —
+  demasiado ruido. Diario alcanza para el nivel de urgencia real del caso.
+- **Dedupe propio (`AvisoUsuarioInactivo`).** El riesgo de la sección 6 ("sin dedupe en el
+  Portal, un aviso que no se calendariza se repite") aplicaba de lleno aquí — a diferencia de
+  `recordatorio_lunes`/`recordatorio_viernes` de HDT, que se resuelven solos porque la condición
+  cambia de una semana a otra. Se resolvió con una marca local por usuario que se libera solo al
+  reactivarse o perder todo el equipo, no con el `dedupe_key` pendiente del Portal (Fase 4 del
+  plan del Portal, sigue sin implementarse).
+- No requirió ningún cambio en Portal-Paldaca ni en Nómina: Activos ya tiene `is_active` del
+  usuario vía su propio `AUTH_USER_MODEL` compartido (`Activo.usuario_asignado__is_active`), así
+  que no hace falta que Portal lea la tabla `activos_activo` ni que Activos reciba un webhook.
 
-- `activos/services/avisos.py`: funciones `usuarios_inactivos_con_equipos()`,
-  `mantenimientos_estancados()`, `etiquetas_sin_vincular()`, `asignaciones_sin_planilla()`, y sus
-  correspondientes `avisar_*`.
-- Comando `enviar_notificaciones_activos` (mismo esqueleto que `enviar_notificaciones_hdt`:
-  `--dry-run`, `--regla`, `--ahora`), con `resumen_semanal_admins` como quinta regla (una vez
-  por semana, ej. lunes 08:00).
-- Seed de los 5 tipos en el Portal.
-- Tests: sin destinatarios no emite, umbral estricto (N-1 días no avisa, N sí), idempotencia de
-  ejecutar dos veces en la misma hora (si el aviso no tiene dedupe en el Portal todavía, ver
-  riesgo en sección 6).
+Trabajo: `activos/services/avisos.py` (`usuarios_inactivos_con_equipos()`,
+`avisar_usuarios_inactivos_con_equipos()`, `_limpiar_avisos_resueltos()`), modelo
+`AvisoUsuarioInactivo` (migración `activos/migrations/0010`), comando
+`enviar_notificaciones_activos`, seed en Portal (`backend/notificaciones/migrations/0009`), tests
+en `activos/tests/test_notificaciones.py`. Ver `CRON_ENDPOINT.md`.
 
-**Criterio de salida:** un usuario desactivado desde el Portal con equipos asignados genera aviso
-a los admins de Activos en la corrida horaria siguiente, sin intervención de Activos.
+**Criterio de salida — cumplido, verificado dos veces:** tests (18, incluida idempotencia y
+recaída tras reactivación) y una corrida real contra el Portal de desarrollo (usuario y admin de
+prueba, servidores locales de ambos repos, revisando `BandejaItem` en la base) — ⚠️ con un admin
+de Activos temporal creado a mano para la prueba, porque hoy nadie tiene ese rol en el Portal (ver
+bloqueante en sección 1): el aviso funciona, pero en producción no le llega a nadie hasta que se
+asigne el rol.
+
+#### Resto de la Fase 2 — pendiente
+
+Requisitos previos (bloqueantes, ver sección 5): umbrales de días para `mantenimiento_estancado`,
+`etiqueta_sin_vincular` y `asignacion_sin_planilla` (decisiones #2, #3, #4).
+
+Trabajo restante: `mantenimientos_estancados()`, `etiquetas_sin_vincular()`,
+`asignaciones_sin_planilla()` y sus `avisar_*`; agregar esas tres reglas más
+`resumen_semanal_admins` (cada una a su horario, ver `HORARIOS` en el comando) al mismo
+despachador; seed de los 4 tipos restantes en el Portal.
 
 ### Fase 3 — Mantenimiento preventivo y garantía (solo si se decide el modelo)
 
@@ -205,9 +235,14 @@ esquema de `Activo` y/o `SubCategoria`. Una vez resuelta, sigue el mismo patrón
 
 ## 7. Orden de trabajo recomendado
 
-1. Decisión #1 (admins en el Portal) — no es código, se puede resolver hoy.
-2. Fase 1 completa (4 avisos de hecho) — sin decisiones pendientes, mismo patrón ya probado en HDT.
-3. Decisiones #2, #3, #4, #5.
-4. Fase 2: empezar por `usuario_inactivo_con_equipos` (mayor valor, ver sección 3.2), luego el
-   resto del despachador.
-5. Decisiones #6 y #7, y solo entonces evaluar la Fase 3.
+1. ⚠️ **Decisión #1 (admins en el Portal) — sigue pendiente**, no es código, se puede resolver
+   hoy. Bloquea el valor real de todo lo que ya está implementado con audiencia "admins",
+   incluido `usuario_inactivo_con_equipos`.
+2. Fase 1 (4 avisos de hecho) — sin decisiones pendientes, mismo patrón ya probado en HDT. Sigue
+   sin empezar.
+3. ~~Fase 2: `usuario_inactivo_con_equipos`~~ — **hecho**, adelantado del resto de la Fase 2 (ver
+   sección 4). No esperó a la Fase 1 porque no comparte código con ella.
+4. Decisiones #2, #3, #4, #5.
+5. Fase 2: resto del despachador (`mantenimiento_estancado`, `etiqueta_sin_vincular`,
+   `asignacion_sin_planilla`, `resumen_semanal_admins`).
+6. Decisiones #6 y #7, y solo entonces evaluar la Fase 3.

@@ -264,6 +264,19 @@ Solo reglas **identificadas en el código**. Cada entrada indica dónde se imple
 - **Implementación:** `usuarios/forms.py` → `UsuarioForm.Meta.fields`.
 - **Implicación:** Rol, disciplina y acceso a módulos (`UsuarioModulo`) **no** se asignan desde esta UI; deben gestionarse en admin Portal/central.
 
+### BR-USR-07 — Aviso si un usuario queda inactivo con equipos asignados
+
+- **Regla:** BR-USR-03 bloquea desactivar desde Activos si la persona tiene equipos, pero esa
+  desactivación también puede ocurrir **fuera de este módulo** (panel de superadmin del Portal
+  hoy; Nómina no escribe `is_active`, solo lo lee — no hay guard ahí). Activos no tiene ningún
+  punto de código que detecte ese caso en el momento, así que lo evalúa un despachador diario:
+  usuarios `is_active=False` que siguen como `usuario_asignado` de algún `Activo` avisan a los
+  administradores de Activos (`activos.usuario_inactivo_con_equipos`), una sola vez por episodio.
+- **Implementación:** `activos/services/avisos.py` → `usuarios_inactivos_con_equipos()`,
+  `avisar_usuarios_inactivos_con_equipos()`; comando `enviar_notificaciones_activos`; dedup en
+  `AvisoUsuarioInactivo` (se libera cuando el usuario se reactiva o pierde todo el equipo).
+- **Ver también:** `docs/plan-notificaciones.md` §3.2, `CRON_ENDPOINT.md`.
+
 ---
 
 ## 6. Presentación (reglas de interfaz con efecto funcional)

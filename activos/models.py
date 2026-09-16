@@ -412,3 +412,31 @@ class EtiquetaQR(models.Model):
         self.estado = self.EstadoEtiqueta.ANULADA
         self.save(update_fields=["estado"])
         return self
+
+
+class AvisoUsuarioInactivo(models.Model):
+    """Marca que ya se avisó a los admins de un usuario inactivo con equipos.
+
+    Un usuario desactivado (típicamente desde el panel de superadmin del
+    Portal, no desde Activos — BR-USR-03 ya bloquea desactivar desde aquí si
+    tiene equipos) puede quedar así indefinidamente si nadie reasigna. Sin
+    este marcador, el despachador diario (`enviar_notificaciones_activos`)
+    repetiría el aviso cada día mientras la situación no cambie. Se borra
+    solo cuando el usuario se reactiva o se queda sin equipo asignado, así
+    que una recaída futura vuelve a avisar.
+    """
+
+    usuario = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="aviso_inactivo_activos",
+    )
+    enviado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = TABLA("aviso_usuario_inactivo")
+        verbose_name = "Aviso de usuario inactivo"
+        verbose_name_plural = "Avisos de usuario inactivo"
+
+    def __str__(self):
+        return f"Aviso pendiente de {self.usuario_id}"
