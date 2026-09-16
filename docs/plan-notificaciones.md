@@ -222,13 +222,25 @@ asigne el rol.
 
 #### Resto de la Fase 2 — pendiente
 
-Requisitos previos (bloqueantes, ver sección 5): umbrales de días para `mantenimiento_estancado`,
-`etiqueta_sin_vincular` y `asignacion_sin_planilla` (decisiones #2, #3, #4).
+Ya no bloqueado por las decisiones #2-#4 (ver sección 5): `activos.mantenimiento_estancado`,
+`activos.etiqueta_sin_vincular` y `activos.asignacion_sin_planilla` están sembrados en el Portal
+con `umbral_dias` por defecto (15 / 30 / 7 días, editable en `/configuracion/notificaciones` sin
+deploy — Portal, migraciones `0011_tipo_umbral_dias`/`0012_seed_tipos_activos_fase2_umbral`).
 
-Trabajo restante: `mantenimientos_estancados()`, `etiquetas_sin_vincular()`,
-`asignaciones_sin_planilla()` y sus `avisar_*`; agregar esas tres reglas más
-`resumen_semanal_admins` (cada una a su horario, ver `HORARIOS` en el comando) al mismo
-despachador; seed de los 4 tipos restantes en el Portal.
+Lo que falta es la lógica de **detección** en este repo, que el catálogo del Portal no resuelve
+por sí solo:
+
+- `activos/services/avisos.py`: `mantenimientos_estancados()`, `etiquetas_sin_vincular()`,
+  `asignaciones_sin_planilla()` (cada una debe leer su propio `umbral_dias` — no hay todavía un
+  cliente en Activos que consulte `TipoNotificacion` del Portal; la forma más simple es que
+  `enviar_notificaciones_activos` lo traiga vía `GET /api/notificaciones/tipos/` firmado, o que
+  el umbral se pase como argumento del comando hasta que haga falta algo más fino) y sus
+  `avisar_*`.
+- Agregar esas tres reglas más `resumen_semanal_admins` (cada una a su horario, ver `HORARIOS` en
+  `enviar_notificaciones_activos`) al mismo despachador.
+- Dedup: a diferencia de `usuario_inactivo_con_equipos`, estas tres SÍ tienen una ventana natural
+  (el umbral en sí) — evaluar si necesitan el mismo patrón de marcador (`AvisoUsuarioInactivo`)
+  o si alcanza con re-emitir mientras la condición siga vigente.
 
 ### Fase 3 — Mantenimiento preventivo y garantía (solo si se decide el modelo)
 
@@ -240,15 +252,22 @@ esquema de `Activo` y/o `SubCategoria`. Una vez resuelta, sigue el mismo patrón
 
 ## 5. Decisiones necesarias antes de seguir
 
-| # | Decisión | Bloquea |
-|---|----------|---------|
-| 1 | ¿Quiénes son `rol=administrador` del módulo `activos` en el Portal? | Toda audiencia "admins" de este plan, incluido lo ya emitido en Fase 0 |
-| 2 | Umbral de días para "mantenimiento estancado" | `activos.mantenimiento_estancado` |
-| 3 | Umbral de días para "etiqueta sin vincular" | `activos.etiqueta_sin_vincular` |
-| 4 | Umbral de días para "asignación sin planilla" | `activos.asignacion_sin_planilla` |
-| 5 | ¿Avisamos siempre al custodio anterior al perder un equipo, o solo si lo pierde sin reemplazo? | `activos.activo_desasignado` |
-| 6 | Mantenimiento preventivo: ¿periodicidad por `SubCategoria` o fecha explícita por `Activo`? | Fase 3 completa |
-| 7 | ¿Activos guarda fecha de compra/garantía, o ese dato vive en otro sistema (contabilidad)? | Fase 3 (garantía) |
+| # | Decisión | Estado |
+|---|----------|--------|
+| 1 | ¿Quiénes son `rol=administrador` del módulo `activos` en el Portal? | ⚠️ **Sigue pendiente** — bloquea toda audiencia "admins" de este plan, incluido lo ya emitido en Fase 0 y Fase 1 |
+| 2 | Umbral de días para "mantenimiento estancado" | ✅ **Resuelto como dato, no como código** — `TipoNotificacion.umbral_dias`, default 15 días, editable en `/configuracion/notificaciones` sin deploy (Portal, migraciones `0011`/`0012`) |
+| 3 | Umbral de días para "etiqueta sin vincular" | ✅ Igual mecanismo, default 30 días |
+| 4 | Umbral de días para "asignación sin planilla" | ✅ Igual mecanismo, default 7 días |
+| 5 | ¿Avisamos siempre al custodio anterior al perder un equipo, o solo si lo pierde sin reemplazo? | ✅ **Resuelto en Fase 1**: siempre avisa (`avisar_activos_desasignados`, sin distinguir si hay reemplazo) |
+| 6 | Mantenimiento preventivo: ¿periodicidad por `SubCategoria` o fecha explícita por `Activo`? | Sigue pendiente — bloquea Fase 3 completa |
+| 7 | ¿Activos guarda fecha de compra/garantía, o ese dato vive en otro sistema (contabilidad)? | Sigue pendiente — bloquea Fase 3 (garantía) |
+
+Idea tomada de `Renata-IA/Notificaciones/models.py` (`ConfiguracionAlertas`): en vez de que un
+umbral de días sea una decisión de producto que bloquea código indefinidamente, es un campo
+editable con un default razonable — el generador de la alerta (cuando se implemente su lógica de
+detección en Activos) lee el valor vigente en cada corrida, así que afinar el número no requiere
+tocar código ni volver a desplegar. Las decisiones #2-#4 seguían "pendientes" solo porque el plan
+las trataba como definitivas; como dato con default son triviales.
 
 ---
 
