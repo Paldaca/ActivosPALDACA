@@ -35,7 +35,15 @@ def url_en_portal(ruta: str) -> str:
     return f"{settings.PALDACA_PORTAL_URL}{settings.PALDACA_SHELL_PATH}{ruta}"
 
 
-def emitir_evento(*, codigo, titulo, cuerpo, payload=None, emisor=None) -> bool:
+def emitir_evento(*, codigo, titulo, cuerpo, payload=None, emisor=None, clave_agrupacion="") -> bool:
+    """
+    `clave_agrupacion`: identidad estable del hecho (ej. "resumen_semanal:2026-09-14").
+    El Portal actualiza el Evento vivo con esa clave en vez de crear uno
+    nuevo si ya existe -- protege contra que el despachador corra dos veces
+    en la misma ventana horaria y duplique un aviso agregado (ver riesgo en
+    docs/plan-notificaciones.md §6). Vacía por defecto: cada llamada crea un
+    evento nuevo, que es lo correcto para hechos puntuales.
+    """
     if not settings.PALDACA_NOTIFICACIONES_ACTIVAS:
         return False
     cliente = settings.PALDACA_MODULO_CODIGO
@@ -45,6 +53,8 @@ def emitir_evento(*, codigo, titulo, cuerpo, payload=None, emisor=None) -> bool:
         "cuerpo": cuerpo,
         "payload": payload or {},
     }
+    if clave_agrupacion:
+        datos["clave_agrupacion"] = clave_agrupacion[:120]
     if getattr(emisor, "pk", None) is not None:
         datos["emisor_id"] = emisor.pk
     cuerpo_json = json.dumps(datos).encode()

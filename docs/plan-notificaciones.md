@@ -36,26 +36,38 @@ Y adelantado de la Fase 2 (ver abajo):
 | `activos.usuario_inactivo_con_equipos` | `enviar_notificaciones_activos` (despachador diario, 08:00) | Admins de Activos |
 | `activos.etiqueta_sin_vincular` | `enviar_notificaciones_activos` (despachador diario, 09:00) | Quien creó la etiqueta (si se registró) + admins |
 | `activos.asignacion_sin_planilla` | `enviar_notificaciones_activos` (despachador diario, 10:00) | Admins de Activos |
+| `activos.resumen_semanal_admins` | `enviar_notificaciones_activos` (despachador semanal, lunes 08:00) | Admins de Activos |
 
 Implementación: `activos/services/avisos.py`, `activos/services/notificaciones_portal.py` (cliente
 firmado, idéntico al de HDT y Códigos). Tests: `activos/tests/test_notificaciones.py`. Cron:
 `CRON_ENDPOINT.md`.
 
-### ⚠️ Bloqueante a resolver antes de sumar audiencia "admins"
+**Todos los tipos dirigidos a "admins" tienen ahora `incluye_superadmins=True`** (Portal, migración
+`0013`): mientras nadie tenga `rol=administrador` en el módulo `activos`, los superadmins de la
+Suite reciben estos avisos igual — la forma en que se resolvió el bloqueante de abajo, sin esperar
+a que alguien asigne ese rol. `activos.activo_asignado`/`mantenimiento_iniciado`/`finalizado`/
+`activo_desasignado` no se tocaron: van a una persona específica del payload, no a "admins", y
+sumarlos ahí sería ruido para los superadmins.
 
-**Mitad resuelto.** `activos.activo_creado` incluye a los **administradores del módulo Activos
-según el Portal** (`rol=administrador` + acceso a `activos`). El gap de *enforcement* que este
-párrafo señalaba (Activos no aplicaba ese rol en sus vistas) ya se cerró: ver BR-ACC-04b en
+### ✅ Bloqueante mitigado — `incluye_superadmins=True` en vez de esperar el rol
+
+`activos.activo_creado` incluye a los **administradores del módulo Activos según el Portal**
+(`rol=administrador` + acceso a `activos`). El gap de *enforcement* que este párrafo señalaba
+(Activos no aplicaba ese rol en sus vistas) ya se cerró: ver BR-ACC-04b en
 `docs/BUSINESS_RULES.md` — gestión ahora exige `AdminActivoRequiredMixin` /
 `@requiere_admin_activo`, y solo queda abierto a cualquiera con el módulo "Mis Activos".
 
-Lo que **sigue sin resolver** es la parte de datos: en la base compartida de desarrollo, a la
-fecha de este párrafo, **ningún usuario tiene `rol=administrador` en el módulo `activos`**
-(confirmado directamente contra la BD al implementar `usuario_inactivo_con_equipos`). Mientras
-eso no cambie, **todos** los avisos que este plan dirige a "admins" — incluido el que ya está en
-producción — no le llegan a nadie; es silencioso, no da error. **Acción pendiente, no es
-código:** asignar `rol=administrador` en el módulo `activos` a quien corresponda (típicamente
-quien hoy gestiona el inventario), desde el panel de superadmin del Portal.
+La parte de **datos** seguía sin resolver: en la base compartida de desarrollo, **ningún usuario
+tiene `rol=administrador` en el módulo `activos`** (confirmado directamente contra la BD al
+implementar `usuario_inactivo_con_equipos`), así que la audiencia `modulo.admins` sigue resolviendo
+vacía. En vez de esperar a que alguien asigne ese rol, se activó `incluye_superadmins=True` en
+todos los tipos dirigidos a "admins" (Portal, migración `0013`) — ver tabla de arriba. Los
+superadmins de la Suite (hoy los únicos administradores reales operando el sistema) reciben estos
+avisos ya mismo, sin depender de esa asignación pendiente.
+
+**Sigue siendo mejor** asignar `rol=administrador` en el módulo `activos` a quien gestiona el
+inventario del día a día (típicamente no es superadmin): así los avisos llegan a la persona
+correcta, no solo a quien administra toda la Suite. Queda como mejora, no como bloqueante.
 
 ---
 
@@ -259,12 +271,22 @@ Implementadas en el mismo despachador que `usuario_inactivo_con_equipos`
   prueba se limpiaron después, sin tocar los datos reales subyacentes (activos, historial,
   etiquetas) ni el `umbral_dias` restaurado a su valor original.
 
-#### `mantenimiento_estancado` y `resumen_semanal_admins` — pendientes
+#### `resumen_semanal_admins` — hecha (septiembre 2026)
 
-`mantenimiento_estancado` deliberadamente no se implementó en esta iteración. Trabajo restante
-para las dos: `activos/services/avisos.py` → `mantenimientos_estancados()` + `avisar_*`;
-`resumen_semanal_admins` (una vez por semana, agrega altas/reasignaciones/mantenimientos de los
-últimos 7 días); sumar ambas reglas a `HORARIOS` en `enviar_notificaciones_activos`.
+Lunes 08:00, agrega altas (`Activo.fecha_creacion`), reasignaciones
+(`HistorialMovimiento` tipo `REASIGNACION`) y mantenimientos (`Mantenimiento.fecha_creacion`) de
+los últimos 7 días en **un solo aviso**. Sin actividad, no emite nada (principio anti-ruido: una
+semana vacía no necesita decir que está vacía).
+
+A diferencia de las otras tres reglas de esta fase, **no usa `AvisoPorUmbral`** — no hace falta:
+usa la `clave_agrupacion` nueva del Portal (`resumen_semanal:{lunes_de_la_semana}`), así que si el
+despachador corre dos veces en la misma ventana (el riesgo de la sección 6 que seguía sin
+resolver), la segunda corrida **actualiza el mismo aviso** en vez de duplicarlo. Es el primer
+consumidor real de `clave_agrupacion` en Activos.
+
+`activos/services/avisos.py` → `resumen_actividad_semanal()`, `avisar_resumen_semanal_admins()`.
+8 tests nuevos. `mantenimiento_estancado` sigue deliberadamente sin implementar (bloqueado por
+falta de dato — sección 5, decisión #6).
 
 ### Fase 3 — Mantenimiento preventivo y garantía (solo si se decide el modelo)
 
@@ -308,18 +330,20 @@ las trataba como definitivas; como dato con default son triviales.
 
 ## 7. Orden de trabajo recomendado
 
-1. ⚠️ **Decisión #1 (admins en el Portal) — sigue pendiente**, no es código, se puede resolver
-   hoy. Bloquea el valor real de todo lo que ya está implementado con audiencia "admins":
-   `activo_creado` sin custodio, `activo_baja`, `usuario_inactivo_con_equipos`,
-   `etiqueta_sin_vincular` y `asignacion_sin_planilla`.
+1. ~~Decisión #1 (admins en el Portal)~~ — **mitigada** vía `incluye_superadmins=True` (ver arriba).
+   La asignación real de `rol=administrador` sigue siendo mejor y queda como mejora, no bloqueante.
 2. ~~Fase 1 (4 avisos de hecho)~~ — **hecha**.
 3. ~~Fase 2: `usuario_inactivo_con_equipos`~~ — **hecho**, adelantado del resto de la Fase 2 (ver
    sección 4). No esperó a la Fase 1 porque no comparte código con ella.
 4. ~~Decisiones #2, #3, #4~~ (umbrales) — **resueltas** como configuración (sección 5). ~~Decisión
    #5~~ (desasignado siempre avisa) — **resuelta** al construir la Fase 1.
-5. ~~Fase 2: `etiqueta_sin_vincular`, `asignacion_sin_planilla`~~ — **hechas**. Queda
-   `mantenimiento_estancado` (deliberadamente fuera de esta iteración) y `resumen_semanal_admins`.
+5. ~~Fase 2: `etiqueta_sin_vincular`, `asignacion_sin_planilla`, `resumen_semanal_admins`~~ —
+   **hechas**. Queda solo `mantenimiento_estancado` (deliberadamente fuera de esta iteración,
+   bloqueado por falta de dato — decisión #6).
 6. ~~Sincronización real Activos↔Portal de `umbral_dias`~~ — **hecha** (`GET .../tipos/<codigo>/config/`
    firmado). Editar el umbral en `/configuracion/notificaciones` ya tiene efecto real en la corrida
    siguiente del despachador, no solo en el catálogo.
-7. Decisiones #6 y #7, y solo entonces evaluar la Fase 3.
+7. ~~`clave_agrupacion` centralizada en el Portal~~ — **hecha** (ver
+   `Portal-Paldaca/docs/plan-sistema-notificaciones.md` §Fase 4). `resumen_semanal_admins` es su
+   primer consumidor real en Activos.
+8. Decisiones #6 y #7 (mantenimiento preventivo, garantía), y solo entonces evaluar la Fase 3.

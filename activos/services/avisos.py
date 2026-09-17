@@ -18,6 +18,8 @@ from django.db.models import Q
 from django.urls import reverse
 from django.utils import timezone
 
+from mantenimientos.models import Mantenimiento
+
 from ..models import Activo, AvisoPorUmbral, AvisoUsuarioInactivo, EtiquetaQR, HistorialMovimiento
 from . import notificaciones_portal
 from .notificaciones_portal import emitir_al_confirmar, url_en_portal
@@ -31,6 +33,7 @@ CODIGO_ACTIVO_BAJA = "activos.activo_baja"
 CODIGO_USUARIO_INACTIVO = "activos.usuario_inactivo_con_equipos"
 CODIGO_ETIQUETA_SIN_VINCULAR = "activos.etiqueta_sin_vincular"
 CODIGO_ASIGNACION_SIN_PLANILLA = "activos.asignacion_sin_planilla"
+CODIGO_RESUMEN_SEMANAL = "activos.resumen_semanal_admins"
 
 
 def _nombre(usuario):
@@ -492,3 +495,96 @@ def avisar_asignaciones_sin_planilla():
         ]
     )
     return len(candidatos)
+
+
+# --- resumen_semanal_admins (regla por reloj) -------------------------------
+
+
+def resumen_actividad_semanal(desde=None, hasta=None):
+    """Altas, reasignaciones y mantenimientos registrados entre `desde` y `hasta`.
+
+    Ventana de 7 días terminando en `hasta` (por defecto ahora) si no se da
+    `desde` explícito.
+    """
+    hasta = hasta or timezone.now()
+    desde = desde or (hasta - timedelta(days=7))
+    # <=, no <: en una ventana de dias, un hecho creado en el mismo instante
+    # que `hasta` (el propio momento de la corrida) debe contar, no quedar
+    # afuera por un empate de microsegundos con `timezone.now()`.
+    return {
+        "desde": desde,
+        "hasta": hasta,
+        "altas": list(
+            Activo.objects.filter(fecha_creacion__gte=desde, fecha_creacion__lte=hasta)
+            .order_by("fecha_creacion")
+        ),
+        "reasignaciones": list(
+            HistorialMovimiento.objects.filter(
+                tipo_movimiento=HistorialMovimiento.TipoMovimiento.REASIGNACION,
+                fecha_movimiento__gte=desde,
+                fecha_movimiento__lte=hasta,
+            )
+            .select_related("activo")
+            .order_by("fecha_movimiento")
+        ),
+        "mantenimientos": list(
+            Mantenimiento.objects.filter(fecha_creacion__gte=desde, fecha_creacion__lte=hasta)
+            .select_related("activo")
+            .order_by("fecha_creacion")
+        ),
+    }
+
+
+def _clave_resumen_semanal(hasta):
+    """Una clave por semana (lunes de la semana de `hasta`).
+
+    Si el despachador corre dos veces en la misma ventana (reinicio de
+    Coolify, doble Scheduled Task), la segunda llamada actualiza el mismo
+    Evento en vez de duplicar el resumen -- el riesgo que
+    docs/plan-notificaciones.md §6 dejaba sin resolver.
+    """
+    lunes = timezone.localtime(hasta).date()
+    lunes -= timedelta(days=lunes.weekday())
+    return f"resumen_semanal:{lunes.isoformat()}"
+
+
+def avisar_resumen_semanal_admins(hasta=None):
+    """Un aviso agregado a los admins con la actividad de los últimos 7 días.
+
+    Sin actividad, no emite nada (principio anti-ruido): una semana vacía no
+    necesita un aviso diciendo que está vacía. Devuelve cuántos hechos se
+    incluyeron (altas + reasignaciones + mantenimientos), 0 si no había nada
+    o el Portal no aceptó el aviso.
+    """
+    hasta = hasta or timezone.now()
+    resumen = resumen_actividad_semanal(hasta=hasta)
+    altas = resumen["altas"]
+    reasignaciones = resumen["reasignaciones"]
+    mantenimientos = resumen["mantenimientos"]
+    total = len(altas) + len(reasignaciones) + len(mantenimientos)
+    if total == 0:
+        return 0
+
+    partes = []
+    if altas:
+        partes.append(f"{len(altas)} alta{'s' if len(altas) != 1 else ''}")
+    if reasignaciones:
+        etiqueta = "reasignación" if len(reasignaciones) == 1 else "reasignaciones"
+        partes.append(f"{len(reasignaciones)} {etiqueta}")
+    if mantenimientos:
+        partes.append(f"{len(mantenimientos)} mantenimiento{'s' if len(mantenimientos) != 1 else ''}")
+    detalle = ", ".join(partes)
+
+    enviado = notificaciones_portal.emitir_evento(
+        codigo=CODIGO_RESUMEN_SEMANAL,
+        titulo=f"Resumen semanal de Activos: {detalle}",
+        cuerpo=f"En los últimos 7 días: {detalle}.",
+        payload={
+            "url": url_en_portal(reverse("activos:activo-list")),
+            "altas": len(altas),
+            "reasignaciones": len(reasignaciones),
+            "mantenimientos": len(mantenimientos),
+        },
+        clave_agrupacion=_clave_resumen_semanal(hasta),
+    )
+    return total if enviado else 0

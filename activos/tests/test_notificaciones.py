@@ -29,13 +29,17 @@ from activos.services.avisos import (
     CODIGO_ETIQUETA_SIN_VINCULAR,
     CODIGO_MANTENIMIENTO_FINALIZADO,
     CODIGO_MANTENIMIENTO_INICIADO,
+    CODIGO_RESUMEN_SEMANAL,
     CODIGO_USUARIO_INACTIVO,
+    _clave_resumen_semanal,
     _umbral_dias,
     asignaciones_sin_planilla,
     avisar_asignaciones_sin_planilla,
     avisar_etiquetas_sin_vincular,
+    avisar_resumen_semanal_admins,
     avisar_usuarios_inactivos_con_equipos,
     etiquetas_sin_vincular,
+    resumen_actividad_semanal,
     usuarios_inactivos_con_equipos,
 )
 from mantenimientos.models import Mantenimiento
@@ -224,8 +228,8 @@ def test_portal_caido_no_impide_el_alta(
 # =============================================================================
 
 
-def _crear_mantenimiento(activo, estado=Mantenimiento.EstadoMantenimiento.EN_PROCESO):
-    return Mantenimiento.objects.create(
+def _crear_mantenimiento(activo, estado=Mantenimiento.EstadoMantenimiento.EN_PROCESO, dias_atras=0):
+    mant = Mantenimiento.objects.create(
         activo=activo,
         tecnico="Técnico Pytest",
         telefono="000-0000",
@@ -233,6 +237,13 @@ def _crear_mantenimiento(activo, estado=Mantenimiento.EstadoMantenimiento.EN_PRO
         costo="10.00",
         estado=estado,
     )
+    if dias_atras:
+        pasado = timezone.now() - timedelta(days=dias_atras)
+        Mantenimiento.objects.filter(pk=mant.pk).update(
+            fecha=pasado.date(), fecha_creacion=pasado
+        )
+        mant.refresh_from_db()
+    return mant
 
 
 @pytest.mark.django_db
@@ -859,3 +870,119 @@ def test_avisar_etiquetas_usa_umbral_del_portal_no_el_local(catalogo, settings, 
     assert incluidas == 1
     [aviso] = _llamadas(emitir, CODIGO_ETIQUETA_SIN_VINCULAR)
     assert "más de 5 días" in aviso["cuerpo"]
+
+
+# =============================================================================
+# resumen_semanal_admins (regla por reloj, con clave_agrupacion)
+# =============================================================================
+
+
+def _envejecer_activo(activo, dias):
+    Activo.objects.filter(pk=activo.pk).update(
+        fecha_creacion=timezone.now() - timedelta(days=dias)
+    )
+    activo.refresh_from_db()
+
+
+@pytest.mark.django_db
+def test_resumen_sin_actividad_no_avisa(catalogo, emitir):
+    assert avisar_resumen_semanal_admins() == 0
+    emitir.assert_not_called()
+
+
+@pytest.mark.django_db
+def test_resumen_cuenta_altas_reasignaciones_y_mantenimientos(catalogo, emitir):
+    _crear_activo(catalogo, "INV-RES-1", catalogo["usuario_a"])
+    act2 = _crear_activo(catalogo, "INV-RES-2", catalogo["usuario_a"])
+    _crear_movimiento_reasignacion(act2, dias_atras=1)
+    _crear_mantenimiento(act2, dias_atras=1)
+
+    total = avisar_resumen_semanal_admins()
+
+    assert total == 4  # 2 altas + 1 reasignación + 1 mantenimiento
+    [aviso] = _llamadas(emitir, CODIGO_RESUMEN_SEMANAL)
+    assert aviso["payload"]["altas"] == 2
+    assert aviso["payload"]["reasignaciones"] == 1
+    assert aviso["payload"]["mantenimientos"] == 1
+    assert "2 altas" in aviso["titulo"]
+    assert aviso["payload"]["url"].endswith("/activos/activos/")
+
+
+@pytest.mark.django_db
+def test_resumen_no_cuenta_actividad_fuera_de_la_ventana(catalogo, emitir):
+    act = _crear_activo(catalogo, "INV-RES-3", catalogo["usuario_a"])
+    _envejecer_activo(act, 8)
+
+    assert avisar_resumen_semanal_admins() == 0
+    emitir.assert_not_called()
+
+
+@pytest.mark.django_db
+def test_resumen_una_sola_alta_usa_singular(catalogo, emitir):
+    _crear_activo(catalogo, "INV-RES-4", catalogo["usuario_a"])
+    avisar_resumen_semanal_admins()
+    [aviso] = _llamadas(emitir, CODIGO_RESUMEN_SEMANAL)
+    assert "1 alta" in aviso["titulo"]
+    assert "1 altas" not in aviso["titulo"]
+
+
+@pytest.mark.django_db
+def test_resumen_envia_clave_de_agrupacion_estable_por_semana(catalogo, emitir):
+    _crear_activo(catalogo, "INV-RES-5", catalogo["usuario_a"])
+    hasta = timezone.now()
+
+    avisar_resumen_semanal_admins(hasta=hasta)
+
+    [aviso] = _llamadas(emitir, CODIGO_RESUMEN_SEMANAL)
+    assert aviso["clave_agrupacion"] == _clave_resumen_semanal(hasta)
+    assert aviso["clave_agrupacion"].startswith("resumen_semanal:")
+
+
+@pytest.mark.django_db
+def test_resumen_actividad_semanal_respeta_ventana_explicita(catalogo):
+    act_dentro = _crear_activo(catalogo, "INV-RES-6", catalogo["usuario_a"])
+    act_fuera = _crear_activo(catalogo, "INV-RES-7", catalogo["usuario_a"])
+    _envejecer_activo(act_fuera, 10)
+
+    resumen = resumen_actividad_semanal()
+    ids = {a.pk for a in resumen["altas"]}
+    assert act_dentro.pk in ids
+    assert act_fuera.pk not in ids
+
+
+@pytest.mark.django_db
+def test_comando_ejecuta_resumen_solo_lunes(catalogo, emitir):
+    _crear_activo(catalogo, "INV-RES-CMD", catalogo["usuario_a"])
+
+    lunes_8am = timezone.localtime().replace(hour=8)
+    lunes_8am -= timedelta(days=lunes_8am.weekday())
+    martes_8am = lunes_8am + timedelta(days=1)
+
+    with mock.patch(
+        "activos.management.commands.enviar_notificaciones_activos.timezone.localtime"
+    ) as localtime:
+        localtime.return_value = martes_8am
+        call_command("enviar_notificaciones_activos")
+    emitir.assert_not_called()
+
+    with mock.patch(
+        "activos.management.commands.enviar_notificaciones_activos.timezone.localtime"
+    ) as localtime:
+        localtime.return_value = lunes_8am
+        call_command("enviar_notificaciones_activos")
+    assert len(_llamadas(emitir, CODIGO_RESUMEN_SEMANAL)) == 1
+
+
+@pytest.mark.django_db
+def test_comando_dry_run_resumen(catalogo, emitir):
+    _crear_activo(catalogo, "INV-RES-CMD2", catalogo["usuario_a"])
+    salida = StringIO()
+    call_command(
+        "enviar_notificaciones_activos",
+        "--regla", "resumen_semanal_admins",
+        "--ahora",
+        "--dry-run",
+        stdout=salida,
+    )
+    emitir.assert_not_called()
+    assert "se avisaría por 1 hecho(s)" in salida.getvalue()

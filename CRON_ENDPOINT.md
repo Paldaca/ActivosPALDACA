@@ -8,20 +8,30 @@ del contenedor ya desplegado (mismo mecanismo que `enviar_notificaciones_hdt` en
 ## `enviar_notificaciones_activos`
 
 Evalúa las reglas de Activos que dependen del reloj (ver `activos/services/avisos.py`). Hoy hay
-tres (`mantenimiento_estancado` sigue sin implementar):
+cuatro (`mantenimiento_estancado` sigue sin implementar):
 
 | Regla | Qué detecta | Horario | A quién avisa |
 |-------|-------------|---------|----------------|
-| `usuario_inactivo_con_equipos` | Usuario `is_active=False` que sigue con equipo asignado — típicamente desactivado desde el panel de superadmin del Portal, no desde Activos (BR-USR-03 ya lo bloquea aquí si tiene equipos) | Diario, 08:00 hora local | Administradores de Activos (`modulo.admins`) |
+| `usuario_inactivo_con_equipos` | Usuario `is_active=False` que sigue con equipo asignado — típicamente desactivado desde el panel de superadmin del Portal, no desde Activos (BR-USR-03 ya lo bloquea aquí si tiene equipos) | Diario, 08:00 hora local | Administradores de Activos (`modulo.admins` + superadmins) |
 | `etiqueta_sin_vincular` | `EtiquetaQR` en `PENDIENTE` hace más de `ACTIVOS_UMBRAL_ETIQUETA_SIN_VINCULAR_DIAS` días (default 30) | Diario, 09:00 hora local | Quien la creó (si se registró) + administradores |
 | `asignacion_sin_planilla` | `HistorialMovimiento` de reasignación sin `archivo_planilla` hace más de `ACTIVOS_UMBRAL_ASIGNACION_SIN_PLANILLA_DIAS` días (default 7) | Diario, 10:00 hora local | Administradores de Activos |
+| `resumen_semanal_admins` | Altas, reasignaciones y mantenimientos de los últimos 7 días, agregados en un solo aviso (nada si no hubo actividad) | **Lunes**, 08:00 hora local | Administradores de Activos |
 
-Se avisa **una sola vez por episodio**: un marcador (`AvisoUsuarioInactivo` para la primera regla,
-`AvisoPorUmbral` para las otras dos) evita repetir el aviso mientras la situación no cambie, y se
-libera solo, en una corrida posterior, cuando se resuelve (usuario reactivado o sin equipo,
-etiqueta vinculada/anulada, planilla archivada) — así que si recae más adelante vuelve a avisar.
+Las tres primeras se avisan **una sola vez por episodio**: un marcador (`AvisoUsuarioInactivo` para
+la primera, `AvisoPorUmbral` para las siguientes dos) evita repetir el aviso mientras la situación
+no cambie, y se libera solo, en una corrida posterior, cuando se resuelve (usuario reactivado o sin
+equipo, etiqueta vinculada/anulada, planilla archivada) — así que si recae más adelante vuelve a
+avisar.
+
+`resumen_semanal_admins` no necesita ese marcador: usa la `clave_agrupacion` del Portal (una por
+semana). Si el despachador corre dos veces en la misma ventana horaria (reinicio de Coolify, doble
+Scheduled Task), la segunda corrida **actualiza el mismo aviso** en vez de duplicarlo — resuelve el
+riesgo de duplicado que `docs/plan-notificaciones.md` §6 dejaba pendiente, sin necesitar una tabla
+de dedup propia.
+
 No hace falta correr esto más de una vez al día; correr más seguido no duplica nada (cada regla se
-autolimita a su hora), pero tampoco acelera la detección más allá de esa ventana.
+autolimita a su horario y, `resumen_semanal_admins`, también a su día), pero tampoco acelera la
+detección más allá de esa ventana.
 
 Los umbrales de días (`etiqueta_sin_vincular`, `asignacion_sin_planilla`) se leen en caliente del
 Portal en cada corrida: `GET /api/notificaciones/tipos/<codigo>/config/`, firmado igual que la
@@ -55,6 +65,7 @@ python manage.py enviar_notificaciones_activos --dry-run
 python manage.py enviar_notificaciones_activos --regla usuario_inactivo_con_equipos --ahora --dry-run
 python manage.py enviar_notificaciones_activos --regla etiqueta_sin_vincular --ahora --dry-run
 python manage.py enviar_notificaciones_activos --regla asignacion_sin_planilla --ahora --dry-run
+python manage.py enviar_notificaciones_activos --regla resumen_semanal_admins --ahora --dry-run
 ```
 
 `--ahora` ignora el horario (útil para probar fuera de las 08:00-10:00); `--regla` limita a una sola.
@@ -97,6 +108,7 @@ por si el despliegue anterior a producción quedó atrás:
 | Repo | Migraciones | Qué agregan |
 |------|-------------|-------------|
 | Portal-Paldaca | `notificaciones.0009` a `0012` | Tipos `usuario_inactivo_con_equipos`/Fase 1 de Activos, campo `umbral_dias`, tipos `mantenimiento_estancado`/`etiqueta_sin_vincular`/`asignacion_sin_planilla` con sus defaults |
+| Portal-Paldaca | `notificaciones.0013`, `0014` | `incluye_superadmins=True` en los tipos "admins" de Activos, tipo `resumen_semanal_admins`, campos `clave_agrupacion`/`resuelto_en`/`actualizado_en` en `Evento` |
 | ActivosPALDACA | `activos.0010`, `activos.0011` | `AvisoUsuarioInactivo`, `AvisoPorUmbral` (marcadores de dedup) |
 
 El entrypoint de cada contenedor ya corre `migrate` al arrancar (mismo mecanismo que el resto de
