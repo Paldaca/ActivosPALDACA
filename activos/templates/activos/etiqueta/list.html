@@ -112,13 +112,17 @@
                             <label class="form-label" for="{{ filter_form.categoria.id_for_label }}">
                                 Categoría
                             </label>
-                            {{ filter_form.categoria }}
+                            <div class="ax-combo" data-combo-placeholder="Escribe una categoría…">
+                                {{ filter_form.categoria }}
+                            </div>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label" for="{{ filter_form.subcategoria.id_for_label }}">
                                 Subcategoría
                             </label>
-                            {{ filter_form.subcategoria }}
+                            <div class="ax-combo" data-combo-placeholder="Escribe una subcategoría…">
+                                {{ filter_form.subcategoria }}
+                            </div>
                         </div>
                         <div class="col-12 d-flex gap-2">
                             <button type="submit" class="btn-pastel btn-pastel--lila btn-pastel--sm">
@@ -430,7 +434,9 @@
                 <label class="form-label" for="{{ form_generar.subcategoria.id_for_label }}">
                     {{ form_generar.subcategoria.label }}
                 </label>
-                {{ form_generar.subcategoria }}
+                <div class="ax-combo" data-combo-placeholder="Escribe una subcategoría…">
+                    {{ form_generar.subcategoria }}
+                </div>
                 <small class="ax-hint">{{ form_generar.subcategoria.help_text }}</small>
             </div>
 

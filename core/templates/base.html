@@ -49,9 +49,13 @@
                 <nav class="app-footer-nav" aria-label="Enlaces pie de página">
                     <a href="{% url 'core:home' %}">Inicio</a>
                     <span class="app-footer-dot" aria-hidden="true"></span>
+                    {% if es_admin_activos %}
                     <a href="{% url 'activos:activo-list' %}">Activos</a>
                     <span class="app-footer-dot" aria-hidden="true"></span>
                     <a href="{% url 'mantenimientos:mantenimiento-list' %}">Mantenimiento</a>
+                    {% else %}
+                    <a href="{% url 'activos:mis-activos-list' %}">Mis Activos</a>
+                    {% endif %}
                 </nav>
             </div>
         </footer>

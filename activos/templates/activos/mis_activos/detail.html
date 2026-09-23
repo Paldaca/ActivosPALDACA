@@ -1,0 +1,171 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load cache_bust %}
+{% load activo_filters %}
+
+{% block title %}{{ activo.codigo_inventario }} - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static_v 'css/activos-ui.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="ax-page">
+
+    <nav class="ax-crumbs" aria-label="Ruta de navegación">
+        <a href="{% url 'activos:mis-activos-list' %}"><i class="bi bi-person-badge"></i> Mis Activos</a>
+        <span class="sep">/</span>
+        <span aria-current="page">{{ activo.codigo_inventario }}</span>
+    </nav>
+
+    <header class="ax-hero">
+        <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
+            <div class="ax-min0">
+                <span class="ax-hero-eyebrow">
+                    <i class="bi {{ activo|icono_activo }}"></i>
+                    {{ activo.subcategoria.categoria.nombre }} · {{ activo.subcategoria.nombre }}
+                </span>
+                <h1 class="ax-hero-title">{{ activo.codigo_inventario }}</h1>
+                <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
+                    {% badge_estado activo tamano='lg' sobre_hero=True %}
+                    <span class="ax-estado ax-estado--onhero">
+                        <i class="bi bi-tag" aria-hidden="true"></i> {{ activo.marca }} {{ activo.modelo }}
+                    </span>
+                    {% if activo.numero_serial %}
+                    <span class="ax-estado ax-estado--onhero ax-mono">
+                        <i class="bi bi-upc-scan" aria-hidden="true"></i> {{ activo.numero_serial }}
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="ax-hero-actions">
+                <a href="{% url 'activos:mis-activos-list' %}" class="btn-pastel btn-pastel--glass">
+                    <i class="bi bi-arrow-left"></i> Volver
+                </a>
+                <a href="{% url 'reportes:planilla-vigente' activo.pk %}"
+                   class="btn-pastel btn-pastel--cta" target="_blank" rel="noopener">
+                    <i class="bi bi-file-earmark-pdf"></i> Ver planilla
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <div class="row g-3">
+        <div class="col-lg-8">
+            <section class="ax-card mb-3">
+                <div class="ax-card-head">
+                    <h2 class="ax-card-title"><i class="bi bi-card-list"></i> Ficha técnica</h2>
+                </div>
+                <div class="ax-card-body">
+                    <div class="ax-spec" data-ax-stagger="12">
+                        <div class="ax-spec-item">
+                            <div class="ax-spec-label"><i class="bi bi-folder2"></i> Categoría</div>
+                            <div class="ax-spec-value">{{ activo.subcategoria.categoria.nombre }}</div>
+                        </div>
+                        <div class="ax-spec-item">
+                            <div class="ax-spec-label"><i class="bi bi-diagram-3"></i> Subcategoría</div>
+                            <div class="ax-spec-value">{{ activo.subcategoria.nombre }}</div>
+                        </div>
+                        <div class="ax-spec-item">
+                            <div class="ax-spec-label"><i class="bi bi-geo-alt"></i> Ubicación</div>
+                            <div class="ax-spec-value">{{ activo.ubicacion.nombre }}</div>
+                        </div>
+                        <div class="ax-spec-item">
+                            <div class="ax-spec-label"><i class="bi bi-upc-scan"></i> Número de serie</div>
+                            <div class="ax-spec-value {% if not activo.numero_serial %}ax-spec-value--muted{% else %}ax-mono{% endif %}">
+                                {{ activo.numero_serial|default:"No especificado" }}
+                            </div>
+                        </div>
+                        <div class="ax-spec-item">
+                            <div class="ax-spec-label"><i class="bi bi-calendar-plus"></i> Asignado desde</div>
+                            <div class="ax-spec-value">{{ activo.fecha_actualizacion|date:"d/m/Y" }}</div>
+                        </div>
+                    </div>
+                    {% if activo.observaciones %}
+                    <hr class="ax-divider">
+                    <div class="ax-spec-item">
+                        <div class="ax-spec-label"><i class="bi bi-chat-left-text"></i> Observaciones</div>
+                        <div class="ax-spec-value fw-normal">{{ activo.observaciones|linebreaksbr }}</div>
+                    </div>
+                    {% endif %}
+                </div>
+            </section>
+
+            {% if mantenimientos_recientes %}
+            <section class="ax-card">
+                <div class="ax-card-head">
+                    <h2 class="ax-card-title"><i class="bi bi-tools"></i> Mantenimientos</h2>
+                </div>
+                <div class="ax-table-wrap">
+                    <table class="ax-table">
+                        <thead>
+                            <tr>
+                                <th scope="col">Fecha</th>
+                                <th scope="col">Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody data-ax-stagger="20">
+                            {% for mantenimiento in mantenimientos_recientes %}
+                            <tr>
+                                <td data-label="Fecha">{{ mantenimiento.fecha|date:"d/m/Y" }}</td>
+                                <td data-label="Estado">
+                                    {% if mantenimiento.estado == 'EP' %}
+                                    <span class="ax-estado ax-estado--mantenimiento">
+                                        <span class="ax-estado-dot"></span>
+                                        <i class="bi bi-hourglass-split"></i> En proceso
+                                    </span>
+                                    {% else %}
+                                    <span class="ax-estado ax-estado--disponible">
+                                        <span class="ax-estado-dot"></span>
+                                        <i class="bi bi-check-circle"></i> Finalizado
+                                    </span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+            {% endif %}
+        </div>
+
+        <div class="col-lg-4">
+            <div class="ax-sticky d-flex flex-column gap-3">
+                <section class="ax-card">
+                    <div class="ax-card-head">
+                        <h2 class="ax-card-title"><i class="bi bi-file-earmark-pdf"></i> Planilla de asignación</h2>
+                    </div>
+                    <div class="ax-card-body">
+                        <p class="ax-hint mt-0 mb-3">
+                            El comprobante firmado de este equipo, si ya se generó.
+                        </p>
+                        <a href="{% url 'reportes:planilla-vigente' activo.pk %}"
+                           class="btn-pastel btn-pastel--durazno btn-pastel--block"
+                           target="_blank" rel="noopener">
+                            <i class="bi bi-file-earmark-pdf"></i> Ver planilla
+                        </a>
+                    </div>
+                </section>
+
+                {% if etiqueta_vigente %}
+                <section class="ax-card">
+                    <div class="ax-card-head">
+                        <h2 class="ax-card-title"><i class="bi bi-qr-code"></i> Etiqueta QR</h2>
+                    </div>
+                    <div class="ax-card-body">
+                        <p class="ax-hint mt-0 mb-0">
+                            Código <strong class="ax-mono">{{ etiqueta_vigente.codigo_reservado }}</strong>
+                        </p>
+                    </div>
+                </section>
+                {% endif %}
+
+                <p class="ax-hint text-center">
+                    ¿Algo no cuadra con este equipo? Contacta al administrador de Activos.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

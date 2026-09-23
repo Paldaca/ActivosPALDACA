@@ -1371,20 +1371,88 @@ tr:hover .ax-avatar { transform: scale(1.1); }
 /* Combobox de personas: buscar por nombre y apellido */
 .ax-combo { position: relative; }
 
+.ax-combo-shell {
+    position: relative;
+    display: block;
+}
+
 .ax-combo-input {
     width: 100%;
-    padding: .6rem .8rem .6rem 2.2rem;
+    padding: .7rem 2.5rem .7rem 2.45rem;
     border-radius: var(--ax-r);
-    border: 1px solid var(--ax-border-strong);
-    background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%237b849f'%3E%3Cpath d='M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001q.44.626 1.4 1.4l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.417-.384M12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0'/%3E%3C/svg%3E") no-repeat .75rem center / 15px;
-    font-size: .9rem;
-    transition: border-color var(--ax-fast) var(--ax-ease), box-shadow var(--ax-fast) var(--ax-ease);
+    border: 1.5px solid var(--ax-border-strong);
+    background: #fff;
+    font-size: .92rem;
+    color: var(--ax-ink);
+    transition:
+        border-color var(--ax-fast) var(--ax-ease),
+        box-shadow var(--ax-fast) var(--ax-ease),
+        background var(--ax-fast) var(--ax-ease);
+}
+
+.ax-combo-input::placeholder { color: var(--ax-ink-3); }
+
+.ax-combo-input:hover {
+    border-color: color-mix(in srgb, var(--ax-indigo) 35%, var(--ax-border-strong));
 }
 
 .ax-combo-input:focus {
     outline: none;
     border-color: var(--ax-indigo);
-    box-shadow: 0 0 0 4px rgba(40, 44, 137, .1);
+    box-shadow: 0 0 0 4px rgba(40, 44, 137, .12);
+    background: #fff;
+}
+
+.ax-combo-input.is-invalid {
+    border-color: var(--ax-red);
+    box-shadow: 0 0 0 4px rgba(237, 37, 70, .1);
+}
+
+.ax-combo-icon {
+    position: absolute;
+    top: 50%;
+    left: .85rem;
+    transform: translateY(-50%);
+    color: var(--ax-ink-3);
+    font-size: .95rem;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.ax-combo-clear {
+    position: absolute;
+    top: 50%;
+    right: .45rem;
+    transform: translateY(-50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.7rem;
+    height: 1.7rem;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--ax-ink-3);
+    cursor: pointer;
+    z-index: 1;
+}
+
+.ax-combo-clear:hover,
+.ax-combo-clear:focus-visible {
+    background: var(--ax-neutro);
+    color: var(--ax-ink);
+    outline: none;
+}
+
+.ax-combo-clear[hidden] { display: none; }
+
+.ax-combo--persona .ax-combo-input {
+    font-weight: 500;
+}
+
+.ax-combo--open .ax-combo-input {
+    border-bottom-left-radius: var(--ax-r-sm);
+    border-bottom-right-radius: var(--ax-r-sm);
 }
 
 /* La lista va EN FLUJO, no flotando.
@@ -1394,14 +1462,14 @@ tr:hover .ax-avatar { transform: scale(1.1); }
    se ve completo. */
 .ax-combo-list {
     position: static;
-    margin: .35rem 0 0;
-    max-height: 264px;
+    margin: .4rem 0 0;
+    max-height: 280px;
     overflow-y: auto;
     overscroll-behavior: contain;
-    padding: .3rem;
+    padding: .35rem;
     list-style: none;
     background: #fff;
-    border: 1px solid var(--ax-border-strong);
+    border: 1.5px solid var(--ax-border-strong);
     border-radius: var(--ax-r);
     box-shadow: var(--ax-sh-2);
     animation: ax-unfold .22s var(--ax-ease-out) both;
@@ -1409,7 +1477,7 @@ tr:hover .ax-avatar { transform: scale(1.1); }
 
 @keyframes ax-unfold {
     from { opacity: 0; max-height: 0; transform: translateY(-6px); }
-    to   { opacity: 1; max-height: 264px; transform: none; }
+    to   { opacity: 1; max-height: 280px; transform: none; }
 }
 
 .ax-combo-list[hidden] { display: none; }
@@ -1417,19 +1485,52 @@ tr:hover .ax-avatar { transform: scale(1.1); }
 .ax-combo-option {
     display: flex;
     align-items: center;
-    gap: .55rem;
-    padding: .45rem .55rem;
+    gap: .65rem;
+    padding: .55rem .6rem;
     border-radius: var(--ax-r-sm);
     cursor: pointer;
-    font-size: .86rem;
+    font-size: .9rem;
+    color: var(--ax-ink);
     transition: background var(--ax-fast) var(--ax-ease);
+}
+
+.ax-combo-option .ax-avatar {
+    flex: 0 0 auto;
+    width: 1.85rem;
+    height: 1.85rem;
+    font-size: .68rem;
 }
 
 .ax-combo-option:hover,
 .ax-combo-option.is-active { background: var(--ax-lila); }
-.ax-combo-option[aria-selected="true"] { background: var(--ax-menta); }
+.ax-combo-option[aria-selected="true"] {
+    background: var(--ax-menta);
+    font-weight: 600;
+}
 .ax-combo-option mark { background: #fff6b8; padding: 0 1px; border-radius: 3px; }
-.ax-combo-empty { padding: .8rem; text-align: center; color: var(--ax-ink-3); font-size: .84rem; }
+.ax-combo-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: .4rem;
+    padding: 1rem .8rem;
+    text-align: center;
+    color: var(--ax-ink-3);
+    font-size: .84rem;
+}
+
+/* El combo dentro de un input-group (select + botón "crear rápido"):
+   Bootstrap solo reparte flex-grow a .form-control/.form-select, asi que sin
+   esto el combo se queda al ancho de su contenido y el boton le queda
+   pegado a la izquierda en vez de al borde derecho del grupo. */
+.input-group > .ax-combo {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+.input-group > .ax-combo .ax-combo-input {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}
 
 /* Cuando JS toma el control, ocultamos el <select> nativo pero lo dejamos en el DOM */
 .ax-combo-native.is-enhanced {

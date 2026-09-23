@@ -14,15 +14,20 @@ from django.urls import reverse
 from django.views.decorators.http import require_POST
 from django.views.generic import ListView
 
-from .decorators import ModuloActivoRequiredMixin, requiere_modulo_paldaca
+from .decorators import (
+    AdminActivoRequiredMixin,
+    requiere_admin_activo,
+    requiere_modulo_paldaca,
+)
 from .forms import AltaDesdeEtiquetaForm, EtiquetaFilterForm, GenerarEtiquetasForm
 from .models import Activo, Categoria, EtiquetaQR, HistorialMovimiento, SubCategoria
+from .services.avisos import avisar_activo_creado
 from .services.codigos import reservar_codigos
 
 _ESTADO_ETIQUETA_LABELS = dict(EtiquetaQR.EstadoEtiqueta.choices)
 
 
-class EtiquetaListView(ModuloActivoRequiredMixin, ListView):
+class EtiquetaListView(AdminActivoRequiredMixin, ListView):
     """Parque de etiquetas emitidas, filtrable por estado."""
 
     model = EtiquetaQR
@@ -113,7 +118,7 @@ class EtiquetaListView(ModuloActivoRequiredMixin, ListView):
         return contexto
 
 
-@requiere_modulo_paldaca
+@requiere_admin_activo
 def generar_etiquetas(request):
     """Aparta N códigos de una subcategoría y crea sus etiquetas.
 
@@ -223,6 +228,7 @@ def etiqueta_alta(request, token):
                     ),
                     usuario=request.user,
                 )
+                avisar_activo_creado(activo, request.user)
 
             messages.success(
                 request,
@@ -257,7 +263,7 @@ def etiqueta_alta(request, token):
 
 
 @require_POST
-@requiere_modulo_paldaca
+@requiere_admin_activo
 def etiqueta_anular(request, pk):
     """Retira una etiqueta de circulación (adhesivo perdido o ilegible).
 
@@ -290,7 +296,7 @@ def etiqueta_anular(request, pk):
 
 
 @require_POST
-@requiere_modulo_paldaca
+@requiere_admin_activo
 def etiqueta_desvincular(request, pk):
     """Suelta el activo de una etiqueta pegada en el equipo equivocado."""
     etiqueta = get_object_or_404(EtiquetaQR.objects.select_related("activo"), pk=pk)
@@ -319,7 +325,7 @@ def etiqueta_desvincular(request, pk):
 
 
 @require_POST
-@requiere_modulo_paldaca
+@requiere_admin_activo
 def etiqueta_eliminar(request, pk):
     """Elimina un QR de lote que nunca recibió datos de activo."""
     from activos.services.etiquetas import eliminar_etiqueta_sin_datos
@@ -340,7 +346,7 @@ def etiqueta_eliminar(request, pk):
 
 
 @require_POST
-@requiere_modulo_paldaca
+@requiere_admin_activo
 def generar_etiqueta_activo(request, pk):
     """Genera (o reimprime) la etiqueta QR de un activo creado manualmente."""
     from django.core.exceptions import ValidationError

@@ -195,6 +195,43 @@ PALDACA_PORTAL_URL = (
 # Ruta del modulo dentro del shell: cpaldaca.com/activos/<ruta del satelite>.
 PALDACA_SHELL_PATH = os.getenv("PALDACA_SHELL_PATH", "/activos")
 
+# Bus de notificaciones del Portal: llamada server-to-server firmada
+# (activos/services/notificaciones_portal.py). Reusa PALDACA_API_BASE del nav si
+# no se define una URL propia. Default de produccion explicito a cpaldaca.com/api
+# (no api.cpaldaca.com): el Portal proxea /api/ al mismo origen que el SPA
+# (docs/COOLIFY.md), y ese alias aparte es opcional -- si no esta configurado en
+# el proxy, la emision y la lectura de umbral_dias fallaban en silencio.
+PALDACA_PORTAL_API_URL = (
+    (os.getenv("PALDACA_PORTAL_API_URL") or os.getenv("PALDACA_API_BASE") or "")
+    .strip()
+    .rstrip("/")
+    or ("http://127.0.0.1:8000/api" if _dev_env.exists() else "https://cpaldaca.com/api")
+)
+PALDACA_NOTIFICACIONES_ACTIVAS = (
+    os.getenv("PALDACA_NOTIFICACIONES_ACTIVAS", "true").lower() == "true"
+)
+
+# Directorio saliente de Nomina (satelite FEDERADO, BD propia): reenvio de la
+# cookie del operador para poblar el selector de personas asignables
+# (activos/services/nomina_directorio.py). Puerto 8086 en local, ver
+# Portal-Paldaca/scripts/modulos.py.
+PALDACA_NOMINA_API_URL = (
+    (os.getenv("PALDACA_NOMINA_API_URL") or "").strip().rstrip("/")
+    or ("http://localhost:8086/api" if _dev_env.exists() else "https://nomina.cpaldaca.com/api")
+)
+
+# Umbrales de las reglas por reloj (enviar_notificaciones_activos). Mismos
+# defaults que el catalogo sembrado en el Portal (TipoNotificacion.umbral_dias,
+# editable ahi sin deploy) -- Activos todavia no lee ese valor en caliente via
+# API, asi que por ahora el numero real que se evalua es este. Cambiarlo aqui
+# solo requiere una variable de entorno, no tocar codigo.
+ACTIVOS_UMBRAL_ETIQUETA_SIN_VINCULAR_DIAS = int(
+    os.getenv("ACTIVOS_UMBRAL_ETIQUETA_SIN_VINCULAR_DIAS", "30")
+)
+ACTIVOS_UMBRAL_ASIGNACION_SIN_PLANILLA_DIAS = int(
+    os.getenv("ACTIVOS_UMBRAL_ASIGNACION_SIN_PLANILLA_DIAS", "7")
+)
+
 # Quien puede enmarcar este satelite. Sustituye a X-Frame-Options, que no
 # admite lista de origenes (SAMEORIGIN no vale: son origenes distintos).
 _frame_ancestors = ["'self'", PALDACA_PORTAL_URL]

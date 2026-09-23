@@ -57,8 +57,8 @@ Disparador (enlace real, para que funcione también sin JavaScript):
                 <label class="form-label" for="drawerReasignarSelect">
                     <i class="bi bi-search me-1"></i> Buscar persona
                 </label>
-                <div class="ax-combo"
-                     data-combo-placeholder="Escribe un nombre o apellido…"
+                <div class="ax-combo ax-combo--persona"
+                     data-combo-placeholder="Buscar por nombre o apellido…"
                      data-combo-empty-label="Sin asignar · liberar equipo"
                      data-combo-remote-url="{% url 'activos:usuarios-asignables' %}">
                     <select name="usuario_asignado" id="drawerReasignarSelect"

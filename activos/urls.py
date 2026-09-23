@@ -56,5 +56,9 @@ urlpatterns = [
 
     # Alta express de catálogo desde el formulario de activos (JSON)
     path('catalogo/<slug:tipo>/rapido/', views.crear_rapido, name='crear-rapido'),
+
+    # "Mis Activos": lo único que ve un usuario sin rol administrador.
+    path('mis-activos/', views.MisActivosListView.as_view(), name='mis-activos-list'),
+    path('mis-activos/<int:pk>/', views.MisActivoDetailView.as_view(), name='mis-activos-detail'),
 ]
 

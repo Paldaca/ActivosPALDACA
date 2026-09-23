@@ -10,8 +10,7 @@ urlpatterns = [
     # Perfil de usuario
     path('<int:pk>/perfil/', views.UsuarioProfileView.as_view(), name='usuario-profile'),
 
-    # Alta y edición
-    path('crear/', views.UsuarioCreateView.as_view(), name='usuario-create'),
+    # Edición
     path('<int:pk>/editar/', views.UsuarioUpdateView.as_view(), name='usuario-update'),
 
     # Baja lógica: core_usuario es la identidad SSO compartida y no se elimina.

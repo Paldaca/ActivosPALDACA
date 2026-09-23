@@ -3,7 +3,7 @@
 {% load cache_bust %}
 {% load activo_filters %}
 
-{% block title %}{% if object %}Editar{% else %}Registrar{% endif %} persona - {{ block.super }}{% endblock %}
+{% block title %}Editar persona - {{ block.super }}{% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static_v 'css/activos-ui.css' %}">
@@ -15,27 +15,17 @@
     <nav class="ax-crumbs" aria-label="Ruta de navegación">
         <a href="{% url 'usuarios:usuario-search' %}">Personas</a>
         <span class="sep">/</span>
-        {% if object %}
         <a href="{% url 'usuarios:usuario-profile' object.pk %}">{{ object|nombre_completo }}</a>
         <span class="sep">/</span>
         <span aria-current="page">Editar</span>
-        {% else %}
-        <span aria-current="page">Registrar</span>
-        {% endif %}
     </nav>
 
     <header class="ax-hero">
         <span class="ax-hero-eyebrow">Responsables de activos</span>
-        <h1 class="ax-hero-title">
-            {% if object %}Editar a {{ object|nombre_completo }}{% else %}Registrar persona{% endif %}
-        </h1>
+        <h1 class="ax-hero-title">Editar a {{ object|nombre_completo }}</h1>
         <p class="ax-hero-sub">
-            {% if object %}
             Los cambios se reflejan en todo el módulo: la persona se muestra siempre
             por su nombre y apellido.
-            {% else %}
-            Solo hacen falta el nombre y el apellido. El resto puede completarse más tarde.
-            {% endif %}
         </p>
     </header>
 
@@ -102,7 +92,9 @@
                         </div>
                         <div class="col-12 ax-field" style="--i:2">
                             <label class="form-label" for="{{ form.perfil.id_for_label }}">{{ form.perfil.label }}</label>
-                            {{ form.perfil }}
+                            <div class="ax-combo" data-combo-placeholder="Escribe un perfil…">
+                                {{ form.perfil }}
+                            </div>
                             {% if form.perfil.errors %}
                             <div class="ax-error"><i class="bi bi-exclamation-circle"></i> {{ form.perfil.errors }}</div>
                             {% endif %}
@@ -124,10 +116,10 @@
                     <span class="ax-formbar-info">
                         <i class="bi bi-shield-check"></i> Nada se guarda hasta que confirmes.
                     </span>
-                    <a href="{% if object %}{% url 'usuarios:usuario-profile' object.pk %}{% else %}{% url 'usuarios:usuario-search' %}{% endif %}"
+                    <a href="{% url 'usuarios:usuario-profile' object.pk %}"
                        class="btn-pastel btn-pastel--neutro">Cancelar</a>
                     <button type="submit" class="btn-pastel btn-pastel--menta">
-                        {% if object %}Guardar cambios{% else %}Registrar persona{% endif %}
+                        Guardar cambios
                     </button>
                 </div>
             </form>

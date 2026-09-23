@@ -86,9 +86,10 @@ directo compartible y camino sin JavaScript.
                     <label class="form-label" for="{{ form.usuario_asignado.id_for_label }}">
                         <i class="bi bi-search me-1"></i> Buscar persona
                     </label>
-                    <div class="ax-combo"
-                         data-combo-placeholder="Escribe un nombre o apellido…"
-                         data-combo-empty-label="Sin asignar · liberar equipo">
+                    <div class="ax-combo ax-combo--persona"
+                         data-combo-placeholder="Buscar por nombre o apellido…"
+                         data-combo-empty-label="Sin asignar · liberar equipo"
+                         data-combo-remote-url="{% url 'activos:usuarios-asignables' %}">
                         {{ form.usuario_asignado }}
                     </div>
                     {% if form.usuario_asignado.errors %}

@@ -127,15 +127,21 @@
                 <div class="row g-3 ax-form">
                     <div class="col-md-5">
                         <label class="form-label" for="{{ filter_form.activo.id_for_label }}">Activo</label>
-                        {{ filter_form.activo }}
+                        <div class="ax-combo" data-combo-placeholder="Escribe un código de inventario…">
+                            {{ filter_form.activo }}
+                        </div>
                     </div>
                     <div class="col-md-3">
                         <label class="form-label" for="{{ filter_form.mes.id_for_label }}">Mes</label>
-                        {{ filter_form.mes }}
+                        <div class="ax-combo" data-combo-placeholder="Escribe un mes…">
+                            {{ filter_form.mes }}
+                        </div>
                     </div>
                     <div class="col-md-2">
                         <label class="form-label" for="{{ filter_form.año.id_for_label }}">Año</label>
-                        {{ filter_form.año }}
+                        <div class="ax-combo" data-combo-placeholder="Escribe un año…">
+                            {{ filter_form.año }}
+                        </div>
                     </div>
                     <div class="col-md-2 d-flex align-items-end gap-2">
                         <button type="submit" class="btn-pastel btn-pastel--lila btn-pastel--sm flex-grow-1">

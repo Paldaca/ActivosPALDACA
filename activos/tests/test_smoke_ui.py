@@ -11,7 +11,8 @@ def datos(db, django_user_model):
 
     mod, _ = Modulo.objects.get_or_create(codigo="activos", defaults={"nombre": "Activos"})
     admin = django_user_model.objects.create_user(
-        username="V-ADMIN", password="x", first_name="Ricardo", last_name="Goitia"
+        username="V-ADMIN", password="x", first_name="Ricardo", last_name="Goitia",
+        rol=django_user_model.ROL_ADMINISTRADOR,
     )
     ana = django_user_model.objects.create_user(
         username="V-ANA", password="x", first_name="Ana", last_name="Prueba"
@@ -318,7 +319,6 @@ def test_pantallas_usuarios_y_mantenimientos(cli, datos, mantenimiento):
         rv("usuarios:usuario-search") + "?estado=inactivos",
         rv("usuarios:usuario-search") + "?buscar=Ana",
         rv("usuarios:usuario-profile", args=[datos["ana"].pk]),
-        rv("usuarios:usuario-create"),
         rv("usuarios:usuario-update", args=[datos["ana"].pk]),
         rv("mantenimientos:mantenimiento-list"),
         rv("mantenimientos:mantenimiento-list") + "?estado=EP",

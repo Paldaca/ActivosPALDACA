@@ -109,6 +109,20 @@
         input.autocomplete = 'off';
         input.placeholder = contenedor.dataset.comboPlaceholder || 'Escribe para buscar…';
 
+        var shell = document.createElement('div');
+        shell.className = 'ax-combo-shell';
+
+        var icono = document.createElement('i');
+        icono.className = 'bi bi-search ax-combo-icon';
+        icono.setAttribute('aria-hidden', 'true');
+
+        var clearBtn = document.createElement('button');
+        clearBtn.type = 'button';
+        clearBtn.className = 'ax-combo-clear';
+        clearBtn.setAttribute('aria-label', 'Quitar selección');
+        clearBtn.innerHTML = '<i class="bi bi-x-lg" aria-hidden="true"></i>';
+        clearBtn.hidden = true;
+
         var lista = document.createElement('ul');
         lista.className = 'ax-combo-list';
         lista.setAttribute('role', 'listbox');
@@ -119,7 +133,10 @@
         // del navegador no quede atrapada en un elemento inalcanzable.
         select.classList.add('is-enhanced');
         select.setAttribute('tabindex', '-1');
-        contenedor.appendChild(input);
+        shell.appendChild(icono);
+        shell.appendChild(input);
+        shell.appendChild(clearBtn);
+        contenedor.appendChild(shell);
         contenedor.appendChild(lista);
 
         select.addEventListener('invalid', function () {
@@ -135,7 +152,10 @@
             return op ? op.label : vacia;
         }
 
-        function sincronizarInput() { input.value = etiquetaActual(); }
+        function sincronizarInput() {
+            input.value = etiquetaActual();
+            clearBtn.hidden = !select.value;
+        }
 
         function agregarOpcion(valor, etiqueta) {
             var value = String(valor);
@@ -223,6 +243,7 @@
             activo = -1;
             pintar('');
             lista.hidden = false;
+            contenedor.classList.add('ax-combo--open');
             input.setAttribute('aria-expanded', 'true');
             input.select();
             cargarRemoto('');
@@ -230,6 +251,7 @@
 
         function cerrar() {
             lista.hidden = true;
+            contenedor.classList.remove('ax-combo--open');
             input.setAttribute('aria-expanded', 'false');
             sincronizarInput();
         }
@@ -239,6 +261,13 @@
             select.dispatchEvent(new Event('change', { bubbles: true }));
             cerrar();
         }
+
+        clearBtn.addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            elegir('');
+            input.focus();
+        });
 
         input.addEventListener('focus', abrir);
         input.addEventListener('input', function () {

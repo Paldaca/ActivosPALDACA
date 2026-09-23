@@ -213,9 +213,13 @@ def test_ficha_publica_pide_no_indexar(client, etiqueta):
 
 @pytest.mark.django_db
 def test_alta_desde_etiqueta_exige_sesion(client, etiqueta):
+    from urllib.parse import unquote
+
     r = client.get(reverse("etiqueta-alta", args=[etiqueta.token]))
     assert r.status_code == 302
     assert "login" in r.url.lower()
+    assert "next=" in r.url
+    assert f"/q/{etiqueta.token}/alta/" in unquote(r.url)
 
 
 @pytest.mark.django_db

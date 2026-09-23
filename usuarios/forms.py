@@ -1,5 +1,3 @@
-import re
-
 from django import forms
 from django.contrib.auth import get_user_model
 
@@ -43,7 +41,7 @@ class UsuarioForm(forms.ModelForm):
                 attrs={"class": "form-control", "placeholder": "Número de teléfono"}
             ),
             "perfil": forms.Select(
-                attrs={"class": "form-select"},
+                attrs={"class": "form-select ax-combo-native"},
             ),
             "is_active": forms.CheckboxInput(attrs={"class": "form-check-input"}),
         }
@@ -57,29 +55,3 @@ class UsuarioForm(forms.ModelForm):
         self.fields["perfil"].required = False
         self.fields["perfil"].queryset = Perfil.objects.order_by("nombre")
         self.fields["perfil"].empty_label = "Sin perfil asignado"
-
-    def save(self, commit=True):
-        user = super().save(commit=False)
-        if not user.pk:
-            user.set_unusable_password()
-            if not user.username:
-                user.username = self._nuevo_username(user)
-        if commit:
-            user.save()
-        return user
-
-    @staticmethod
-    def _nuevo_username(user):
-        if user.email:
-            base = user.email.split("@")[0].lower()
-        else:
-            partes = [user.first_name.strip(), user.last_name.strip()]
-            base = ".".join(p for p in partes if p).lower() or "usuario"
-        base = re.sub(r"[^\w.@+-]", "", base)[:150] or "usuario"
-        username = base
-        n = 1
-        while UserModel.objects.filter(username=username).exists():
-            sufijo = f"-{n}"
-            username = f"{base[: 150 - len(sufijo)]}{sufijo}"
-            n += 1
-        return username

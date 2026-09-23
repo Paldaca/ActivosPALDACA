@@ -9,7 +9,16 @@ from django.http import HttpResponseRedirect
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 from activos.models import Activo
-from activos.decorators import ModuloActivoRequiredMixin, requiere_modulo_paldaca
+from activos.decorators import (
+    AdminActivoRequiredMixin,
+    requiere_admin_activo,
+    requiere_modulo_paldaca,
+)
+from activos.services.avisos import (
+    avisar_mantenimiento_finalizado,
+    avisar_mantenimiento_iniciado,
+)
+
 from .models import Mantenimiento
 from .forms import MantenimientoForm, MantenimientoFilterForm
 
@@ -28,7 +37,7 @@ def _url_de_retorno(request, url, fallback='mantenimientos:mantenimiento-list'):
         return url
     return reverse(fallback)
 
-class MantenimientoListView(ModuloActivoRequiredMixin, ListView):
+class MantenimientoListView(AdminActivoRequiredMixin, ListView):
     """Vista de lista de mantenimientos"""
     model = Mantenimiento
     template_name = 'mantenimientos/mantenimiento_list.html'
@@ -105,7 +114,7 @@ class MantenimientoListView(ModuloActivoRequiredMixin, ListView):
         )
         return context
 
-class MantenimientoCreateView(ModuloActivoRequiredMixin, CreateView):
+class MantenimientoCreateView(AdminActivoRequiredMixin, CreateView):
     """Vista para crear un nuevo mantenimiento"""
     model = Mantenimiento
     form_class = MantenimientoForm
@@ -129,6 +138,7 @@ class MantenimientoCreateView(ModuloActivoRequiredMixin, CreateView):
     
     def form_valid(self, form):
         response = super().form_valid(form)
+        avisar_mantenimiento_iniciado(self.object, self.request.user)
         messages.success(
             self.request,
             f'Mantenimiento registrado para {self.object.activo.codigo_inventario}.',
@@ -143,7 +153,7 @@ class MantenimientoCreateView(ModuloActivoRequiredMixin, CreateView):
         return reverse('mantenimientos:mantenimiento-detail', kwargs={'pk': self.object.pk})
 
 
-class MantenimientoUpdateView(ModuloActivoRequiredMixin, UpdateView):
+class MantenimientoUpdateView(AdminActivoRequiredMixin, UpdateView):
     """Vista para actualizar un mantenimiento"""
     model = Mantenimiento
     form_class = MantenimientoForm
@@ -158,7 +168,7 @@ class MantenimientoUpdateView(ModuloActivoRequiredMixin, UpdateView):
     def get_success_url(self):
         return reverse('mantenimientos:mantenimiento-detail', kwargs={'pk': self.object.pk})
 
-class MantenimientoDetailView(ModuloActivoRequiredMixin, DetailView):
+class MantenimientoDetailView(AdminActivoRequiredMixin, DetailView):
     """Vista de detalle de un mantenimiento"""
     model = Mantenimiento
     template_name = 'mantenimientos/mantenimiento_detail.html'
@@ -168,7 +178,7 @@ class MantenimientoDetailView(ModuloActivoRequiredMixin, DetailView):
         return super().get_queryset().select_related('activo__subcategoria__categoria', 'activo__ubicacion', 'activo__usuario_asignado')
 
 @require_POST
-@requiere_modulo_paldaca
+@requiere_admin_activo
 def finalizar_mantenimiento(request, pk):
     """Cierra un mantenimiento en un clic.
 
@@ -184,6 +194,7 @@ def finalizar_mantenimiento(request, pk):
     if mantenimiento.estado == Mantenimiento.EstadoMantenimiento.EN_PROCESO:
         mantenimiento.estado = Mantenimiento.EstadoMantenimiento.FINALIZADO
         mantenimiento.save()
+        avisar_mantenimiento_finalizado(mantenimiento, request.user)
         messages.success(
             request,
             f'Mantenimiento de {mantenimiento.activo.codigo_inventario} finalizado. '

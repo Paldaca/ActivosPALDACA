@@ -412,3 +412,72 @@ class EtiquetaQR(models.Model):
         self.estado = self.EstadoEtiqueta.ANULADA
         self.save(update_fields=["estado"])
         return self
+
+
+class AvisoUsuarioInactivo(models.Model):
+    """Marca que ya se avisó a los admins de un usuario inactivo con equipos.
+
+    Un usuario desactivado (típicamente desde el panel de superadmin del
+    Portal, no desde Activos — BR-USR-03 ya bloquea desactivar desde aquí si
+    tiene equipos) puede quedar así indefinidamente si nadie reasigna. Sin
+    este marcador, el despachador diario (`enviar_notificaciones_activos`)
+    repetiría el aviso cada día mientras la situación no cambie. Se borra
+    solo cuando el usuario se reactiva o se queda sin equipo asignado, así
+    que una recaída futura vuelve a avisar.
+    """
+
+    usuario = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="aviso_inactivo_activos",
+    )
+    enviado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = TABLA("aviso_usuario_inactivo")
+        verbose_name = "Aviso de usuario inactivo"
+        verbose_name_plural = "Avisos de usuario inactivo"
+
+    def __str__(self):
+        return f"Aviso pendiente de {self.usuario_id}"
+
+
+class AvisoPorUmbral(models.Model):
+    """Marca que ya se avisó sobre un registro que cruzó un umbral de días.
+
+    Generaliza `AvisoUsuarioInactivo` a las reglas por reloj que evalúan un
+    registro concreto (una etiqueta, una reasignación) en vez de un usuario:
+    ambas condiciones persisten hasta que alguien actúa (vincular la
+    etiqueta, archivar la planilla), así que sin este marcador el
+    despachador diario repetiría el aviso cada día. `regla` + `objeto_id`
+    identifican el caso puntual; se borra en cuanto deja de cumplirse, para
+    poder volver a avisar si recae (ej. una etiqueta que se desvincula y
+    vuelve a quedar pendiente).
+    """
+
+    REGLA_ETIQUETA_SIN_VINCULAR = "etiqueta_sin_vincular"
+    REGLA_ASIGNACION_SIN_PLANILLA = "asignacion_sin_planilla"
+    REGLAS = (
+        (REGLA_ETIQUETA_SIN_VINCULAR, "Etiqueta sin vincular"),
+        (REGLA_ASIGNACION_SIN_PLANILLA, "Asignación sin planilla"),
+    )
+
+    regla = models.CharField(max_length=32, choices=REGLAS)
+    objeto_id = models.PositiveIntegerField(
+        help_text="pk de EtiquetaQR o HistorialMovimiento, según la regla."
+    )
+    enviado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = TABLA("aviso_por_umbral")
+        verbose_name = "Aviso por umbral"
+        verbose_name_plural = "Avisos por umbral"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["regla", "objeto_id"],
+                name="activos_aviso_por_umbral_unico",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.regla}:{self.objeto_id}"

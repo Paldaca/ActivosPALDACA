@@ -93,7 +93,15 @@ class PaldacaSessionMiddleware:
             response = embed_signal_response(request, "session-expired")
             return apply_paldaca_cookie_clearance(response)
 
-        response = redirect(login_url)
+        from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+
+        parts = urlsplit(login_url)
+        query = dict(parse_qsl(parts.query, keep_blank_values=True))
+        query["next"] = request.build_absolute_uri()
+        login_con_next = urlunsplit(
+            (parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment)
+        )
+        response = redirect(login_con_next)
         return apply_paldaca_cookie_clearance(response)
 
 

@@ -152,7 +152,9 @@
                         <label class="form-label" for="{{ form.estado.id_for_label }}">
                             {{ form.estado.label }} <span class="ax-req">*</span>
                         </label>
-                        {{ form.estado }}
+                        <div class="ax-combo" data-combo-placeholder="Escribe un estado…">
+                            {{ form.estado }}
+                        </div>
                         {% if form.estado.errors %}
                         <div class="ax-error"><i class="bi bi-exclamation-circle"></i> {{ form.estado.errors }}</div>
                         {% endif %}

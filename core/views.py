@@ -6,13 +6,24 @@ from mantenimientos.models import Mantenimiento
 from django.db.models import Count, Q
 from django.shortcuts import redirect
 import logging
-from activos.decorators import ModuloActivoRequiredMixin
+from activos.decorators import ModuloActivoRequiredMixin, usuario_es_admin_activos
 
 logger = logging.getLogger(__name__)
 
 
 class HomeView(ModuloActivoRequiredMixin, TemplateView):
+    """Dashboard del inventario completo — solo para administradores de Activos.
+
+    Un usuario sin ese rol no tiene nada que hacer aquí (todo lo que muestra es
+    agregado del inventario ajeno): se manda directo a "Mis Activos".
+    """
+
     template_name = 'home.html'
+
+    def get(self, request, *args, **kwargs):
+        if not usuario_es_admin_activos(request):
+            return redirect('activos:mis-activos-list')
+        return super().get(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

@@ -14,3 +14,6 @@ DATABASES = {
 PASSWORD_HASHERS = [
     "django.contrib.auth.hashers.MD5PasswordHasher",
 ]
+
+# Ningun test sale a la red: los que prueban la emision la simulan.
+PALDACA_NOTIFICACIONES_ACTIVAS = False

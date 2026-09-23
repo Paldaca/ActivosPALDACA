@@ -7,11 +7,19 @@ from core.models import Modulo, UsuarioModulo
 
 @pytest.fixture
 def user(db):
+    """Usuario de pruebas con acceso a Activos y rol administrador.
+
+    La inmensa mayoría de este suite ejercita pantallas de gestión
+    (crear/editar/reasignar/etc.), que ahora exigen `rol=administrador`
+    (`AdminActivoRequiredMixin`). Un usuario sin ese rol solo ve
+    `activos:mis-activos-*`; para esos casos usar `usuario_normal`.
+    """
     user_model = get_user_model()
     user = user_model.objects.create_user(
         username="pytest_user",
         email="pytest@example.com",
         password="test-pass-123",
+        rol=user_model.ROL_ADMINISTRADOR,
     )
     modulo, _ = Modulo.objects.get_or_create(
         codigo="activos", defaults={"nombre": "Activos"}
@@ -23,6 +31,28 @@ def user(db):
 @pytest.fixture
 def client_auth(client, user):
     client.force_login(user)
+    return client
+
+
+@pytest.fixture
+def usuario_normal(db):
+    """Acceso a Activos SIN rol administrador: solo puede ver sus propios activos."""
+    user_model = get_user_model()
+    user = user_model.objects.create_user(
+        username="pytest_user_normal",
+        email="pytest-normal@example.com",
+        password="test-pass-123",
+    )
+    modulo, _ = Modulo.objects.get_or_create(
+        codigo="activos", defaults={"nombre": "Activos"}
+    )
+    UsuarioModulo.objects.get_or_create(usuario=user, modulo=modulo)
+    return user
+
+
+@pytest.fixture
+def client_normal(client, usuario_normal):
+    client.force_login(usuario_normal)
     return client
 
 

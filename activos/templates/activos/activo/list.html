@@ -258,20 +258,26 @@
                     <div class="row g-3 mt-1 ax-form">
                         <div class="col-md-3">
                             <label class="form-label" for="{{ filter_form.categoria.id_for_label }}">Categoría</label>
-                            {{ filter_form.categoria }}
+                            <div class="ax-combo" data-combo-placeholder="Escribe una categoría…">
+                                {{ filter_form.categoria }}
+                            </div>
                         </div>
                         <div class="col-md-3">
                             <label class="form-label" for="{{ filter_form.subcategoria.id_for_label }}">Subcategoría</label>
-                            {{ filter_form.subcategoria }}
+                            <div class="ax-combo" data-combo-placeholder="Escribe una subcategoría…">
+                                {{ filter_form.subcategoria }}
+                            </div>
                         </div>
                         <div class="col-md-3">
                             <label class="form-label" for="{{ filter_form.ubicacion.id_for_label }}">Ubicación</label>
-                            {{ filter_form.ubicacion }}
+                            <div class="ax-combo" data-combo-placeholder="Escribe una ubicación…">
+                                {{ filter_form.ubicacion }}
+                            </div>
                         </div>
                         <div class="col-md-3">
                             <label class="form-label" for="axResponsable">Responsable</label>
-                            <div class="ax-combo"
-                                 data-combo-placeholder="Escribe un nombre…"
+                            <div class="ax-combo ax-combo--persona"
+                                 data-combo-placeholder="Buscar por nombre…"
                                  data-combo-empty-label="Cualquier persona"
                                  data-combo-remote-url="{% url 'activos:usuarios-asignables' %}">
                                 <select name="usuario_asignado" id="axResponsable"

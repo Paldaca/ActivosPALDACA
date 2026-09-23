@@ -167,6 +167,39 @@ Migración a prefijo: `activos/migrations/0004_activos_prefijo_tablas.py`.
 | Nav JS | `{asset_base}/static/paldaca-nav.js` | Sidebar Suite | `core/context_processors.py` |
 | Nav API | `PALDACA_API_BASE` (default `https://api.cpaldaca.com/api`) | Menú / módulos habilitados | `paldaca_nav.html` → `window.__PALDACA_NAV__` |
 | Logos Portal | `{portal_url}/images/logo*.png` | Branding nav | `core/context_processors.py` |
+| Bus de notificaciones | `PALDACA_PORTAL_API_URL` (o `PALDACA_API_BASE`) + `/notificaciones/eventos/` | Avisos en la campana del Portal | `activos/services/notificaciones_portal.py` |
+| Directorio saliente de Nómina | `PALDACA_NOMINA_API_URL` + `/empleados/directorio/asignables/` | Personas asignables a activos (empleados de Nómina, no `core_usuario` local) | `activos/services/nomina_directorio.py` |
+
+### Directorio de Nómina (personas asignables)
+
+Nómina PALDACA es un satélite **federado** (base de datos propia, ver
+`Portal-Paldaca/docs/PALDACA_SUITE/CONTRATO_SSO_FEDERADO.md`): no hay forma de
+hacer JOIN entre `activos_activo` y sus empleados. En su lugar, Activos reenvía
+la cookie de sesión del operador (la misma `paldaca_sessionid` que comparte con
+el Portal) a un endpoint de solo lectura que Nómina expone bajo `/api/`
+(`Empleados/views_directorio_saliente.py` en ese repo), que a su vez la valida
+contra el Portal. Ningún secreto nuevo se comparte entre Activos y Nómina. Si
+Nómina no responde, el selector de "Responsable" se degrada a "sin resultados"
+— nunca un 500 (`activos/services/nomina_directorio.py`).
+
+### Bus de notificaciones del Portal
+
+Llamada server-to-server **firmada** (HMAC-SHA256 con clave derivada de `DJANGO_SECRET_KEY`;
+misma función que `backend/notificaciones/firma.py` del Portal). No usa la sesión del
+operador, así que funciona aunque el rol administrador no se aplique en las vistas. Nunca
+lanza y se emite con `transaction.on_commit`: si el Portal no responde, el alta o la
+asignación se guardan igual.
+
+| Evento | Dónde | Destinatarios |
+|--------|-------|---------------|
+| `activos.activo_creado` | `ActivoCreateView`, `etiqueta_alta` | Admins de Activos (Portal) + custodio si ya viene asignado |
+| `activos.activo_asignado` | `ActivoUpdateView`, `reasignar_activo`, `acciones_masivas` | El nuevo custodio. La masiva agrupa: un aviso "Se te asignaron N activos" |
+
+- Alta con custodio emite solo `activo_creado` (no además `activo_asignado`).
+- Reasignar al mismo custodio o dejar sin asignar no avisa. Reubicar tampoco.
+- Lógica en `activos/services/avisos.py`; `PALDACA_NOTIFICACIONES_ACTIVAS=false` la apaga
+  (`SSAPI/settings_test.py` la apaga). Contrato en
+  `Portal-Paldaca/docs/guia-integracion-programas-satelite.md`.
 
 Default producción del bundle nav: **`https://cpaldaca.com`**. Override local: `PALDACA_NAV_ASSET_BASE=http://localhost:8000`.
 
@@ -261,8 +294,8 @@ Comando local: `python manage.py seed_core_modulos` (`core/management/commands/s
 | Cambiar `rol`, `disciplina`, `perfil` | Posible invalidación sesión |
 | Desactivar `is_active` en `core_usuario` | Logout / sin acceso |
 | Crear usuario solo en Portal | Visible en Activos si tiene acceso módulo |
-| Crear usuario desde Activos (`UsuarioForm`) | Crea fila en **`core_usuario` global** sin asignar `UsuarioModulo` automáticamente — **puede no tener acceso a Activos ni otros módulos** hasta configuración en admin |
 | Migraciones `core` en Portal sin sincronizar en Activos | Riesgo de esquema inconsistente |
+| Nómina cae o no responde | Selector de "Responsable" muestra "no se pudo cargar la lista"; el resto de Activos sigue funcionando (`activos/services/nomina_directorio.py` nunca lanza) |
 
 ---
 
@@ -287,7 +320,6 @@ Comando local: `python manage.py seed_core_modulos` (`core/management/commands/s
 9. **`README.md` desactualizado** — riesgo operativo para nuevos desarrolladores (MySQL vs PostgreSQL).
 10. **`ReporteGenerado` sin uso** — esquema extra sin valor hasta implementar persistencia.
 11. **Chat legacy en `base.js`** — llamadas a endpoint inexistente (ruido en consola).
-12. **Alta de usuarios en Activos sin `UsuarioModulo`** — usuarios "huérfanos" de acceso SSO al módulo.
 
 ---
 

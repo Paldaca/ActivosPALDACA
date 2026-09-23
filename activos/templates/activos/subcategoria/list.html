@@ -49,15 +49,17 @@
             <form method="get" class="ax-form d-flex flex-wrap align-items-end gap-2">
                 <div class="flex-grow-1" style="min-width: 220px;">
                     <label class="form-label" for="axFiltroCategoria">Filtrar por categoría</label>
-                    <select name="categoria" id="axFiltroCategoria" class="form-select" data-ax-autofiltro>
-                        <option value="">Todas las categorías</option>
-                        {% for categoria in categorias %}
-                        <option value="{{ categoria.id }}"
-                                {% if request.GET.categoria == categoria.id|stringformat:"s" %}selected{% endif %}>
-                            {{ categoria.nombre }}
-                        </option>
-                        {% endfor %}
-                    </select>
+                    <div class="ax-combo" data-combo-placeholder="Escribe una categoría…">
+                        <select name="categoria" id="axFiltroCategoria" class="form-select ax-combo-native" data-ax-autofiltro>
+                            <option value="">Todas las categorías</option>
+                            {% for categoria in categorias %}
+                            <option value="{{ categoria.id }}"
+                                    {% if request.GET.categoria == categoria.id|stringformat:"s" %}selected{% endif %}>
+                                {{ categoria.nombre }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
                 </div>
                 <a href="{% url 'activos:subcategoria-list' %}" class="btn-pastel btn-pastel--neutro">
                     <i class="bi bi-arrow-counterclockwise"></i> Limpiar

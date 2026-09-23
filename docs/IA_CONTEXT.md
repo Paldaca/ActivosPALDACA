@@ -55,9 +55,13 @@ MODULO_CODIGO = "activos"  # activos/constants.py
 
 - SSO: cookie `paldaca_sessionid`, `DJANGO_SECRET_KEY` compartida
 - Login/logout → Portal (`PALDACA_SSO_LOGIN_URL`, `PALDACA_SSO_LOGOUT_URL`)
-- Guard: `ModuloActivoRequiredMixin`, `@requiere_modulo_paldaca` → `tiene_acceso_modulo("activos")`
+- Guard de acceso al módulo: `ModuloActivoRequiredMixin`, `@requiere_modulo_paldaca` →
+  `tiene_acceso_modulo("activos")`
+- Guard de gestión (todo salvo "Mis Activos"): `AdminActivoRequiredMixin`,
+  `@requiere_admin_activo` → `es_administrador_en_modulo("activos")`. Sin ese rol,
+  solo `activos:mis-activos-list/-detail` (BR-ACC-04b). Cacheado por request en
+  `usuario_es_admin_activos()`.
 - `PaldacaSessionMiddleware`: invalida sesión si cambian permisos (`get_auth_revision`)
-- **`es_administrador_en_modulo()` no se usa en vistas** — acceso binario al módulo
 - **Excepción anónima:** `/q/<token>/` (ficha pública de una etiqueta QR) es la ÚNICA vista sin sesión.
   Vive aislada en `activos/views_publicos.py`. Publica datos del equipo + nombre y apellido del responsable; nada más.
 
@@ -80,7 +84,8 @@ MODULO_CODIGO = "activos"  # activos/constants.py
 - No borrar `core_usuario` — solo `is_active=False` (`usuarios/views.py`)
 - No desactivar usuario con activos asignados
 - Categoría/subcategoría/ubicación: no delete si tienen hijos/activos
-- Crear usuario desde Activos → `set_unusable_password()`, **sin** auto-asignar `UsuarioModulo`
+- Activos **no** crea personas: el selector de responsables sale de Nómina PALDACA
+  (`activos/services/nomina_directorio.py`), no de una alta local en `core_usuario`
 
 ---
 
@@ -88,9 +93,10 @@ MODULO_CODIGO = "activos"  # activos/constants.py
 
 | Con | Cómo |
 |-----|------|
-| Portal-Paldaca | SSO, logout API, `paldaca-nav.js/css`, API menú |
+| Portal-Paldaca | SSO, logout API, `paldaca-nav.js/css`, API menú, bus de notificaciones: POST firmado al hecho (alta/asignación) y por reloj (`usuario_inactivo_con_equipos`, diario) — `activos/services/avisos.py`, `enviar_notificaciones_activos` |
 | MySQL compartido | `core_*` + `activos_*` + `django_session` |
 | Calidad/Codigos/HDT | Solo vía BD compartida (`core_*`), sin imports |
+| Nómina PALDACA (federado, BD propia) | Cookie-forwarding a `/api/empleados/directorio/asignables/` — `activos/services/nomina_directorio.py` |
 
 Nav: `core/context_processors.py` → `paldaca_nav_current_app = "activos"`.
 
@@ -135,8 +141,10 @@ key.env.example            # Plantilla env SSO
 
 | Ruta | Nombre |
 |------|--------|
-| `/` | `core:home` |
-| `/activos/` | `activos:activo-list` |
+| `/` | `core:home` — admin: dashboard; no-admin: redirige a `mis-activos-list` |
+| `/activos/mis-activos/` | `activos:mis-activos-list` (cualquiera con el módulo, filtrado a lo propio) |
+| `/activos/mis-activos/<pk>/` | `activos:mis-activos-detail` (ídem; 404 si el activo no es tuyo) |
+| `/activos/` | `activos:activo-list` (admin) |
 | `/activos/crear/` | `activos:activo-create` |
 | `/activos/etiquetas/` | `activos:etiqueta-list` |
 | `/q/<token>/` | `etiqueta-publica` (**anónima**, sin namespace) |
@@ -171,6 +179,7 @@ python manage.py migrate
 python manage.py seed_core_modulos
 python manage.py seed_activos_pal          # datos demo
 python manage.py etiquetar_activos --dry-run  # etiquetas QR para inventario existente
+python manage.py enviar_notificaciones_activos --dry-run  # avisos por reloj, ver CRON_ENDPOINT.md
 pytest                                      # SSAPI/settings_test
 python manage.py runserver 8001            # puerto oficial Suite (Portal .env.development)
 ```
@@ -180,7 +189,9 @@ python manage.py runserver 8001            # puerto oficial Suite (Portal .env.d
 ## Al implementar cambios
 
 - **No** duplicar tablas `core_*` ni otro `AUTH_USER_MODEL`
-- Proteger vistas nuevas con `ModuloActivoRequiredMixin` o `@requiere_modulo_paldaca`
+- Proteger vistas nuevas: gestión → `AdminActivoRequiredMixin` / `@requiere_admin_activo`;
+  algo que cualquiera con el módulo pueda ver → `ModuloActivoRequiredMixin` /
+  `@requiere_modulo_paldaca` (raro fuera de "Mis Activos", ver BR-ACC-04b)
 - Nuevas tablas negocio: prefijo `activos_`
 - FK a usuario: siempre `settings.AUTH_USER_MODEL`
 - Cambios en permisos globales: considerar impacto en `get_auth_revision()` y SSO Suite

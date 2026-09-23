@@ -1,4 +1,6 @@
-{% load static %}<!DOCTYPE html>
+{% load static %}
+{% load cache_bust %}
+<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -7,6 +9,7 @@
     <link rel="icon" type="image/png" href="{% static 'core/img/logo blanco recortado.png' %}">
     <title>Registrar {{ etiqueta.codigo_reservado }} · Activos PALDACA</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="{% static_v 'css/activos-ui.css' %}">
     <style>
         :root {
             --marca: #32407b;
@@ -75,9 +78,7 @@
             margin-bottom: .3rem;
         }
         .campo .ayuda { font-size: .8rem; color: var(--tinta-suave); margin-top: .25rem; }
-        /* Los widgets llegan con clases de Bootstrap desde el ModelForm; aquí se
-           les da el tamaño táctil que pide un formulario que se rellena de pie. */
-        .campo input, .campo select, .campo textarea {
+        .campo input:not(.ax-combo-input), .campo select:not(.ax-combo-native.is-enhanced), .campo textarea {
             width: 100%;
             padding: .7rem .8rem;
             font-size: 1rem;
@@ -87,12 +88,21 @@
             border: 1px solid var(--linea);
             border-radius: .55rem;
         }
-        .campo input:focus, .campo select:focus, .campo textarea:focus {
+        .campo input:not(.ax-combo-input):focus,
+        .campo select:not(.ax-combo-native.is-enhanced):focus,
+        .campo textarea:focus {
             outline: 3px solid #9fb0e6;
             outline-offset: 1px;
             border-color: var(--marca);
         }
         .campo textarea { resize: vertical; }
+
+        .campo .ax-combo--persona .ax-combo-input {
+            min-height: 3rem;
+            padding: .75rem 2.6rem .75rem 2.55rem;
+            font-size: 1rem;
+            border-radius: .7rem;
+        }
 
         .errores { margin: .35rem 0 0; padding: 0; list-style: none; color: var(--alto); font-size: .85rem; }
 
@@ -159,7 +169,20 @@
                 <label for="{{ campo.id_for_label }}">
                     {{ campo.label }}{% if not campo.field.required %} <span style="font-weight:400;text-transform:none;letter-spacing:0">(opcional)</span>{% endif %}
                 </label>
+                {% if campo.name == "usuario_asignado" %}
+                <div class="ax-combo ax-combo--persona"
+                     data-combo-placeholder="Buscar por nombre o apellido…"
+                     data-combo-empty-label="Sin asignar por ahora"
+                     data-combo-remote-url="{% url 'activos:usuarios-asignables' %}">
+                    {{ campo }}
+                </div>
+                {% elif campo.name == "ubicacion" %}
+                <div class="ax-combo" data-combo-placeholder="Escribe una ubicación…">
+                    {{ campo }}
+                </div>
+                {% else %}
                 {{ campo }}
+                {% endif %}
                 {% if campo.help_text %}<p class="ayuda">{{ campo.help_text }}</p>{% endif %}
                 {% if campo.errors %}
                 <ul class="errores">
@@ -184,5 +207,6 @@
     </footer>
 
 </div>
+<script src="{% static_v 'js/activos-ui.js' %}"></script>
 </body>
 </html>
