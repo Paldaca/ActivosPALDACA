@@ -175,7 +175,7 @@ class MantenimientoDetailView(AdminActivoRequiredMixin, DetailView):
     context_object_name = 'mantenimiento'
     
     def get_queryset(self):
-        return super().get_queryset().select_related('activo__subcategoria__categoria', 'activo__ubicacion', 'activo__usuario_asignado')
+        return super().get_queryset().select_related('activo__subcategoria__categoria', 'activo__ubicacion', 'activo__responsable', 'activo__usuario_legacy')
 
 @require_POST
 @requiere_admin_activo

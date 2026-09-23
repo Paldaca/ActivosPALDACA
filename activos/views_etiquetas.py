@@ -235,7 +235,7 @@ def etiqueta_alta(request, token):
                 f"Activo {activo.codigo_inventario} registrado correctamente.",
             )
             destino = reverse("activos:activo-detail", kwargs={"pk": activo.pk})
-            if activo.usuario_asignado_id:
+            if activo.responsable_id:
                 try:
                     from reportes.services.asignacion import (
                         guardar_planilla_en_historial,

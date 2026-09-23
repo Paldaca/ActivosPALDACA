@@ -145,7 +145,7 @@ def test_ficha_publica_visible_sin_sesion(client, etiqueta, catalogo, subcategor
     activo = Activo.objects.create(
         subcategoria=subcategoria, marca="Lenovo", modelo="T14",
         ubicacion=catalogo["ubicacion_almacen"],
-        usuario_asignado=catalogo["usuario_a"],
+        responsable=catalogo["empleado_a"],
         observaciones="SECRETO-INTERNO-NO-PUBLICAR",
     )
     etiqueta.vincular(activo)
@@ -229,7 +229,7 @@ def test_alta_desde_etiqueta_usa_el_codigo_reservado(client_auth, etiqueta, cata
         "modelo": "T14",
         "numero_serial": "SN-QR-1",
         "ubicacion": catalogo["ubicacion_almacen"].pk,
-        "usuario_asignado": "",
+        "responsable": "",
         "observaciones": "",
     })
     assert r.status_code == 302
@@ -249,7 +249,7 @@ def test_alta_desde_etiqueta_deja_rastro_en_historial(client_auth, etiqueta, cat
     client_auth.post(reverse("etiqueta-alta", args=[etiqueta.token]), {
         "marca": "Lenovo", "modelo": "T14", "numero_serial": "",
         "ubicacion": catalogo["ubicacion_almacen"].pk,
-        "usuario_asignado": "", "observaciones": "",
+        "responsable": "", "observaciones": "",
     })
     etiqueta.refresh_from_db()
     assert HistorialMovimiento.objects.filter(
@@ -264,7 +264,7 @@ def test_reenviar_el_alta_no_duplica_el_activo(client_auth, etiqueta, catalogo):
     datos = {
         "marca": "Lenovo", "modelo": "T14", "numero_serial": "",
         "ubicacion": catalogo["ubicacion_almacen"].pk,
-        "usuario_asignado": "", "observaciones": "",
+        "responsable": "", "observaciones": "",
     }
     client_auth.post(reverse("etiqueta-alta", args=[etiqueta.token]), datos)
     client_auth.post(reverse("etiqueta-alta", args=[etiqueta.token]), datos)
@@ -277,7 +277,7 @@ def test_alta_con_responsable_ofrece_la_constancia(client_auth, etiqueta, catalo
     r = client_auth.post(reverse("etiqueta-alta", args=[etiqueta.token]), {
         "marca": "Lenovo", "modelo": "T14", "numero_serial": "",
         "ubicacion": catalogo["ubicacion_almacen"].pk,
-        "usuario_asignado": catalogo["usuario_a"].pk,
+        "responsable": catalogo["empleado_a"].pk,
         "observaciones": "",
     })
     assert "constancia=" in r["Location"]
@@ -288,7 +288,7 @@ def test_alta_sin_responsable_no_ofrece_constancia(client_auth, etiqueta, catalo
     r = client_auth.post(reverse("etiqueta-alta", args=[etiqueta.token]), {
         "marca": "Lenovo", "modelo": "T14", "numero_serial": "",
         "ubicacion": catalogo["ubicacion_almacen"].pk,
-        "usuario_asignado": "", "observaciones": "",
+        "responsable": "", "observaciones": "",
     })
     assert "constancia=" not in r["Location"]
 

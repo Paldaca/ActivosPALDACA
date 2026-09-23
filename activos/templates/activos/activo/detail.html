@@ -251,22 +251,40 @@
                         <h2 class="ax-card-title"><i class="bi bi-person-badge"></i> Responsable</h2>
                     </div>
                     <div class="ax-card-body text-center">
-                        {% if activo.usuario_asignado %}
-                        <a href="{% url 'usuarios:usuario-profile' activo.usuario_asignado.pk %}"
+                        {% if activo.responsable %}
+                        <a href="{% url 'usuarios:usuario-profile' activo.responsable_id %}"
                            class="ax-link-plain d-inline-block">
-                            <span class="ax-avatar ax-avatar--xl ax-avatar--c{{ activo.usuario_asignado|tono_avatar }} mx-auto mb-2">
-                                {{ activo.usuario_asignado|iniciales }}
+                            <span class="ax-avatar ax-avatar--xl ax-avatar--c{{ activo.responsable|tono_avatar }} mx-auto mb-2">
+                                {{ activo.responsable|iniciales }}
                             </span>
-                            <p class="ax-spec-value mb-1">{{ activo.usuario_asignado|nombre_completo }}</p>
+                            <p class="ax-spec-value mb-1">{{ activo.responsable|nombre_completo }}</p>
                         </a>
-                        {% if activo.usuario_asignado.perfil %}
-                        <p class="ax-person-meta mb-2">{{ activo.usuario_asignado.perfil }}</p>
+                        {% if activo.responsable.cargo %}
+                        <p class="ax-person-meta mb-2">{{ activo.responsable.cargo }}</p>
+                        {% endif %}
+                        {% if not activo.responsable.activo %}
+                        <div class="ax-callout ax-callout--warn text-start mb-3">
+                            <i class="bi bi-person-slash"></i>
+                            <span>Está de baja en Nómina. Reasigna este equipo.</span>
+                        </div>
                         {% endif %}
                         <a href="{% url 'reportes:planilla-vigente' activo.pk %}"
                            class="btn-pastel btn-pastel--durazno btn-pastel--block mb-3"
                            target="_blank" rel="noopener">
                             <i class="bi bi-file-earmark-pdf"></i> Ver planilla
                         </a>
+                        {% elif activo.pendiente_de_vincular %}
+                        <span class="ax-avatar ax-avatar--xl ax-avatar--c{{ activo.usuario_legacy|tono_avatar }} mx-auto mb-2">
+                            {{ activo.usuario_legacy|iniciales }}
+                        </span>
+                        <p class="ax-spec-value mb-1">{{ activo.usuario_legacy|nombre_completo }}</p>
+                        <div class="ax-callout ax-callout--warn text-start mb-3">
+                            <i class="bi bi-link-45deg"></i>
+                            <span>
+                                Asignación anterior sin empleado en Nómina. Vincula esta
+                                cuenta en Nómina o reasigna el equipo a un empleado.
+                            </span>
+                        </div>
                         {% else %}
                         <span class="ax-avatar ax-avatar--xl mx-auto mb-2" style="border-style: dashed;">
                             <i class="bi bi-person-dash"></i>
@@ -282,8 +300,8 @@
                            data-equipo="{{ activo.marca }} {{ activo.modelo }}"
                            data-serial="{{ activo.numero_serial|default:'' }}"
                            data-icono="{{ activo|icono_activo }}"
-                           data-usuario-id="{{ activo.usuario_asignado_id|default:'' }}"
-                           data-usuario-nombre="{{ activo.usuario_asignado|nombre_completo }}">
+                           data-usuario-id="{{ activo.responsable_id|default:'' }}"
+                           data-usuario-nombre="{{ activo.persona_responsable|nombre_completo }}">
                             <i class="bi bi-person-gear"></i> Reasignar
                         </a>
                     </div>
@@ -351,7 +369,7 @@
                 </section>
 
                 {# Planilla de asignación con firmas #}
-                {% if activo.usuario_asignado %}
+                {% if activo.tiene_responsable %}
                 <section class="ax-card">
                     <div class="ax-card-head">
                         <h2 class="ax-card-title"><i class="bi bi-vector-pen"></i> Planilla de asignación</h2>
@@ -402,7 +420,7 @@
                            data-codigo="{{ activo.codigo_inventario }}"
                            data-ficha="{{ activo.marca }} {{ activo.modelo }} · {{ activo.ubicacion.nombre }}"
                            data-impacto="Se borrarán también sus {{ total_movimientos }} movimiento(s) de historial y sus {{ resumen_mantenimientos.total }} mantenimiento(s). No se puede deshacer."
-                           {% if activo.usuario_asignado %}data-aviso="Está bajo la responsabilidad de {{ activo.usuario_asignado|nombre_completo }}. Si solo quieres liberarlo, reasígnalo o márcalo como Inactivo: así conservas la trazabilidad."{% endif %}
+                           {% if activo.tiene_responsable %}data-aviso="Está bajo la responsabilidad de {{ activo.persona_responsable|nombre_completo }}. Si solo quieres liberarlo, reasígnalo o márcalo como Inactivo: así conservas la trazabilidad."{% endif %}
                            data-confirmar="{{ activo.codigo_inventario }}">
                             <i class="bi bi-trash"></i> Eliminar activo
                         </a>

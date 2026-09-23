@@ -2,7 +2,7 @@
 
 from django.db.models import Q
 
-from activos.models import Activo
+from activos.models import SIN_RESPONSABLE, Activo
 
 
 def filtros_desde_request(request) -> dict:
@@ -13,7 +13,7 @@ def filtros_desde_request(request) -> dict:
         "ubicacion",
         "estado",
         "asignacion",
-        "usuario_asignado",
+        "responsable",
         "buscar",
     )
     return {k: request.GET.get(k) for k in claves if request.GET.get(k)}
@@ -27,14 +27,15 @@ def queryset_activos_filtrados(request):
     queryset = Activo.objects.select_related(
         "subcategoria__categoria",
         "ubicacion",
-        "usuario_asignado",
+        "responsable",
+        "usuario_legacy",
     ).all()
 
     categoria_id = request.GET.get("categoria", "")
     subcategoria_id = request.GET.get("subcategoria", "")
     ubicacion_id = request.GET.get("ubicacion", "")
     estado = request.GET.get("estado", "")
-    usuario_asignado_id = request.GET.get("usuario_asignado", "")
+    responsable_id = request.GET.get("responsable", "")
     buscar = request.GET.get("buscar", "")
     asignacion = request.GET.get("asignacion", "")
 
@@ -47,19 +48,22 @@ def queryset_activos_filtrados(request):
     if estado:
         queryset = queryset.filter(estado=estado)
     if asignacion == "libre":
-        queryset = queryset.filter(usuario_asignado__isnull=True)
+        queryset = queryset.filter(SIN_RESPONSABLE)
     elif asignacion == "asignado":
-        queryset = queryset.filter(usuario_asignado__isnull=False)
-    if usuario_asignado_id:
-        queryset = queryset.filter(usuario_asignado_id=usuario_asignado_id)
+        queryset = queryset.exclude(SIN_RESPONSABLE)
+    if responsable_id:
+        queryset = queryset.filter(responsable_id=responsable_id)
     if buscar:
         queryset = queryset.filter(
             Q(codigo_inventario__icontains=buscar)
             | Q(marca__icontains=buscar)
             | Q(modelo__icontains=buscar)
             | Q(numero_serial__icontains=buscar)
-            | Q(usuario_asignado__first_name__icontains=buscar)
-            | Q(usuario_asignado__last_name__icontains=buscar)
+            | Q(responsable__nombres__icontains=buscar)
+            | Q(responsable__apellidos__icontains=buscar)
+            | Q(responsable__cedula__icontains=buscar)
+            | Q(usuario_legacy__first_name__icontains=buscar)
+            | Q(usuario_legacy__last_name__icontains=buscar)
             | Q(ubicacion__nombre__icontains=buscar)
         )
 

@@ -19,6 +19,7 @@ from activos.models import (
     EtiquetaQR,
     HistorialMovimiento,
 )
+from activos.tests.utils import empleado_de
 from activos.services import notificaciones_portal
 from activos.services.avisos import (
     CODIGO_ACTIVO_ASIGNADO,
@@ -58,7 +59,7 @@ def _crear_activo(catalogo, codigo, usuario=None):
         marca="Dell",
         modelo="Latitude",
         codigo_inventario=codigo,
-        usuario_asignado=usuario,
+        responsable=empleado_de(usuario),
         ubicacion=catalogo["ubicacion_almacen"],
         estado=Activo.EstadoActivo.ACTIVO,
     )
@@ -98,7 +99,7 @@ def test_alta_con_custodio_emite_un_solo_aviso_con_su_id(
 def test_alta_sin_custodio_solo_llega_a_admins(
     client_auth, catalogo, emitir, django_capture_on_commit_callbacks
 ):
-    datos = _payload_activo(catalogo, usuario_asignado="")
+    datos = _payload_activo(catalogo, responsable="")
     with django_capture_on_commit_callbacks(execute=True):
         client_auth.post(reverse("activos:activo-create"), datos)
     [aviso] = _llamadas(emitir, CODIGO_ACTIVO_CREADO)
@@ -113,7 +114,7 @@ def test_reasignar_avisa_al_nuevo_custodio_y_desasigna_al_anterior(
     with django_capture_on_commit_callbacks(execute=True):
         client_auth.post(
             reverse("activos:activo-reasignar", args=[act.pk]),
-            {"usuario_asignado": catalogo["usuario_b"].pk},
+            {"responsable": catalogo["empleado_b"].pk},
         )
     [aviso] = _llamadas(emitir, CODIGO_ACTIVO_ASIGNADO)
     assert aviso["payload"]["usuario_ids"] == [catalogo["usuario_b"].pk]
@@ -134,7 +135,7 @@ def test_reasignar_al_mismo_custodio_no_avisa_nada(
     act = _crear_activo(catalogo, "INV-NOTIF-2", catalogo["usuario_a"])
     url = reverse("activos:activo-reasignar", args=[act.pk])
     with django_capture_on_commit_callbacks(execute=True):
-        client_auth.post(url, {"usuario_asignado": catalogo["usuario_a"].pk})
+        client_auth.post(url, {"responsable": catalogo["empleado_a"].pk})
     assert _llamadas(emitir, CODIGO_ACTIVO_ASIGNADO) == []
     assert _llamadas(emitir, CODIGO_ACTIVO_DESASIGNADO) == []
 
@@ -146,7 +147,7 @@ def test_reasignar_a_vacio_avisa_desasignado_al_anterior(
     act = _crear_activo(catalogo, "INV-NOTIF-2b", catalogo["usuario_a"])
     url = reverse("activos:activo-reasignar", args=[act.pk])
     with django_capture_on_commit_callbacks(execute=True):
-        client_auth.post(url, {"usuario_asignado": ""})
+        client_auth.post(url, {"responsable": ""})
     assert _llamadas(emitir, CODIGO_ACTIVO_ASIGNADO) == []
     [desaviso] = _llamadas(emitir, CODIGO_ACTIVO_DESASIGNADO)
     assert desaviso["payload"]["usuario_ids"] == [catalogo["usuario_a"].pk]
@@ -163,7 +164,7 @@ def test_asignacion_masiva_agrupa_en_un_aviso(
             {
                 "accion": "reasignar",
                 "activos": [a.pk for a in activos],
-                "destino": catalogo["usuario_b"].pk,
+                "destino": catalogo["empleado_b"].pk,
             },
         )
     [aviso] = _llamadas(emitir, CODIGO_ACTIVO_ASIGNADO)
@@ -192,7 +193,7 @@ def test_asignacion_masiva_agrupa_desasignados_por_custodio_anterior(
             {
                 "accion": "reasignar",
                 "activos": [a.pk for a in de_a + de_b],
-                "destino": catalogo["usuario_b"].pk,
+                "destino": catalogo["empleado_b"].pk,
             },
         )
     avisos = _llamadas(emitir, CODIGO_ACTIVO_DESASIGNADO)
@@ -322,7 +323,7 @@ def test_editar_a_inactivo_avisa_baja_a_custodio(
     data = _payload_activo(
         catalogo,
         codigo_inventario="INV-BAJA-1",
-        usuario_asignado=catalogo["usuario_a"].pk,
+        responsable=catalogo["empleado_a"].pk,
         estado=Activo.EstadoActivo.INACTIVO,
     )
     with django_capture_on_commit_callbacks(execute=True):
@@ -342,7 +343,7 @@ def test_editar_sin_cambiar_estado_no_avisa_baja(
     data = _payload_activo(
         catalogo,
         codigo_inventario="INV-BAJA-2",
-        usuario_asignado=catalogo["usuario_a"].pk,
+        responsable=catalogo["empleado_a"].pk,
         marca="Marca actualizada",
         estado=Activo.EstadoActivo.ACTIVO,
     )
@@ -384,8 +385,10 @@ def test_eliminar_activo_sin_custodio_no_incluye_usuario_ids(
 
 
 def _desactivar(usuario):
-    usuario.is_active = False
-    usuario.save(update_fields=["is_active"])
+    """Baja en Nomina: la regla mira el empleado, no la cuenta del Portal."""
+    empleado = empleado_de(usuario)
+    empleado.activo = False
+    empleado.save(update_fields=["activo"])
 
 
 @pytest.mark.django_db
@@ -404,7 +407,7 @@ def test_usuario_inactivo_sin_equipos_no_es_candidato(catalogo):
 def test_usuario_inactivo_con_equipos_es_candidato(catalogo):
     _crear_activo(catalogo, "INV-INACT-2", catalogo["usuario_a"])
     _desactivar(catalogo["usuario_a"])
-    assert usuarios_inactivos_con_equipos() == [catalogo["usuario_a"]]
+    assert usuarios_inactivos_con_equipos() == [catalogo["empleado_a"]]
 
 
 @pytest.mark.django_db
@@ -418,9 +421,9 @@ def test_avisa_un_solo_usuario_con_deep_link_a_su_ficha(catalogo, emitir):
     assert avisados == 1
     [aviso] = _llamadas(emitir, CODIGO_USUARIO_INACTIVO)
     assert aviso["payload"]["usuario_ids"] == [catalogo["usuario_a"].pk]
-    assert aviso["payload"]["url"].endswith(f"/usuarios/{catalogo['usuario_a'].pk}/perfil/")
+    assert aviso["payload"]["url"].endswith(f"/usuarios/{catalogo['empleado_a'].pk}/perfil/")
     assert "2 equipos" in aviso["titulo"]
-    assert AvisoUsuarioInactivo.objects.filter(usuario=catalogo["usuario_a"]).exists()
+    assert AvisoUsuarioInactivo.objects.filter(empleado=catalogo["empleado_a"]).exists()
 
 
 @pytest.mark.django_db
@@ -437,7 +440,7 @@ def test_avisa_varios_usuarios_en_un_solo_evento(catalogo, emitir):
     assert sorted(aviso["payload"]["usuario_ids"]) == sorted(
         [catalogo["usuario_a"].pk, catalogo["usuario_b"].pk]
     )
-    assert aviso["payload"]["url"].endswith("/usuarios/")
+    assert aviso["payload"]["url"].endswith("/usuarios/?estado=baja_con_activos")
 
 
 @pytest.mark.django_db
@@ -463,11 +466,12 @@ def test_vuelve_a_avisar_si_se_reactiva_y_recae(catalogo, emitir):
     _desactivar(catalogo["usuario_a"])
     assert avisar_usuarios_inactivos_con_equipos() == 1
 
-    catalogo["usuario_a"].is_active = True
-    catalogo["usuario_a"].save(update_fields=["is_active"])
-    # Corrida intermedia: limpia el marcador (usuario activo, sin candidatos).
+    catalogo["empleado_a"].refresh_from_db()
+    catalogo["empleado_a"].activo = True
+    catalogo["empleado_a"].save(update_fields=["activo"])
+    # Corrida intermedia: limpia el marcador (empleado activo, sin candidatos).
     assert avisar_usuarios_inactivos_con_equipos() == 0
-    assert not AvisoUsuarioInactivo.objects.filter(usuario=catalogo["usuario_a"]).exists()
+    assert not AvisoUsuarioInactivo.objects.filter(empleado=catalogo["empleado_a"]).exists()
 
     _desactivar(catalogo["usuario_a"])
 
@@ -481,12 +485,12 @@ def test_deja_de_avisar_si_pierde_todo_el_equipo(catalogo, emitir):
     _desactivar(catalogo["usuario_a"])
     assert avisar_usuarios_inactivos_con_equipos() == 1
 
-    activo.usuario_asignado = None
-    activo.save(update_fields=["usuario_asignado"])
+    activo.responsable = None
+    activo.save(update_fields=["responsable"])
 
-    assert AvisoUsuarioInactivo.objects.filter(usuario=catalogo["usuario_a"]).exists()
+    assert AvisoUsuarioInactivo.objects.filter(empleado=catalogo["empleado_a"]).exists()
     assert avisar_usuarios_inactivos_con_equipos() == 0
-    assert not AvisoUsuarioInactivo.objects.filter(usuario=catalogo["usuario_a"]).exists()
+    assert not AvisoUsuarioInactivo.objects.filter(empleado=catalogo["empleado_a"]).exists()
 
 
 @pytest.mark.django_db

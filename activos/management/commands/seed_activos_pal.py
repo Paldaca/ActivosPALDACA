@@ -1,7 +1,8 @@
 """
 Carga datos de ejemplo de activos con códigos PAL-<ABREV>-NNN
 (ej.: PAL-D-001 desktop, PAL-L-001 laptop, PAL-M-001 monitor, PAL-MO-001 mouse).
-Crea además 10 usuarios Paldaca de demo y reparte los activos entre ellos.
+Reparte los activos entre los empleados activos de Nómina (tabla
+portal_empleado); si no hay ninguno sincronizado, quedan sin asignar.
 
 Uso:
   python manage.py seed_activos_pal
@@ -9,14 +10,11 @@ Uso:
 """
 import re
 
-from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
+from activos.forms import empleados_asignables
 from activos.models import Activo, Categoria, SubCategoria, Ubicacion
-
-NUM_USUARIOS_SEED = 10
-PREFIJO_ID_USUARIO_SEED = "PAL-SEED"
 
 
 def maximo_sufijo_codigo_pal(abreviatura: str) -> int:
@@ -39,38 +37,6 @@ def codigo_inventario_pal(abreviatura: str, numero: int) -> str:
     return f"PAL-{abr}-{numero:03d}"
 
 
-def asegurar_usuarios_seed():
-    """
-    Garantiza NUM_USUARIOS_SEED usuarios en core_usuario con username PAL-SEED-01..10.
-    Devuelve (lista de instancias, cantidad de filas nuevas creadas).
-    """
-    User = get_user_model()
-    creados = 0
-    usuarios = []
-    for n in range(1, NUM_USUARIOS_SEED + 1):
-        username = f"{PREFIJO_ID_USUARIO_SEED}-{n:02d}"
-        u, was_created = User.objects.get_or_create(
-            username=username,
-            defaults={
-                "first_name": f"Usuario demo {n}",
-                "last_name": "PALDACA",
-                "email": f"demo{n}@paldaca.seed",
-                "is_active": True,
-            },
-        )
-        if was_created:
-            u.set_unusable_password()
-            u.save(update_fields=["password"])
-            creados += 1
-        usuarios.append(u)
-    return usuarios, creados
-
-
-def etiqueta_usuario_demo(n: int) -> str:
-    username = f"{PREFIJO_ID_USUARIO_SEED}-{n:02d}"
-    return f"Usuario demo {n} ({username})"
-
-
 DEFINICIONES_TIPOS = [
     {"abbr": "D", "subcategoria": "PC de escritorio (Desktop)", "marca": "HP", "modelo": "ProDesk 400 G7"},
     {"abbr": "L", "subcategoria": "Laptop", "marca": "Lenovo", "modelo": "ThinkPad E14 Gen 5"},
@@ -82,8 +48,8 @@ DEFINICIONES_TIPOS = [
 class Command(BaseCommand):
     help = (
         "Inserta activos de ejemplo (desktop D, laptop L, monitor M, mouse MO) "
-        "con códigos PAL-<abreviatura>-001, 002, ...; crea 10 UsuarioPaldaca y "
-        "asigna cada activo en round-robin a esos usuarios."
+        "con códigos PAL-<abreviatura>-001, 002, ...; los reparte en round-robin "
+        "entre los empleados activos de Nómina."
     )
 
     def add_arguments(self, parser):
@@ -128,31 +94,11 @@ class Command(BaseCommand):
             categoria, _ = Categoria.objects.get_or_create(nombre=categoria_nombre)
             ubicacion, _ = Ubicacion.objects.get_or_create(nombre=ubicacion_nombre)
 
-            usuarios_nuevos = 0
-            if dry_run:
-                self.stdout.write(
-                    self.style.NOTICE(
-                        f"Se asegurarían {NUM_USUARIOS_SEED} usuarios ({PREFIJO_ID_USUARIO_SEED}-01.."
-                        f"{NUM_USUARIOS_SEED:02d}) y la asignación round-robin a los activos."
-                    )
-                )
-                usuarios_para_asignar = None
-            else:
-                usuarios_para_asignar, usuarios_nuevos = asegurar_usuarios_seed()
-                if usuarios_nuevos:
-                    self.stdout.write(
-                        self.style.NOTICE(
-                            f"Usuarios seed: {usuarios_nuevos} nuevo(s), "
-                            f"{NUM_USUARIOS_SEED - usuarios_nuevos} ya existían."
-                        )
-                    )
-                else:
-                    self.stdout.write(
-                        self.style.NOTICE(
-                            f"Usuarios seed: los {NUM_USUARIOS_SEED} ya existían; "
-                            "se reutilizan para asignar activos."
-                        )
-                    )
+            empleados = list(empleados_asignables())
+            if not empleados:
+                self.stdout.write(self.style.WARNING(
+                    "No hay empleados sincronizados desde Nómina: los activos quedan sin asignar."
+                ))
 
             creados = []
             indice_asignacion = 0
@@ -166,16 +112,10 @@ class Command(BaseCommand):
                 ultimo = maximo_sufijo_codigo_pal(abbr)
                 for i in range(por_tipo):
                     codigo = codigo_inventario_pal(abbr, ultimo + i + 1)
-                    if dry_run:
-                        slot = (indice_asignacion % NUM_USUARIOS_SEED) + 1
-                        asignado_a = etiqueta_usuario_demo(slot)
-                        usuario_obj = None
-                    else:
-                        usuario_obj = usuarios_para_asignar[
-                            indice_asignacion % len(usuarios_para_asignar)
-                        ]
-                        nombre = usuario_obj.get_full_name().strip() or usuario_obj.username
-                        asignado_a = f"{nombre} ({usuario_obj.username})"
+                    empleado = (
+                        empleados[indice_asignacion % len(empleados)] if empleados else None
+                    )
+                    asignado_a = empleado.nombre_completo if empleado else "Sin asignar"
                     indice_asignacion += 1
 
                     creados.append(
@@ -194,7 +134,7 @@ class Command(BaseCommand):
                             modelo=definicion["modelo"],
                             numero_serial=None,
                             codigo_inventario=codigo,
-                            usuario_asignado=usuario_obj,
+                            responsable=empleado,
                             ubicacion=ubicacion,
                             observaciones="Cargado con seed_activos_pal",
                             estado=Activo.EstadoActivo.ACTIVO,

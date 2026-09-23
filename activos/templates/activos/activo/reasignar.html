@@ -70,7 +70,7 @@ directo compartible y camino sin JavaScript.
                 <div class="ax-transfer mb-3">
                     <div class="ax-transfer-side">
                         <div class="ax-transfer-label">Responsable actual</div>
-                        {% include 'activos/includes/_persona.html' with persona=activo.usuario_asignado %}
+                        {% include 'activos/includes/_persona.html' with persona=activo.persona_responsable %}
                     </div>
                     <div class="ax-transfer-arrow" aria-hidden="true"><i class="bi bi-arrow-right"></i></div>
                     <div class="ax-transfer-side">
@@ -83,17 +83,17 @@ directo compartible y camino sin JavaScript.
                 </div>
 
                 <div class="mb-3">
-                    <label class="form-label" for="{{ form.usuario_asignado.id_for_label }}">
+                    <label class="form-label" for="{{ form.responsable.id_for_label }}">
                         <i class="bi bi-search me-1"></i> Buscar persona
                     </label>
                     <div class="ax-combo ax-combo--persona"
                          data-combo-placeholder="Buscar por nombre o apellido…"
                          data-combo-empty-label="Sin asignar · liberar equipo"
-                         data-combo-remote-url="{% url 'activos:usuarios-asignables' %}">
-                        {{ form.usuario_asignado }}
+                         data-combo-remote-url="{% url 'activos:empleados-asignables' %}">
+                        {{ form.responsable }}
                     </div>
-                    {% if form.usuario_asignado.errors %}
-                    <div class="ax-error"><i class="bi bi-exclamation-circle"></i> {{ form.usuario_asignado.errors }}</div>
+                    {% if form.responsable.errors %}
+                    <div class="ax-error"><i class="bi bi-exclamation-circle"></i> {{ form.responsable.errors }}</div>
                     {% endif %}
                     <small class="ax-hint">
                         <i class="bi bi-info-circle"></i>

@@ -53,7 +53,8 @@ def exportar_nota_entrega_pdf(
         Activo.objects.select_related(
             "subcategoria__categoria",
             "ubicacion",
-            "usuario_asignado",
+            "responsable",
+            "usuario_legacy",
         ).filter(id__in=activos_ids)
     )
     context = {

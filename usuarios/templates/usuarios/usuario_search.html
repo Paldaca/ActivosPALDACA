@@ -24,12 +24,23 @@
                 <span class="ax-hero-eyebrow">Responsables de activos</span>
                 <h1 class="ax-hero-title">Personas</h1>
                 <p class="ax-hero-sub">
-                    Quién responde por cada equipo. Busca por nombre, apellido, perfil,
-                    teléfono o incluso por el código de inventario que tiene asignado.
+                    Empleados de Nómina y los equipos que tienen a cargo. Busca por nombre,
+                    cédula, cargo o por el código de inventario que tiene asignado.
                 </p>
             </div>
         </div>
     </header>
+
+    {% if pendientes_vincular %}
+    <div class="ax-callout ax-callout--warn mb-3">
+        <i class="bi bi-link-45deg"></i>
+        <span>
+            <strong>{{ pendientes_vincular }} equipo(s)</strong> siguen asignados a una cuenta
+            del Portal sin empleado en Nómina. Aparecen como asignados, pero no en esta lista:
+            vincula esas cuentas en Nómina y corre <code>manage.py vincular_responsables</code>.
+        </span>
+    </div>
+    {% endif %}
 
     {# ===================================================================== #}
     {#  Indicadores                                                          #}
@@ -37,7 +48,7 @@
     <section class="ax-kpis" aria-label="Resumen de personas" data-ax-stagger="4">
         <a href="?estado=activos" class="ax-kpi ax-kpi--total {% filtro_activo 'estado' 'activos' %}">
             <span class="ax-kpi-head">
-                <span class="ax-kpi-label">Personas activas</span>
+                <span class="ax-kpi-label">Empleados activos</span>
                 <span class="ax-kpi-icon"><i class="bi bi-people"></i></span>
             </span>
             <span class="ax-kpi-value"><span class="ax-count" data-value="{{ resumen.total }}">0</span></span>
@@ -71,14 +82,14 @@
             </span>
         </a>
 
-        <a href="?estado=inactivos" class="ax-kpi ax-kpi--baja {% filtro_activo 'estado' 'inactivos' %}">
+        <a href="?estado=baja_con_activos" class="ax-kpi ax-kpi--baja {% filtro_activo 'estado' 'baja_con_activos' %}">
             <span class="ax-kpi-head">
-                <span class="ax-kpi-label">Desactivadas</span>
+                <span class="ax-kpi-label">De baja con equipos</span>
                 <span class="ax-kpi-icon"><i class="bi bi-person-slash"></i></span>
             </span>
-            <span class="ax-kpi-value"><span class="ax-count" data-value="{{ resumen.inactivos }}">0</span></span>
-            <span class="ax-kpi-meter"><span style="width:{{ resumen.inactivos|porcentaje_css:resumen.total }}%"></span></span>
-            <span class="ax-kpi-foot"><span>Se pueden reactivar</span></span>
+            <span class="ax-kpi-value"><span class="ax-count" data-value="{{ resumen.baja_con_activos }}">0</span></span>
+            <span class="ax-kpi-meter"><span style="width:{% if resumen.baja_con_activos %}100{% else %}0{% endif %}%"></span></span>
+            <span class="ax-kpi-foot"><span>Hay que reasignar</span></span>
         </a>
     </section>
 
@@ -92,7 +103,7 @@
                 <div class="ax-searchbar">
                     <i class="bi bi-search" aria-hidden="true"></i>
                     <input type="search" name="buscar" data-ax-buscar value="{{ buscar }}"
-                           placeholder="Nombre, apellido, perfil, teléfono, correo o código de inventario…"
+                           placeholder="Nombre, cédula, cargo, correo o código de inventario…"
                            aria-label="Buscar personas">
                     <kbd class="ax-kbd d-none d-md-inline">/</kbd>
                     <button type="submit" class="btn-pastel btn-pastel--lila btn-pastel--sm">Buscar</button>
@@ -127,7 +138,7 @@
                 <thead>
                     <tr>
                         <th scope="col">Persona</th>
-                        <th scope="col">Perfil</th>
+                        <th scope="col">Cargo</th>
                         <th scope="col">Contacto</th>
                         <th scope="col">Activos a cargo</th>
                         <th scope="col">Estado</th>
@@ -147,17 +158,15 @@
                                 </span>
                                 <span class="ax-min0">
                                     <span class="ax-person-name d-block">{{ persona|nombre_completo }}</span>
-                                    {% if persona.disciplina %}
-                                    <span class="ax-person-meta">{{ persona.disciplina.nombre }}</span>
-                                    {% endif %}
+                                    <span class="ax-person-meta">{{ persona.cedula }}</span>
                                 </span>
                             </a>
                         </td>
-                        <td data-label="Perfil">
-                            {% if persona.perfil %}
-                            <span class="ax-tag">{{ persona.perfil.nombre }}</span>
+                        <td data-label="Cargo">
+                            {% if persona.cargo %}
+                            <span class="ax-tag">{{ persona.cargo }}</span>
                             {% else %}
-                            <span class="ax-hint">Sin perfil</span>
+                            <span class="ax-hint">Sin cargo</span>
                             {% endif %}
                         </td>
                         <td data-label="Contacto">
@@ -173,7 +182,7 @@
                         </td>
                         <td data-label="Activos a cargo">
                             {% if persona.num_activos %}
-                            <a href="{% url 'activos:activo-list' %}?usuario_asignado={{ persona.pk }}"
+                            <a href="{% url 'activos:activo-list' %}?responsable={{ persona.pk }}"
                                class="ax-tag" style="background: var(--ax-cielo); color: var(--ax-cielo-ink);">
                                 {{ persona.num_activos }} equipo(s)
                             </a>
@@ -182,13 +191,13 @@
                             {% endif %}
                         </td>
                         <td data-label="Estado">
-                            {% if persona.is_active %}
+                            {% if persona.activo %}
                             <span class="ax-estado ax-estado--disponible">
-                                <span class="ax-estado-dot"></span> Activa
+                                <span class="ax-estado-dot"></span> Activo
                             </span>
                             {% else %}
                             <span class="ax-estado ax-estado--baja">
-                                <span class="ax-estado-dot"></span> Desactivada
+                                <span class="ax-estado-dot"></span> De baja
                             </span>
                             {% endif %}
                         </td>
@@ -198,11 +207,6 @@
                                    class="btn-pastel btn-pastel--cielo btn-pastel--icon" title="Ver ficha">
                                     <i class="bi bi-eye"></i>
                                     <span class="visually-hidden">Ver ficha de {{ persona|nombre_completo }}</span>
-                                </a>
-                                <a href="{% url 'usuarios:usuario-update' persona.pk %}"
-                                   class="btn-pastel btn-pastel--lila btn-pastel--icon" title="Editar">
-                                    <i class="bi bi-pencil"></i>
-                                    <span class="visually-hidden">Editar {{ persona|nombre_completo }}</span>
                                 </a>
                             </div>
                         </td>
@@ -216,13 +220,13 @@
             <div class="ax-empty-icon"><i class="bi bi-people"></i></div>
             {% if buscar %}
             <h3>Nadie coincide con «{{ buscar }}»</h3>
-            <p>Prueba con otro término o revisa si la persona está desactivada.</p>
-            <a href="?estado=inactivos" class="btn-pastel btn-pastel--neutro">Ver desactivadas</a>
+            <p>Prueba con otro término. Si es alguien nuevo, debe estar cargado en Nómina.</p>
+            <a href="?estado=todos&amp;buscar={{ buscar|urlencode }}" class="btn-pastel btn-pastel--neutro">Incluir empleados de baja</a>
             {% else %}
-            <h3>Aún no hay personas registradas</h3>
+            <h3>Aún no hay empleados</h3>
             <p>
-                Las personas se dan de alta como empleados en Nómina y se vinculan al
-                Portal desde allí — Activos ya no crea personas nuevas.
+                Los empleados llegan desde Nómina: allí, en Empleados &gt; Vínculos,
+                pulsa «Sincronizar con el Portal».
             </p>
             {% endif %}
         </div>

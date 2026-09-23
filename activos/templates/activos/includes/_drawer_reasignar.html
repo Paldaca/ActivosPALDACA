@@ -2,7 +2,7 @@
 Drawer de reasignación rápida. Se renderiza UNA vez por página y lo alimenta
 cualquier disparador con [data-ax-reasignar].
 
-Las personas se consultan bajo demanda en `usuarios-asignables`.
+Los empleados se consultan bajo demanda en `empleados-asignables`.
 Disparador (enlace real, para que funcione también sin JavaScript):
 
   <a href="{% url 'activos:activo-reasignar' a.pk %}"
@@ -60,8 +60,8 @@ Disparador (enlace real, para que funcione también sin JavaScript):
                 <div class="ax-combo ax-combo--persona"
                      data-combo-placeholder="Buscar por nombre o apellido…"
                      data-combo-empty-label="Sin asignar · liberar equipo"
-                     data-combo-remote-url="{% url 'activos:usuarios-asignables' %}">
-                    <select name="usuario_asignado" id="drawerReasignarSelect"
+                     data-combo-remote-url="{% url 'activos:empleados-asignables' %}">
+                    <select name="responsable" id="drawerReasignarSelect"
                             class="ax-combo-native form-select" data-ax-origen-id="">
                         <option value="">Sin asignar · liberar equipo</option>
                     </select>

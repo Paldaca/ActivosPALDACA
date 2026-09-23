@@ -33,11 +33,11 @@ def formatear_fecha(fecha) -> str:
     return f"{fecha.day} de {meses[fecha.month - 1]} de {fecha.year}"
 
 
-def _nombre_usuario(usuario) -> str:
-    if not usuario:
+def _nombre_usuario(persona) -> str:
+    """Empleado o, en la fase 1, la cuenta anterior sin vincular."""
+    if not persona:
         return "Sin asignar"
-    nombre = f"{usuario.first_name or ''} {usuario.last_name or ''}".strip()
-    return nombre or (usuario.email or "Sin asignar")
+    return (persona.get_full_name() or "").strip() or (persona.email or "Sin asignar")
 
 
 def generar_pdf(template_name, context, filename):
@@ -214,7 +214,7 @@ def crear_tabla_activos(activos):
                 activo.numero_serial or "N/A",
                 activo.ubicacion.nombre,
                 activo.get_estado_display(),
-                _nombre_usuario(activo.usuario_asignado),
+                _nombre_usuario(activo.persona_responsable),
             ]
         )
 

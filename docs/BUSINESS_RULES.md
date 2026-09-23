@@ -259,7 +259,9 @@ Solo reglas **identificadas en el código**. Cada entrada indica dónde se imple
   activos son empleados de Nómina, vinculados al Portal desde `/empleados/vinculos/`
   en Nómina Paldaca — Activos solo edita y desactiva personas que ya existen.
 - **Implementación:** `usuarios/urls.py` no expone ruta de alta;
-  `activos/services/nomina_directorio.py` alimenta el selector de responsables.
+  el responsable de un activo es un empleado (`Activo.responsable` → `EmpleadoPortal`,
+  tabla `portal_empleado` del Portal, que alimenta solo Nómina). Un empleado puede
+  tener equipos sin tener cuenta del Portal.
 
 ### BR-USR-06 — Campos editables desde Activos
 

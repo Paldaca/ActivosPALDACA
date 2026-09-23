@@ -43,7 +43,7 @@ Página completa de reubicación: respaldo del drawer lateral del listado.
                     <div class="ax-equipo-main mt-1">{{ activo.marca }} {{ activo.modelo }}</div>
                     <div class="ax-equipo-sub">
                         <i class="bi bi-person"></i>
-                        <span>{{ activo.usuario_asignado|nombre_completo }}</span>
+                        <span>{{ activo.persona_responsable|nombre_completo }}</span>
                     </div>
                 </div>
                 <span class="ms-auto">{% badge_estado activo %}</span>

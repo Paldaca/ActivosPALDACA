@@ -33,110 +33,68 @@ def test_usuarios_requiere_sesion(client):
 
 
 @pytest.mark.django_db
-def test_busqueda_usuarios_core(usuario_activos_admin, client):
-    UserModel.objects.create_user(
-        username="V-99999",
-        email="empleado@test.com",
-        password="unused",
-        first_name="Juan",
-        last_name="Pérez",
-        is_active=True,
-    )
-    response = client.get(reverse("usuarios:usuario-search"), {"buscar": "Juan"})
+def test_busqueda_de_empleados(usuario_activos_admin, client, crear_empleado):
+    crear_empleado("Juan", "Pérez")
+    response = client.get(reverse("usuarios:usuario-search"), {"buscar": "juan pérez"})
     assert response.status_code == 200
     assert b"Juan" in response.content
 
 
 @pytest.mark.django_db
 def test_no_existe_ruta_para_crear_usuario_desde_activos(usuario_activos_admin, client):
-    """Las personas ahora se dan de alta como empleados en Nomina, nunca
-    localmente desde Activos (ver activos/services/nomina_directorio.py)."""
+    """Las personas son empleados de Nomina: Activos no las crea."""
     with pytest.raises(Exception):
         reverse("usuarios:usuario-create")
 
 
 @pytest.mark.django_db
-def test_busqueda_excluye_superusuarios(usuario_activos_admin, client):
-    UserModel.objects.create_user(
-        username="empleado-ok",
-        email="empleado@test.com",
-        password="unused",
-        first_name="Ana",
-        last_name="Normal",
-        is_active=True,
-    )
-    UserModel.objects.create_superuser(
-        username="root-admin",
-        email="root@test.com",
-        password="unused",
-        first_name="Root",
-        last_name="Super",
-    )
+def test_listado_por_defecto_excluye_empleados_de_baja(usuario_activos_admin, client, crear_empleado):
+    crear_empleado("Ana", "Normal")
+    crear_empleado("Pedro", "DeBaja", activo=False)
     response = client.get(reverse("usuarios:usuario-search"))
-    assert response.status_code == 200
-    assert b"Ana" in response.content
-    assert b"Root" not in response.content
-    assert b"Super" not in response.content
+    assert b"Normal" in response.content
+    assert b"DeBaja" not in response.content
 
 
 @pytest.mark.django_db
-def test_perfil_superusuario_no_existe(usuario_activos_admin, client):
-    superuser = UserModel.objects.create_superuser(
-        username="root-admin",
-        email="root@test.com",
-        password="unused",
-    )
-    response = client.get(
-        reverse("usuarios:usuario-profile", kwargs={"pk": superuser.pk})
-    )
-    assert response.status_code == 404
+def test_de_baja_con_equipos_aparece_en_su_filtro(usuario_activos_admin, client, crear_empleado):
+    from activos.models import Activo, Categoria, SubCategoria, Ubicacion
+
+    baja = crear_empleado("Pedro", "DeBaja", activo=False)
+    cat = Categoria.objects.create(nombre="Computacion")
+    sub = SubCategoria.objects.create(nombre="Laptop", prefijo="LAP", categoria=cat)
+    ubi = Ubicacion.objects.create(nombre="Oficina")
+    Activo.objects.create(subcategoria=sub, marca="HP", modelo="X", ubicacion=ubi, responsable=baja)
+    response = client.get(reverse("usuarios:usuario-search"), {"estado": "baja_con_activos"})
+    assert list(response.context["usuarios"]) == [baja]
 
 
 @pytest.mark.django_db
-def test_usuarios_asignables_excluye_superusuarios(db):
-    from activos.forms import usuarios_asignables
+def test_empleados_asignables_excluye_empleados_de_baja(crear_empleado):
+    from activos.forms import empleados_asignables
 
-    normal = UserModel.objects.create_user(
-        username="persona",
-        email="persona@test.com",
-        password="unused",
-        first_name="Luis",
-        last_name="Perez",
-        is_active=True,
-    )
-    UserModel.objects.create_superuser(
-        username="root-admin",
-        email="root@test.com",
-        password="unused",
-    )
-    ids = set(usuarios_asignables().values_list("pk", flat=True))
-    assert normal.pk in ids
-    assert not any(
-        UserModel.objects.filter(pk=pk, is_superuser=True).exists() for pk in ids
-    )
+    activo = crear_empleado("Ana", "Normal")
+    crear_empleado("Pedro", "DeBaja", activo=False)
+    assert list(empleados_asignables()) == [activo]
 
 
 @pytest.mark.django_db
-def test_no_asignar_activo_a_superusuario(db):
-    from django.core.exceptions import ValidationError
-
+def test_no_se_puede_elegir_un_empleado_de_baja_pero_si_conservarlo(crear_empleado):
+    from activos.forms import ReasignarActivoForm
     from activos.models import Activo, Categoria, SubCategoria, Ubicacion
 
     cat = Categoria.objects.create(nombre="Computacion")
     sub = SubCategoria.objects.create(nombre="Laptop", prefijo="LAP", categoria=cat)
     ubi = Ubicacion.objects.create(nombre="Oficina")
-    superuser = UserModel.objects.create_superuser(
-        username="root-admin",
-        email="root@test.com",
-        password="unused",
-    )
-    activo = Activo(
-        subcategoria=sub,
-        marca="HP",
-        modelo="X",
-        ubicacion=ubi,
-        usuario_asignado=superuser,
-        estado=Activo.EstadoActivo.ACTIVO,
-    )
-    with pytest.raises(ValidationError):
-        activo.save()
+    baja = crear_empleado("Pedro", "DeBaja", activo=False)
+    otro = crear_empleado("Luis", "Otro")
+
+    libre = Activo.objects.create(subcategoria=sub, marca="HP", modelo="X", ubicacion=ubi)
+    form = ReasignarActivoForm({"responsable": baja.pk}, instance=libre)
+    assert not form.is_valid()
+
+    # Ya asignado a alguien que luego se dio de baja: el formulario lo acepta
+    # sin cambios, para poder editar el activo; reasignar a otro sigue abierto.
+    suyo = Activo.objects.create(subcategoria=sub, marca="HP", modelo="Y", ubicacion=ubi, responsable=baja)
+    assert ReasignarActivoForm({"responsable": baja.pk}, instance=suyo).is_valid()
+    assert ReasignarActivoForm({"responsable": otro.pk}, instance=suyo).is_valid()

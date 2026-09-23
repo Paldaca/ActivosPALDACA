@@ -9,7 +9,7 @@ from django.http import HttpResponse
 from django.templatetags.static import static
 from django.utils import timezone
 
-from activos.models import Activo
+from activos.models import Activo, EmpleadoPortal
 
 from .html_pdf import render_html_pdf, render_html_pdf_bytes
 from .pdf import formatear_fecha
@@ -18,7 +18,16 @@ PLANTILLA = "reportes/asignacion_activos.html"
 
 
 def datos_persona(usuario) -> dict:
-    """Name, role, contact. Cedula stays None until core_usuario has it."""
+    """Nombre, cargo y contacto de quien entrega (cuenta del Portal) o recibe
+    (empleado de Nomina; en la fase 1, quiza una cuenta aun sin vincular)."""
+    if isinstance(usuario, EmpleadoPortal):
+        return {
+            "nombre": usuario.nombre_completo,
+            "cargo": usuario.cargo,
+            "telefono": usuario.telefono,
+            "email": usuario.email,
+            "cedula": usuario.cedula or None,
+        }
     if not usuario:
         return {
             "nombre": "",
@@ -46,7 +55,7 @@ def contexto_planilla(activos, entrega_usuario, observaciones=""):
     """Build the template context for one or more planilla pages."""
     recibe = None
     if activos:
-        recibe = activos[0].usuario_asignado
+        recibe = activos[0].persona_responsable
     return {
         "activos": activos,
         "entrega": datos_persona(entrega_usuario),
@@ -79,7 +88,8 @@ def _activo_con_relaciones(activo) -> Activo:
     return Activo.objects.select_related(
         "subcategoria__categoria",
         "ubicacion",
-        "usuario_asignado__disciplina",
+        "responsable",
+        "usuario_legacy__disciplina",
     ).get(pk=activo.pk)
 
 
@@ -93,7 +103,7 @@ def guardar_planilla_en_historial(
     if movimiento is None:
         return None
     activo = _activo_con_relaciones(activo)
-    if not activo.usuario_asignado_id:
+    if not activo.tiene_responsable:
         return None
     pdf_bytes = render_html_pdf_bytes(
         PLANTILLA,

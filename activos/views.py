@@ -11,11 +11,19 @@ from django.http import JsonResponse
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_GET, require_POST
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
-from .models import Categoria, SubCategoria, Ubicacion, Activo, HistorialMovimiento
+from .models import (
+    SIN_RESPONSABLE,
+    Activo,
+    Categoria,
+    EmpleadoPortal,
+    HistorialMovimiento,
+    SubCategoria,
+    Ubicacion,
+)
 from .forms import (
     CategoriaForm, SubCategoriaForm, UbicacionForm,
     ActivoForm, ActivoFilterForm, ReasignarActivoForm, ReubicarActivoForm,
-    usuarios_asignables,
+    empleados_asignables, etiqueta_empleado,
 )
 from .decorators import (
     AdminActivoRequiredMixin,
@@ -23,7 +31,6 @@ from .decorators import (
     requiere_admin_activo,
     requiere_modulo_paldaca,
 )
-from .services.nomina_directorio import buscar_empleados_asignables
 from .services.avisos import (
     avisar_activo_baja,
     avisar_activo_creado,
@@ -91,13 +98,14 @@ class SinPaginaDeBorradoMixin:
 def _resumen_inventario():
     """KPIs del encabezado, en una sola consulta.
 
-    Los estados que ve el usuario se derivan de (estado, usuario_asignado):
-    el modelo solo guarda AC / IN / EM.
+    Los estados que ve el usuario se derivan de (estado, responsable):
+    el modelo solo guarda AC / IN / EM. Un activo pendiente de vincular
+    (fase 1, `usuario_legacy`) sigue contando como asignado.
     """
     return Activo.objects.aggregate(
         total=Count('id'),
-        disponibles=Count('id', filter=Q(estado='AC', usuario_asignado__isnull=True)),
-        asignados=Count('id', filter=Q(estado='AC', usuario_asignado__isnull=False)),
+        disponibles=Count('id', filter=Q(estado='AC') & SIN_RESPONSABLE),
+        asignados=Count('id', filter=Q(estado='AC') & ~SIN_RESPONSABLE),
         mantenimiento=Count('id', filter=Q(estado='EM')),
         baja=Count('id', filter=Q(estado='IN')),
     )
@@ -286,7 +294,7 @@ class ActivoListView(AdminActivoRequiredMixin, ListView):
     
     def get_queryset(self):
         queryset = super().get_queryset().select_related(
-            'subcategoria__categoria', 'ubicacion', 'usuario_asignado'
+            'subcategoria__categoria', 'ubicacion', 'responsable', 'usuario_legacy'
         )
         
         # Filtros
@@ -295,7 +303,7 @@ class ActivoListView(AdminActivoRequiredMixin, ListView):
         ubicacion_id = self.request.GET.get('ubicacion')
         estado = self.request.GET.get('estado')
         asignacion = self.request.GET.get('asignacion')
-        usuario_id = self.request.GET.get('usuario_asignado')
+        responsable_id = self.request.GET.get('responsable')
         buscar = self.request.GET.get('buscar')
 
         if categoria_id:
@@ -308,11 +316,11 @@ class ActivoListView(AdminActivoRequiredMixin, ListView):
             queryset = queryset.filter(estado=estado)
         # Distingue "Disponible" (sin responsable) de "Asignado" sin tocar el modelo.
         if asignacion == 'libre':
-            queryset = queryset.filter(usuario_asignado__isnull=True)
+            queryset = queryset.filter(SIN_RESPONSABLE)
         elif asignacion == 'asignado':
-            queryset = queryset.filter(usuario_asignado__isnull=False)
-        if usuario_id:
-            queryset = queryset.filter(usuario_asignado_id=usuario_id)
+            queryset = queryset.exclude(SIN_RESPONSABLE)
+        if responsable_id:
+            queryset = queryset.filter(responsable_id=responsable_id)
         if buscar:
             # Buscar también por persona: "¿qué tiene asignado Ana?" es una
             # pregunta diaria y antes obligaba a recorrer la tabla a mano.
@@ -321,8 +329,11 @@ class ActivoListView(AdminActivoRequiredMixin, ListView):
                 Q(marca__icontains=buscar) |
                 Q(modelo__icontains=buscar) |
                 Q(numero_serial__icontains=buscar) |
-                Q(usuario_asignado__first_name__icontains=buscar) |
-                Q(usuario_asignado__last_name__icontains=buscar) |
+                Q(responsable__nombres__icontains=buscar) |
+                Q(responsable__apellidos__icontains=buscar) |
+                Q(responsable__cedula__icontains=buscar) |
+                Q(usuario_legacy__first_name__icontains=buscar) |
+                Q(usuario_legacy__last_name__icontains=buscar) |
                 Q(ubicacion__nombre__icontains=buscar)
             )
 
@@ -355,10 +366,10 @@ class ActivoListView(AdminActivoRequiredMixin, ListView):
             obj = Ubicacion.objects.filter(pk=get['ubicacion']).first()
             agregar('ubicacion', 'Ubicación', obj.nombre if obj else None)
 
-        if get.get('usuario_asignado'):
-            obj = usuarios_asignables().filter(pk=get['usuario_asignado']).first()
-            self._usuario_filtro = obj
-            agregar('usuario_asignado', 'Responsable', _nombre(obj) if obj else None)
+        if get.get('responsable'):
+            obj = EmpleadoPortal.objects.filter(pk=get['responsable']).first()
+            self._responsable_filtro = obj
+            agregar('responsable', 'Responsable', obj.nombre_completo if obj else None)
 
         return pills
 
@@ -378,8 +389,8 @@ class ActivoListView(AdminActivoRequiredMixin, ListView):
         context['filtros_activos'] = self._filtros_activos()
         context['hay_filtros'] = bool(context['filtros_activos'])
 
-        # La lista completa de personas se carga bajo demanda desde el drawer.
-        context['usuario_filtro'] = getattr(self, '_usuario_filtro', None)
+        # La lista completa de empleados se carga bajo demanda desde el drawer.
+        context['responsable_filtro'] = getattr(self, '_responsable_filtro', None)
         context['ubicaciones'] = Ubicacion.objects.all()
 
         # Distribución (top 5 con activos)
@@ -400,15 +411,32 @@ class ActivoListView(AdminActivoRequiredMixin, ListView):
 
 @require_GET
 @requiere_admin_activo
-def buscar_usuarios_asignables(request):
-    """Personas asignables, en vivo: empleados activos de Nomina (no
-    `core_usuario` local -- ver activos/services/nomina_directorio.py)."""
+def buscar_empleados_asignables(request):
+    """Empleados de Nomina activos (tabla portal_empleado), para el combo de
+    Responsable. Cada palabra debe coincidir con nombre, apellido, cedula o cargo."""
     query = (request.GET.get('q') or '').strip()[:80]
     try:
         page = max(1, int(request.GET.get('page', '1')))
     except ValueError:
         page = 1
-    return JsonResponse(buscar_empleados_asignables(request, q=query, page=page))
+    page_size = 20
+    queryset = empleados_asignables()
+    for palabra in query.split()[:5]:
+        queryset = queryset.filter(
+            Q(nombres__icontains=palabra)
+            | Q(apellidos__icontains=palabra)
+            | Q(cedula__icontains=palabra)
+            | Q(cargo__icontains=palabra)
+        )
+    start = (page - 1) * page_size
+    rows = list(queryset[start:start + page_size + 1])
+    return JsonResponse({
+        'results': [
+            {'id': empleado.pk, 'text': etiqueta_empleado(empleado)}
+            for empleado in rows[:page_size]
+        ],
+        'has_more': len(rows) > page_size,
+    })
 
 
 class ActivoDetailView(AdminActivoRequiredMixin, DetailView):
@@ -418,7 +446,7 @@ class ActivoDetailView(AdminActivoRequiredMixin, DetailView):
 
     def get_queryset(self):
         return super().get_queryset().select_related(
-            'subcategoria__categoria', 'ubicacion', 'usuario_asignado'
+            'subcategoria__categoria', 'ubicacion', 'responsable', 'usuario_legacy'
         )
 
     def get_context_data(self, **kwargs):
@@ -524,7 +552,7 @@ class ActivoUpdateView(ActivoFormContextMixin, AdminActivoRequiredMixin, UpdateV
     def form_valid(self, form):
         pk = self.object.pk
         activo_original = Activo.objects.select_related(
-            'ubicacion', 'usuario_asignado'
+            'ubicacion', 'responsable', 'usuario_legacy'
         ).get(pk=pk)
         response = super().form_valid(form)
         activo_actualizado = self.object
@@ -534,11 +562,11 @@ class ActivoUpdateView(ActivoFormContextMixin, AdminActivoRequiredMixin, UpdateV
             activo_actualizado.ubicacion,
             self.request.user,
         )
-        usuario_anterior = activo_original.usuario_asignado
+        usuario_anterior = activo_original.persona_responsable
         movimiento = _registrar_reasignacion_en_historial(
             activo_actualizado,
             usuario_anterior,
-            activo_actualizado.usuario_asignado,
+            activo_actualizado.persona_responsable,
             self.request.user,
         )
         if (
@@ -546,7 +574,7 @@ class ActivoUpdateView(ActivoFormContextMixin, AdminActivoRequiredMixin, UpdateV
             and activo_original.estado != Activo.EstadoActivo.INACTIVO
         ):
             avisar_activo_baja(activo_actualizado, self.request.user)
-        usuario_nuevo = activo_actualizado.usuario_asignado
+        usuario_nuevo = activo_actualizado.responsable
         if movimiento and usuario_anterior:
             avisar_activos_desasignados([activo_actualizado], usuario_anterior, self.request.user)
         if movimiento and usuario_nuevo:
@@ -581,7 +609,7 @@ class ActivoDeleteView(SinPaginaDeBorradoMixin, AdminActivoRequiredMixin, Delete
 
     def get_queryset(self):
         return super().get_queryset().select_related(
-            'subcategoria__categoria', 'ubicacion', 'usuario_asignado'
+            'subcategoria__categoria', 'ubicacion', 'responsable', 'usuario_legacy'
         )
 
     def get_redireccion_get(self):
@@ -619,11 +647,17 @@ def _registrar_reubicacion_en_historial(activo, ubicacion_anterior, ubicacion_nu
     )
 
 
+def _misma_persona(a, b):
+    """Compara responsables que pueden ser de dos tablas distintas en la fase 1
+    (empleado o cuenta anterior sin vincular): mismo pk no basta."""
+    if a is None or b is None:
+        return a is b
+    return type(a) is type(b) and a.pk == b.pk
+
+
 def _registrar_reasignacion_en_historial(activo, usuario_anterior, usuario_nuevo, usuario):
-    """Si cambió el usuario asignado, registra reasignación (misma semántica que reasignar_activo)."""
-    if (usuario_anterior.id if usuario_anterior else None) == (
-        usuario_nuevo.id if usuario_nuevo else None
-    ):
+    """Si cambió el responsable, registra reasignación (misma semántica que reasignar_activo)."""
+    if _misma_persona(usuario_anterior, usuario_nuevo):
         return
     # El historial también respeta la regla: "Nombre Apellido", nunca username.
     valor_anterior = _nombre(usuario_anterior)
@@ -631,8 +665,8 @@ def _registrar_reasignacion_en_historial(activo, usuario_anterior, usuario_nuevo
     return HistorialMovimiento.objects.create(
         activo=activo,
         tipo_movimiento=HistorialMovimiento.TipoMovimiento.REASIGNACION,
-        descripcion=f"Reasignación de usuario: {valor_anterior} -> {valor_nuevo}",
-        campo_modificado='usuario_asignado',
+        descripcion=f"Reasignación de responsable: {valor_anterior} -> {valor_nuevo}",
+        campo_modificado='responsable',
         valor_anterior=valor_anterior,
         valor_nuevo=valor_nuevo,
         usuario=usuario if usuario and usuario.is_authenticated else None,
@@ -650,7 +684,7 @@ def reasignar_activo(request, pk):
     queda como respaldo accesible y sin JavaScript.
     """
     activo = get_object_or_404(
-        Activo.objects.select_related('subcategoria__categoria', 'ubicacion', 'usuario_asignado'),
+        Activo.objects.select_related('subcategoria__categoria', 'ubicacion', 'responsable', 'usuario_legacy'),
         pk=pk,
     )
     destino = _url_de_retorno(
@@ -662,12 +696,17 @@ def reasignar_activo(request, pk):
     if request.method == 'POST':
         # Guardamos estado original desde BD antes de que el ModelForm
         # muta la instancia en memoria durante is_valid().
-        activo_original = Activo.objects.select_related('usuario_asignado').get(pk=pk)
+        activo_original = Activo.objects.select_related(
+            'responsable', 'usuario_legacy'
+        ).get(pk=pk)
         form = ReasignarActivoForm(request.POST, instance=activo)
         if form.is_valid():
-            usuario_anterior = activo_original.usuario_asignado
+            usuario_anterior = activo_original.persona_responsable
+            # Reasignar es una decision explicita: aunque se elija "sin
+            # asignar", cierra la asignacion anterior pendiente de vincular.
+            form.instance.usuario_legacy = None
             activo_actualizado = form.save()
-            usuario_nuevo = activo_actualizado.usuario_asignado
+            usuario_nuevo = activo_actualizado.responsable
 
             movimiento = _registrar_reasignacion_en_historial(
                 activo_actualizado,
@@ -713,7 +752,6 @@ def reasignar_activo(request, pk):
     return render(request, 'activos/activo/reasignar.html', {
         'form': form,
         'activo': activo,
-        'usuarios_asignables': usuarios_asignables(),
         'next': destino,
     })
 
@@ -722,7 +760,7 @@ def reasignar_activo(request, pk):
 def reubicar_activo(request, pk):
     """Reubica un activo. Mismo contrato que `reasignar_activo`."""
     activo = get_object_or_404(
-        Activo.objects.select_related('subcategoria__categoria', 'ubicacion', 'usuario_asignado'),
+        Activo.objects.select_related('subcategoria__categoria', 'ubicacion', 'responsable', 'usuario_legacy'),
         pk=pk,
     )
     destino = _url_de_retorno(
@@ -853,32 +891,35 @@ def acciones_masivas(request):
         messages.warning(request, 'No seleccionaste ningún activo.')
         return redirect(volver)
 
-    activos = Activo.objects.select_related('usuario_asignado', 'ubicacion').filter(pk__in=ids)
+    activos = Activo.objects.select_related(
+        'responsable', 'usuario_legacy', 'ubicacion'
+    ).filter(pk__in=ids)
     cambios = 0
 
     if accion == 'reasignar':
         usuario = None
         if destino_id:
-            usuario = usuarios_asignables().filter(pk=destino_id).first()
+            usuario = empleados_asignables().filter(pk=destino_id).first()
             if usuario is None:
-                messages.error(request, 'La persona seleccionada no está disponible.')
+                messages.error(request, 'El empleado seleccionado no está disponible.')
                 return redirect(volver)
 
         pendientes = []
         desasignados_por_anterior = {}
         with transaction.atomic():
             for activo in activos:
-                if activo.usuario_asignado_id == (usuario.pk if usuario else None):
+                anterior = activo.persona_responsable
+                if _misma_persona(anterior, usuario):
                     continue
-                anterior = activo.usuario_asignado
-                activo.usuario_asignado = usuario
-                activo.save(update_fields=['usuario_asignado', 'fecha_actualizacion'])
+                activo.asignar(usuario)
+                activo.save(update_fields=['responsable', 'usuario_legacy', 'fecha_actualizacion'])
                 movimiento = _registrar_reasignacion_en_historial(
                     activo, anterior, usuario, request.user,
                 )
                 cambios += 1
                 if anterior:
-                    desasignados_por_anterior.setdefault(anterior.pk, (anterior, []))[1].append(activo)
+                    clave = (type(anterior), anterior.pk)
+                    desasignados_por_anterior.setdefault(clave, (anterior, []))[1].append(activo)
                 if usuario:
                     pendientes.append((activo, movimiento))
 
@@ -941,7 +982,7 @@ class ActivoHistorialView(AdminActivoRequiredMixin, DetailView):
     
     def get_queryset(self):
         return super().get_queryset().select_related(
-            'subcategoria__categoria', 'ubicacion', 'usuario_asignado'
+            'subcategoria__categoria', 'ubicacion', 'responsable', 'usuario_legacy'
         )
 
     def get_context_data(self, **kwargs):
@@ -972,7 +1013,7 @@ class MisActivosListView(ModuloActivoRequiredMixin, ListView):
 
     def get_queryset(self):
         return (
-            Activo.objects.filter(usuario_asignado=self.request.user)
+            Activo.objects.filter(responsable__usuario=self.request.user)
             .select_related('subcategoria__categoria', 'ubicacion')
             .order_by('-fecha_actualizacion')
         )
@@ -997,7 +1038,7 @@ class MisActivoDetailView(ModuloActivoRequiredMixin, DetailView):
 
     def get_queryset(self):
         return (
-            Activo.objects.filter(usuario_asignado=self.request.user)
+            Activo.objects.filter(responsable__usuario=self.request.user)
             .select_related('subcategoria__categoria', 'ubicacion')
         )
 

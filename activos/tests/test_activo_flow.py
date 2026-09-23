@@ -39,7 +39,7 @@ def _payload_activo(catalogo, **overrides):
         "modelo": "ModeloPy",
         "numero_serial": "SN-PY-1",
         "codigo_inventario": "INV-PY-UNICO",
-        "usuario_asignado": catalogo["usuario_a"].pk,
+        "responsable": catalogo["empleado_a"].pk,
         "ubicacion": catalogo["ubicacion_almacen"].pk,
         "observaciones": "Nota pytest",
         "estado": Activo.EstadoActivo.ACTIVO,
@@ -105,7 +105,7 @@ def test_crear_activo_exitoso(client_auth, catalogo):
     assert r["Location"].endswith(reverse("activos:activo-detail", args=[act.pk]))
     assert act.marca == "MarcaPy"
     assert act.ubicacion_id == catalogo["ubicacion_almacen"].pk
-    assert act.usuario_asignado_id == catalogo["usuario_a"].pk
+    assert act.responsable_id == catalogo["empleado_a"].pk
     assert not act.historial_movimientos.exists()
 
 
@@ -118,7 +118,7 @@ def test_editar_activo_registra_reubicacion_y_reasignacion_en_historial(
         marca="M1",
         modelo="Mo1",
         codigo_inventario="INV-EDIT-HIST",
-        usuario_asignado=catalogo["usuario_a"],
+        responsable=catalogo["empleado_a"],
         ubicacion=catalogo["ubicacion_almacen"],
         estado=Activo.EstadoActivo.ACTIVO,
     )
@@ -141,7 +141,7 @@ def test_editar_activo_registra_reubicacion_y_reasignacion_en_historial(
     data = _payload_activo(
         catalogo,
         codigo_inventario="INV-EDIT-HIST",
-        usuario_asignado=catalogo["usuario_b"].pk,
+        responsable=catalogo["empleado_b"].pk,
         ubicacion=catalogo["ubicacion_oficina"].pk,
         marca="M1-actualizada",
     )
@@ -150,7 +150,7 @@ def test_editar_activo_registra_reubicacion_y_reasignacion_en_historial(
 
     act.refresh_from_db()
     assert act.ubicacion_id == catalogo["ubicacion_oficina"].pk
-    assert act.usuario_asignado_id == catalogo["usuario_b"].pk
+    assert act.responsable_id == catalogo["empleado_b"].pk
 
     tipos = list(
         act.historial_movimientos.order_by("id").values_list(
@@ -196,7 +196,7 @@ def test_reubicar_activo_crea_entrada_historial(client_auth, catalogo, user):
         marca="M",
         modelo="Mo",
         codigo_inventario="INV-REUB",
-        usuario_asignado=None,
+        responsable=None,
         ubicacion=catalogo["ubicacion_almacen"],
         estado=Activo.EstadoActivo.ACTIVO,
     )
@@ -218,13 +218,13 @@ def test_reasignar_activo_crea_entrada_historial(client_auth, catalogo, user):
         marca="M",
         modelo="Mo",
         codigo_inventario="INV-REAS",
-        usuario_asignado=catalogo["usuario_a"],
+        responsable=catalogo["empleado_a"],
         ubicacion=catalogo["ubicacion_almacen"],
         estado=Activo.EstadoActivo.ACTIVO,
     )
     url = reverse("activos:activo-reasignar", args=[act.pk])
     r = client_auth.post(
-        url, {"usuario_asignado": catalogo["usuario_b"].pk}
+        url, {"responsable": catalogo["empleado_b"].pk}
     )
     assert r.status_code == 302
     assert act.historial_movimientos.count() == 1
@@ -240,7 +240,7 @@ def test_historial_vista_lista_movimientos(client_auth, catalogo):
         marca="M",
         modelo="Mo",
         codigo_inventario="INV-HIST-VIEW",
-        usuario_asignado=None,
+        responsable=None,
         ubicacion=catalogo["ubicacion_almacen"],
         estado=Activo.EstadoActivo.ACTIVO,
     )
@@ -265,7 +265,7 @@ def test_eliminar_activo(client_auth, catalogo):
         marca="M",
         modelo="Mo",
         codigo_inventario="INV-DEL",
-        usuario_asignado=None,
+        responsable=None,
         ubicacion=catalogo["ubicacion_almacen"],
         estado=Activo.EstadoActivo.ACTIVO,
     )
@@ -303,7 +303,7 @@ def test_flujo_integrado_crear_editar_reubicar_reasignar_historial_eliminar(
             codigo_inventario=codigo,
             marca="MarcaPostEdicion",
             ubicacion=catalogo["ubicacion_oficina"].pk,
-            usuario_asignado=catalogo["usuario_b"].pk,
+            responsable=catalogo["empleado_b"].pk,
         ),
     )
     assert r.status_code == 302
@@ -317,7 +317,7 @@ def test_flujo_integrado_crear_editar_reubicar_reasignar_historial_eliminar(
     assert r_hist.status_code == 200
     body = _response_text(r_hist)
     assert "Reubicación:" in body
-    assert "Reasignación de usuario:" in body
+    assert "Reasignación de responsable:" in body
 
     # Reubicar (sin cambio real → sin entrada extra)
     reub_url = reverse("activos:activo-reubicar", args=[act.pk])
@@ -337,7 +337,7 @@ def test_flujo_integrado_crear_editar_reubicar_reasignar_historial_eliminar(
     # Reasignar con cambio
     reas_url = reverse("activos:activo-reasignar", args=[act.pk])
     client_auth.post(
-        reas_url, {"usuario_asignado": catalogo["usuario_a"].pk}
+        reas_url, {"responsable": catalogo["empleado_a"].pk}
     )
     act.refresh_from_db()
     assert act.historial_movimientos.count() == 4

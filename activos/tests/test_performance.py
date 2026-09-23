@@ -1,14 +1,11 @@
 """Query budgets for the pages most often loaded inside the Portal iframe."""
 
-from unittest.mock import patch
-
 import pytest
-from django.contrib.auth import get_user_model
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
-from activos.models import Activo
+from activos.models import Activo, EmpleadoPortal
 
 
 def _assert_query_budget(client, url, maximum):
@@ -23,13 +20,13 @@ def _assert_query_budget(client, url, maximum):
 
 @pytest.mark.django_db
 def test_presupuesto_listado_usuarios(client_auth, catalogo):
-    user_model = get_user_model()
-    user_model.objects.bulk_create([
-        user_model(
-            username=f"perf-{index}",
-            first_name="Persona",
-            last_name=f"{index:03d}",
-            is_active=True,
+    EmpleadoPortal.objects.bulk_create([
+        EmpleadoPortal(
+            nomina_id=900 + index,
+            cedula=f"V900{index:03d}",
+            nombres="Persona",
+            apellidos=f"{index:03d}",
+            activo=True,
         )
         for index in range(30)
     ])
@@ -37,8 +34,9 @@ def test_presupuesto_listado_usuarios(client_auth, catalogo):
         client_auth,
         reverse("usuarios:usuario-search"),
         # +1: AdminActivoRequiredMixin confirma rol administrador ademas del
-        # acceso al modulo (activos/decorators.py).
-        maximum=10,
+        # acceso al modulo (activos/decorators.py). +1: conteo de activos
+        # pendientes de vincular (fase 1 de la migracion a empleados).
+        maximum=11,
     )
 
 
@@ -50,7 +48,7 @@ def test_presupuesto_perfil_usuario(client_auth, catalogo):
             marca="Marca",
             modelo=f"Modelo {index}",
             codigo_inventario=f"PERF-{index:03d}",
-            usuario_asignado=catalogo["usuario_a"],
+            responsable=catalogo["empleado_a"],
             ubicacion=catalogo["ubicacion_almacen"],
         )
         for index in range(30)
@@ -59,7 +57,7 @@ def test_presupuesto_perfil_usuario(client_auth, catalogo):
         client_auth,
         reverse(
             "usuarios:usuario-profile",
-            args=[catalogo["usuario_a"].pk],
+            args=[catalogo["empleado_a"].pk],
         ),
         # +1: AdminActivoRequiredMixin confirma rol administrador ademas del
         # acceso al modulo (activos/decorators.py).
@@ -79,22 +77,21 @@ def test_presupuesto_listado_activos(client_auth, catalogo):
 
 
 @pytest.mark.django_db
-def test_busqueda_asignables_consulta_a_nomina(client_auth, catalogo):
-    """Las personas asignables ahora vienen de Nomina (ver
-    activos/services/nomina_directorio.py), no de una consulta local a
-    core_usuario -- se sustituye el transporte HTTP, no la vista."""
-    resultado_nomina = {
-        "results": [{"id": 1, "text": "Prueba Uno — Analista"}],
-        "has_more": False,
-    }
-    with patch(
-        "activos.views.buscar_empleados_asignables", return_value=resultado_nomina
-    ) as mock_buscar:
-        response = client_auth.get(
-            reverse("activos:usuarios-asignables"),
-            {"q": "Prueba"},
-        )
-    assert response.status_code == 200
-    assert response.json() == resultado_nomina
-    mock_buscar.assert_called_once()
-    assert mock_buscar.call_args.kwargs == {"q": "Prueba", "page": 1}
+def test_busqueda_asignables_es_paginada_y_solo_empleados_activos(client_auth, catalogo, crear_empleado):
+    for index in range(25):
+        crear_empleado("Prueba", f"Masiva {index:02d}")
+    crear_empleado("Prueba", "De Baja", activo=False)
+
+    payload = client_auth.get(reverse("activos:empleados-asignables"), {"q": "Prueba"}).json()
+    assert len(payload["results"]) == 20
+    assert payload["has_more"] is True
+    assert all("De Baja" not in r["text"] for r in payload["results"])
+
+
+@pytest.mark.django_db
+def test_busqueda_asignables_por_nombre_y_apellido_en_cualquier_orden(client_auth, catalogo):
+    for q in ("ana prueba", "prueba ana"):
+        ids = [r["id"] for r in client_auth.get(
+            reverse("activos:empleados-asignables"), {"q": q}
+        ).json()["results"]]
+        assert ids == [catalogo["empleado_a"].pk], q

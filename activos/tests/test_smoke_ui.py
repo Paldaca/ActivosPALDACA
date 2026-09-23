@@ -3,6 +3,7 @@ import pytest
 from django.urls import reverse
 
 from activos.models import Activo, Categoria, SubCategoria, Ubicacion, HistorialMovimiento
+from activos.tests.utils import empleado_de
 
 
 @pytest.fixture
@@ -20,6 +21,7 @@ def datos(db, django_user_model):
     sin_nombre = django_user_model.objects.create_user(username="V-SINNOMBRE", password="x")
     for u in (admin, ana, sin_nombre):
         UsuarioModulo.objects.get_or_create(usuario=u, modulo=mod)
+    ana_emp = empleado_de(ana)
 
     cat = Categoria.objects.create(nombre="Equipos de cómputo")
     sub = SubCategoria.objects.create(nombre="Laptop", prefijo="LAP", categoria=cat)
@@ -29,7 +31,7 @@ def datos(db, django_user_model):
 
     asignado = Activo.objects.create(
         subcategoria=sub, marca="Dell", modelo="Latitude 5420",
-        numero_serial="SN123", ubicacion=ub, usuario_asignado=ana, estado="AC",
+        numero_serial="SN123", ubicacion=ub, responsable=ana_emp, estado="AC",
     )
     disponible = Activo.objects.create(
         subcategoria=sub, marca="HP", modelo="ProBook", ubicacion=ub, estado="AC",
@@ -39,7 +41,7 @@ def datos(db, django_user_model):
     )
     baja = Activo.objects.create(
         subcategoria=sub, marca="Acer", modelo="Viejo", ubicacion=ub2,
-        usuario_asignado=sin_nombre, estado="IN",
+        usuario_legacy=sin_nombre, estado="IN",
     )
     HistorialMovimiento.objects.create(
         activo=asignado, tipo_movimiento="RE", descripcion="Reasignación de usuario: Sin asignar -> Ana Prueba",
@@ -47,7 +49,7 @@ def datos(db, django_user_model):
         valor_nuevo="Ana Prueba", usuario=admin,
     )
     return {
-        "admin": admin, "ana": ana, "cat": cat, "sub": sub, "ub": ub, "ub2": ub2,
+        "admin": admin, "ana": ana, "ana_emp": ana_emp, "cat": cat, "sub": sub, "ub": ub, "ub2": ub2,
         "asignado": asignado, "disponible": disponible, "manten": manten, "baja": baja,
     }
 
@@ -65,7 +67,7 @@ def test_todas_las_pantallas_renderizan(cli, datos):
         reverse("activos:activo-list") + "?estado=AC&asignacion=libre",
         reverse("activos:activo-list") + "?estado=EM",
         reverse("activos:activo-list") + "?buscar=Ana",
-        reverse("activos:activo-list") + f"?categoria={datos['cat'].pk}&ubicacion={datos['ub'].pk}&usuario_asignado={datos['ana'].pk}&buscar=Dell",
+        reverse("activos:activo-list") + f"?categoria={datos['cat'].pk}&ubicacion={datos['ub'].pk}&responsable={datos['ana_emp'].pk}&buscar=Dell",
         reverse("activos:activo-detail", args=[a.pk]),
         reverse("activos:activo-detail", args=[datos["disponible"].pk]),
         reverse("activos:activo-create"),
@@ -124,13 +126,13 @@ def test_reasignar_con_next_vuelve_al_listado(cli, datos):
     destino = reverse("activos:activo-list") + "?estado=AC"
     r = cli.post(
         reverse("activos:activo-reasignar", args=[a.pk]),
-        {"usuario_asignado": datos["ana"].pk, "next": destino},
+        {"responsable": datos["ana_emp"].pk, "next": destino},
     )
     assert r.status_code == 302
     assert r.url.startswith(destino)
     assert f"constancia={a.pk}" in r.url
     a.refresh_from_db()
-    assert a.usuario_asignado_id == datos["ana"].pk
+    assert a.responsable_id == datos["ana_emp"].pk
     assert a.historial_movimientos.filter(tipo_movimiento="RE").count() == 1
 
 
@@ -138,7 +140,7 @@ def test_next_externo_es_rechazado(cli, datos):
     a = datos["disponible"]
     r = cli.post(
         reverse("activos:activo-reasignar", args=[a.pk]),
-        {"usuario_asignado": "", "next": "https://malicioso.example.com/"},
+        {"responsable": "", "next": "https://malicioso.example.com/"},
     )
     assert r.status_code == 302
     assert "malicioso" not in r.url
@@ -147,21 +149,21 @@ def test_next_externo_es_rechazado(cli, datos):
 def test_acciones_masivas_reasignar(cli, datos):
     ids = [datos["disponible"].pk, datos["manten"].pk]
     r = cli.post(reverse("activos:activo-acciones-masivas"), {
-        "accion": "reasignar", "activos": ids, "destino": datos["ana"].pk,
+        "accion": "reasignar", "activos": ids, "destino": datos["ana_emp"].pk,
         "next": reverse("activos:activo-list"),
     })
     assert r.status_code == 302
     assert "constancia=" in r.url
     for pk in ids:
         act = Activo.objects.get(pk=pk)
-        assert act.usuario_asignado_id == datos["ana"].pk
+        assert act.responsable_id == datos["ana_emp"].pk
         assert act.historial_movimientos.filter(tipo_movimiento="RE").count() == 1
 
 
 def test_acciones_masivas_omite_sin_cambio(cli, datos):
     a = datos["asignado"]  # ya es de Ana
     r = cli.post(reverse("activos:activo-acciones-masivas"), {
-        "accion": "reasignar", "activos": [a.pk], "destino": datos["ana"].pk,
+        "accion": "reasignar", "activos": [a.pk], "destino": datos["ana_emp"].pk,
     })
     assert r.status_code == 302
     assert a.historial_movimientos.filter(tipo_movimiento="RE").count() == 1  # la del fixture
@@ -198,7 +200,7 @@ def test_catalogo_protegido_no_revienta(cli, datos):
 def test_guardar_y_nuevo(cli, datos):
     r = cli.post(reverse("activos:activo-create"), {
         "subcategoria": datos["sub"].pk, "marca": "Lenovo", "modelo": "T14",
-        "numero_serial": "", "usuario_asignado": "", "ubicacion": datos["ub"].pk,
+        "numero_serial": "", "responsable": "", "ubicacion": datos["ub"].pk,
         "observaciones": "", "estado": "AC", "guardar_y_nuevo": "1",
     })
     assert r.status_code == 302
@@ -318,8 +320,7 @@ def test_pantallas_usuarios_y_mantenimientos(cli, datos, mantenimiento):
         rv("usuarios:usuario-search") + "?estado=con_activos",
         rv("usuarios:usuario-search") + "?estado=inactivos",
         rv("usuarios:usuario-search") + "?buscar=Ana",
-        rv("usuarios:usuario-profile", args=[datos["ana"].pk]),
-        rv("usuarios:usuario-update", args=[datos["ana"].pk]),
+        rv("usuarios:usuario-profile", args=[datos["ana_emp"].pk]),
         rv("mantenimientos:mantenimiento-list"),
         rv("mantenimientos:mantenimiento-list") + "?estado=EP",
         rv("mantenimientos:mantenimiento-create"),
@@ -334,37 +335,27 @@ def test_pantallas_usuarios_y_mantenimientos(cli, datos, mantenimiento):
 def test_buscar_persona_por_codigo_de_inventario(cli, datos):
     from django.urls import reverse as rv
     r = cli.get(rv("usuarios:usuario-search"), {"buscar": datos["asignado"].codigo_inventario})
-    assert list(r.context["usuarios"]) == [datos["ana"]]
+    assert list(r.context["usuarios"]) == [datos["ana_emp"]]
 
 
-def test_desactivar_persona_no_borra_la_identidad_sso(cli, datos, django_user_model):
+def test_personas_es_solo_consulta():
+    """Los datos y la baja de un empleado se gestionan en Nomina."""
+    from django.urls import NoReverseMatch, reverse as rv
+    for nombre in ("usuarios:usuario-update", "usuarios:usuario-estado", "usuarios:usuario-create"):
+        with pytest.raises(NoReverseMatch):
+            rv(nombre, args=[1])
+
+
+def test_activo_con_asignacion_anterior_sin_vincular_cuenta_como_asignado(cli, datos):
+    """Fase 1: no se pierde la asignacion aunque la cuenta no tenga empleado."""
     from django.urls import reverse as rv
-    ana = datos["ana"]
-    # Con activos a cargo NO se puede desactivar
-    r = cli.post(rv("usuarios:usuario-estado", args=[ana.pk]), {"activar": "0"}, follow=True)
-    ana.refresh_from_db()
-    assert ana.is_active is True
-    assert django_user_model.objects.filter(pk=ana.pk).exists()
-
-    # Liberando el equipo, la baja es lógica y reversible
-    datos["asignado"].usuario_asignado = None
-    datos["asignado"].save(update_fields=["usuario_asignado"])
-    cli.post(rv("usuarios:usuario-estado", args=[ana.pk]), {"activar": "0"})
-    ana.refresh_from_db()
-    assert ana.is_active is False
-    assert django_user_model.objects.filter(pk=ana.pk).exists()   # nunca se borra
-
-    cli.post(rv("usuarios:usuario-estado", args=[ana.pk]), {"activar": "1"})
-    ana.refresh_from_db()
-    assert ana.is_active is True
-
-
-def test_no_puedo_desactivarme_a_mi_mismo(cli, datos):
-    from django.urls import reverse as rv
-    admin = datos["admin"]
-    cli.post(rv("usuarios:usuario-estado", args=[admin.pk]), {"activar": "0"})
-    admin.refresh_from_db()
-    assert admin.is_active is True
+    baja = datos["baja"]
+    baja.estado = "AC"
+    baja.save(update_fields=["estado"])
+    r = cli.get(rv("activos:activo-list"), {"asignacion": "libre"})
+    assert baja not in list(r.context["activos"])
+    body = cli.get(rv("activos:activo-detail", args=[baja.pk])).content.decode()
+    assert "sin empleado en Nómina" in body
 
 
 def test_finalizar_mantenimiento_requiere_post(cli, mantenimiento):

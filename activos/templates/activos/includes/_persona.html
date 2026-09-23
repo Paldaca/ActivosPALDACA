@@ -1,6 +1,6 @@
 {% load activo_filters %}{% comment %}
 Persona con avatar de iniciales. REGLA: siempre "Nombre Apellido", nunca username.
-Uso:  {% include 'activos/includes/_persona.html' with persona=activo.usuario_asignado %}
+Uso:  {% include 'activos/includes/_persona.html' with persona=activo.persona_responsable %}
 Opcional: tamano='lg'|'xl', meta='texto secundario'
 {% endcomment %}{% if persona %}
 <span class="ax-person">

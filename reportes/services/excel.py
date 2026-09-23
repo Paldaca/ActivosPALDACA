@@ -9,11 +9,11 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
 
-def nombre_usuario(usuario) -> str:
-    if not usuario:
+def nombre_usuario(persona) -> str:
+    """Empleado o, en la fase 1, la cuenta anterior sin vincular."""
+    if not persona:
         return ""
-    nombre = f"{usuario.first_name or ''} {usuario.last_name or ''}".strip()
-    return nombre or (usuario.email or "")
+    return (persona.get_full_name() or "").strip() or (persona.email or "")
 
 
 def exportar_activos_excel(activos, filename: str, filtros_aplicados=None) -> HttpResponse:
@@ -84,7 +84,7 @@ def exportar_activos_excel(activos, filename: str, filtros_aplicados=None) -> Ht
             activo.numero_serial or "",
             activo.get_estado_display(),
             activo.ubicacion.nombre if activo.ubicacion_id else "",
-            nombre_usuario(activo.usuario_asignado),
+            nombre_usuario(activo.persona_responsable),
             activo.observaciones or "",
             activo.fecha_creacion.strftime("%d/%m/%Y %H:%M") if activo.fecha_creacion else "",
             (

@@ -168,19 +168,32 @@ Migración a prefijo: `activos/migrations/0004_activos_prefijo_tablas.py`.
 | Nav API | `PALDACA_API_BASE` (default `https://api.cpaldaca.com/api`) | Menú / módulos habilitados | `paldaca_nav.html` → `window.__PALDACA_NAV__` |
 | Logos Portal | `{portal_url}/images/logo*.png` | Branding nav | `core/context_processors.py` |
 | Bus de notificaciones | `PALDACA_PORTAL_API_URL` (o `PALDACA_API_BASE`) + `/notificaciones/eventos/` | Avisos en la campana del Portal | `activos/services/notificaciones_portal.py` |
-| Directorio saliente de Nómina | `PALDACA_NOMINA_API_URL` + `/empleados/directorio/asignables/` | Personas asignables a activos (empleados de Nómina, no `core_usuario` local) | `activos/services/nomina_directorio.py` |
 
-### Directorio de Nómina (personas asignables)
+### Empleados de Nómina (responsables de activos)
 
-Nómina PALDACA es un satélite **federado** (base de datos propia, ver
-`Portal-Paldaca/docs/PALDACA_SUITE/CONTRATO_SSO_FEDERADO.md`): no hay forma de
-hacer JOIN entre `activos_activo` y sus empleados. En su lugar, Activos reenvía
-la cookie de sesión del operador (la misma `paldaca_sessionid` que comparte con
-el Portal) a un endpoint de solo lectura que Nómina expone bajo `/api/`
-(`Empleados/views_directorio_saliente.py` en ese repo), que a su vez la valida
-contra el Portal. Ningún secreto nuevo se comparte entre Activos y Nómina. Si
-Nómina no responde, el selector de "Responsable" se degrada a "sin resultados"
-— nunca un 500 (`activos/services/nomina_directorio.py`).
+El responsable de un activo es un **empleado de Nómina**, no una cuenta del
+Portal: `Activo.responsable` → `EmpleadoPortal`, que lee la tabla
+`portal_empleado` del Portal (`managed = False`: Activos no la migra ni la
+escribe). Nómina es el único que la escribe, por dos vías (ver
+`Portal-Paldaca/backend/portal/views.py` y `Nomina Paldaca/Empleados/services/sync_portal.py`):
+
+- al guardar/eliminar un empleado en Nómina, se envía el cambio al Portal;
+- el botón «Sincronizar con el Portal» (Empleados > Vínculos) manda la
+  plantilla completa y da de baja a quien falte. Nunca se borran filas.
+
+Como la tabla vive en la BD compartida, **no hay llamadas HTTP en tiempo de
+ejecución**: el combo de Responsable (`activos:empleados-asignables`) es una
+consulta local. Si Nómina cae, Activos sigue funcionando con la última copia.
+
+Un empleado puede tener equipos **sin cuenta del Portal** (`usuario` vacío):
+no recibe avisos en la campana ni ve "Mis activos", pero puede ser responsable.
+
+**Migración en dos fases.** La FK anterior a `core_usuario` quedó como
+`Activo.usuario_legacy`. La migración `0012` vincula cada activo al empleado
+cuya cuenta del Portal era la asignada; lo que no tiene empleado queda como
+"pendiente de vincular" (cuenta como asignado, se muestra con aviso).
+`python manage.py vincular_responsables` repite la vinculación y lista los
+pendientes. Fase 2: eliminar `usuario_legacy` cuando ese listado quede vacío.
 
 ### Bus de notificaciones del Portal
 
@@ -295,7 +308,8 @@ Comando local: `python manage.py seed_core_modulos` (`core/management/commands/s
 | Desactivar `is_active` en `core_usuario` | Logout / sin acceso |
 | Crear usuario solo en Portal | Visible en Activos si tiene acceso módulo |
 | Migraciones `core` en Portal sin sincronizar en Activos | Riesgo de esquema inconsistente |
-| Nómina cae o no responde | Selector de "Responsable" muestra "no se pudo cargar la lista"; el resto de Activos sigue funcionando (`activos/services/nomina_directorio.py` nunca lanza) |
+| Nómina cae o no responde | Nada: Activos lee la copia de empleados en `portal_empleado`. Solo se retrasan las altas y bajas de empleados hasta que Nómina vuelva |
+| Empleado dado de baja en Nómina con equipos | Sigue como responsable; el despachador diario avisa a los admins (`activos.usuario_inactivo_con_equipos`) |
 
 ---
 

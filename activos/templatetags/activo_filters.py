@@ -5,7 +5,7 @@ el usuario. Dos reglas de negocio se aplican de forma centralizada:
 
 1. Las personas SIEMPRE se muestran como "Nombre Apellido", nunca por username.
 2. El estado operativo que ve el usuario (Disponible / Asignado / En
-   Mantenimiento / Dado de Baja) se DERIVA de `estado` + `usuario_asignado`;
+   Mantenimiento / Dado de Baja) se DERIVA de `estado` + `responsable`;
    no requiere migración ni cambios en el modelo.
 """
 
@@ -107,13 +107,14 @@ ESTADOS_UI = {
 
 @register.filter(name='estado_key')
 def estado_key(activo):
-    """Traduce (estado, usuario_asignado) al estado operativo de la interfaz."""
+    """Traduce (estado, responsable) al estado operativo de la interfaz."""
     estado = getattr(activo, 'estado', None)
     if estado == 'EM':
         return 'mantenimiento'
     if estado == 'IN':
         return 'baja'
-    return 'asignado' if getattr(activo, 'usuario_asignado_id', None) else 'disponible'
+    # Una asignacion anterior pendiente de vincular (fase 1) sigue siendo asignado.
+    return 'asignado' if getattr(activo, 'tiene_responsable', False) else 'disponible'
 
 
 @register.filter(name='estado_label')

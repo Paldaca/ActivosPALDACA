@@ -8,6 +8,7 @@ import pytest
 from django.urls import reverse
 
 from activos.models import Activo
+from activos.tests.utils import empleado_de
 
 
 def _crear_activo(catalogo, codigo, usuario=None):
@@ -16,7 +17,7 @@ def _crear_activo(catalogo, codigo, usuario=None):
         marca="Dell",
         modelo="Latitude",
         codigo_inventario=codigo,
-        usuario_asignado=usuario,
+        responsable=empleado_de(usuario),
         ubicacion=catalogo["ubicacion_almacen"],
         estado=Activo.EstadoActivo.ACTIVO,
     )

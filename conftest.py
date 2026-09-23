@@ -1,8 +1,43 @@
 import pytest
 from django.contrib.auth import get_user_model
 
-from activos.models import Categoria, SubCategoria, Ubicacion
+from activos.models import Categoria, EmpleadoPortal, SubCategoria, Ubicacion
 from core.models import Modulo, UsuarioModulo
+
+
+@pytest.fixture(scope="session")
+def django_db_setup(django_db_setup, django_db_blocker):
+    """`portal_empleado` es del Portal (EmpleadoPortal es `managed = False`):
+    las migraciones de Activos no la crean, asi que se crea aqui."""
+    from django.db import connection
+
+    with django_db_blocker.unblock():
+        with connection.schema_editor() as editor:
+            editor.create_model(EmpleadoPortal)
+
+
+_nomina_ids = iter(range(1, 10**6))
+
+
+@pytest.fixture
+def crear_empleado(db):
+    """Fabrica de empleados de Nomina (en produccion los escribe solo Nomina)."""
+
+    def _crear(nombres="Empleado", apellidos="Prueba", usuario=None, **extra):
+        nomina_id = next(_nomina_ids)
+        datos = {
+            "nomina_id": nomina_id,
+            "cedula": f"V{nomina_id:08d}",
+            "nombres": nombres,
+            "apellidos": apellidos,
+            "cargo": "Tecnico",
+            "activo": True,
+            "usuario": usuario,
+        }
+        datos.update(extra)
+        return EmpleadoPortal.objects.create(**datos)
+
+    return _crear
 
 
 @pytest.fixture
@@ -66,8 +101,12 @@ def media_tmp(tmp_path, settings):
 
 
 @pytest.fixture
-def catalogo(db):
-    """Categoría, subcategoría, dos ubicaciones y dos usuarios Paldaca asignables."""
+def catalogo(db, crear_empleado):
+    """Categoría, subcategoría, dos ubicaciones y dos empleados asignables.
+
+    Cada empleado tiene cuenta del Portal (`usuario_a` / `usuario_b`): así las
+    pruebas de "mis activos" y de avisos tienen a quién iniciar sesión o avisar.
+    """
     user_model = get_user_model()
     cat = Categoria.objects.create(nombre="Categoría Pytest")
     sub = SubCategoria.objects.create(nombre="Sub Pytest", categoria=cat)
@@ -94,4 +133,6 @@ def catalogo(db):
         "ubicacion_oficina": u_oficina,
         "usuario_a": ua,
         "usuario_b": ub,
+        "empleado_a": crear_empleado("Ana", "Prueba", usuario=ua),
+        "empleado_b": crear_empleado("Luis", "Prueba", usuario=ub),
     }

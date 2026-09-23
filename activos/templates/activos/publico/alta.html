@@ -169,11 +169,11 @@
                 <label for="{{ campo.id_for_label }}">
                     {{ campo.label }}{% if not campo.field.required %} <span style="font-weight:400;text-transform:none;letter-spacing:0">(opcional)</span>{% endif %}
                 </label>
-                {% if campo.name == "usuario_asignado" %}
+                {% if campo.name == "responsable" %}
                 <div class="ax-combo ax-combo--persona"
                      data-combo-placeholder="Buscar por nombre o apellido…"
                      data-combo-empty-label="Sin asignar por ahora"
-                     data-combo-remote-url="{% url 'activos:usuarios-asignables' %}">
+                     data-combo-remote-url="{% url 'activos:empleados-asignables' %}">
                     {{ campo }}
                 </div>
                 {% elif campo.name == "ubicacion" %}

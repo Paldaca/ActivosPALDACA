@@ -27,7 +27,7 @@ class ActivoAdmin(admin.ModelAdmin):
     list_display = [
         'codigo_inventario', 'marca', 'modelo', 
         'subcategoria', 'ubicacion', 'estado', 
-        'usuario_asignado', 'fecha_creacion'
+        'responsable', 'fecha_creacion'
     ]
     list_filter = ['estado', 'subcategoria__categoria', 'subcategoria', 'ubicacion']
     search_fields = [
@@ -35,6 +35,7 @@ class ActivoAdmin(admin.ModelAdmin):
         'numero_serial', 'observaciones'
     ]
     autocomplete_fields = ['subcategoria', 'ubicacion']
+    raw_id_fields = ['responsable', 'usuario_legacy']
     readonly_fields = ['fecha_creacion', 'fecha_actualizacion']
     
     fieldsets = (
@@ -42,7 +43,7 @@ class ActivoAdmin(admin.ModelAdmin):
             'fields': ('codigo_inventario', 'subcategoria', 'marca', 'modelo', 'numero_serial')
         }),
         ('Asignación', {
-            'fields': ('usuario_asignado', 'ubicacion', 'estado')
+            'fields': ('responsable', 'usuario_legacy', 'ubicacion', 'estado')
         }),
         ('Detalles Adicionales', {
             'fields': ('observaciones',)

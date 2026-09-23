@@ -1,7 +1,7 @@
 from django.shortcuts import render
 from django.views.generic import TemplateView
 from django.conf import settings
-from activos.models import Activo, Categoria, HistorialMovimiento, Ubicacion
+from activos.models import SIN_RESPONSABLE, Activo, Categoria, HistorialMovimiento, Ubicacion
 from mantenimientos.models import Mantenimiento
 from django.db.models import Count, Q
 from django.shortcuts import redirect
@@ -32,8 +32,8 @@ class HomeView(ModuloActivoRequiredMixin, TemplateView):
         # el modelo guarda AC/IN/EM y la persona asignada define el resto.
         context['resumen'] = Activo.objects.aggregate(
             total=Count('id'),
-            disponibles=Count('id', filter=Q(estado='AC', usuario_asignado__isnull=True)),
-            asignados=Count('id', filter=Q(estado='AC', usuario_asignado__isnull=False)),
+            disponibles=Count('id', filter=Q(estado='AC') & SIN_RESPONSABLE),
+            asignados=Count('id', filter=Q(estado='AC') & ~SIN_RESPONSABLE),
             mantenimiento=Count('id', filter=Q(estado='EM')),
             baja=Count('id', filter=Q(estado='IN')),
             sin_serial=Count(

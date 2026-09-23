@@ -68,6 +68,61 @@ class Ubicacion(models.Model):
         return self.nombre
 
 
+class EmpleadoPortal(models.Model):
+    """Empleado de Nomina, leido de la tabla `portal_empleado` del Portal.
+
+    SOLO LECTURA (`managed = False`): la tabla es del Portal y la escribe
+    unicamente Nomina (Portal-Paldaca/backend/portal/models.py). Activos no la
+    migra ni la modifica. `usuario` es la cuenta del Portal vinculada, si la
+    tiene: un empleado puede tener equipos asignados sin tener acceso al Portal.
+
+    `db_constraint=False` en las FK que apuntan aqui: la tabla no la crean las
+    migraciones de Activos, asi que no puede haber una restriccion de BD
+    hacia ella; la integridad la garantiza que el Portal nunca borra filas
+    (baja = `activo=False`).
+    """
+
+    nomina_id = models.PositiveIntegerField(unique=True)
+    cedula = models.CharField(max_length=20)
+    nombres = models.CharField(max_length=100)
+    apellidos = models.CharField(max_length=100)
+    cargo = models.CharField(max_length=100, blank=True, default="")
+    email = models.EmailField(blank=True, default="")
+    telefono = models.CharField(max_length=30, blank=True, default="")
+    activo = models.BooleanField(default=True)
+    usuario = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.DO_NOTHING,
+        db_constraint=False,
+        related_name="empleado_portal",
+    )
+    sincronizado_en = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        managed = False
+        db_table = "portal_empleado"
+        ordering = ("apellidos", "nombres")
+        verbose_name = "Empleado"
+        verbose_name_plural = "Empleados"
+
+    def __str__(self):
+        return self.nombre_completo
+
+    @property
+    def nombre_completo(self):
+        return f"{self.nombres} {self.apellidos}".strip()
+
+    def get_full_name(self):
+        return self.nombre_completo
+
+
+#: Activo sin nadie que responda: ni empleado ni asignacion anterior pendiente
+#: de vincular (fase 1). Criterio unico para KPIs, filtros y reportes.
+SIN_RESPONSABLE = models.Q(responsable__isnull=True, usuario_legacy__isnull=True)
+
+
 class Activo(models.Model):
     """Activo del sistema"""
 
@@ -86,12 +141,25 @@ class Activo(models.Model):
     numero_serial = models.CharField(max_length=100, blank=True, null=True)
     codigo_inventario = models.CharField(max_length=50, unique=True)
 
-    usuario_asignado = models.ForeignKey(
+    responsable = models.ForeignKey(
+        EmpleadoPortal,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_constraint=False,
+        related_name="activos_asignados",
+    )
+    # FASE 1 de la migracion a empleados de Nomina: la cuenta del Portal a la
+    # que estaba asignado el activo antes. `vincular_responsables` la convierte
+    # en `responsable`; lo que no tenga empleado queda aqui, visible como
+    # "pendiente de vincular", sin perder la asignacion. Se elimina en la fase 2
+    # (cuando `vincular_responsables --pendientes` quede vacio).
+    usuario_legacy = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name="activos_asignados",
+        related_name="activos_legacy",
     )
 
     ubicacion = models.ForeignKey(
@@ -127,21 +195,29 @@ class Activo(models.Model):
     def categoria(self):
         return self.subcategoria.categoria
 
-    def clean(self):
-        from django.core.exceptions import ValidationError
+    @property
+    def persona_responsable(self):
+        """Quien responde por el equipo, para mostrar: el empleado o, en la
+        fase 1, la cuenta anterior aun sin vincular (`pendiente_de_vincular`)."""
+        return self.responsable or self.usuario_legacy
 
+    @property
+    def pendiente_de_vincular(self):
+        return self.responsable_id is None and self.usuario_legacy_id is not None
+
+    @property
+    def tiene_responsable(self):
+        return self.responsable_id is not None or self.usuario_legacy_id is not None
+
+    def asignar(self, empleado):
+        """Cambia el responsable. Una asignacion explicita cierra la fase 1."""
+        self.responsable = empleado
+        self.usuario_legacy = None
+
+    def clean(self):
         super().clean()
         if self.codigo_inventario:
             self.codigo_inventario = self.codigo_inventario.upper().strip()
-        usuario = self.usuario_asignado
-        if usuario is not None and getattr(usuario, "is_superuser", False):
-            raise ValidationError(
-                {
-                    "usuario_asignado": (
-                        "Los superusuarios no pueden tener activos asignados."
-                    )
-                }
-            )
     def _generar_codigo_inventario(self):
         """Siguiente código libre de la subcategoría.
 
@@ -153,19 +229,6 @@ class Activo(models.Model):
         return siguiente_codigo(self.subcategoria)
 
     def save(self, *args, **kwargs):
-        from django.core.exceptions import ValidationError
-
-        if self.usuario_asignado_id:
-            usuario = self.usuario_asignado
-            if usuario is not None and usuario.is_superuser:
-                raise ValidationError(
-                    {
-                        "usuario_asignado": (
-                            "Los superusuarios no pueden tener activos asignados."
-                        )
-                    }
-                )
-
         # `reservar_codigos()` (dentro de `_generar_codigo_inventario`) suelta su
         # bloqueo de la subcategoría en cuanto CALCULA el código: es la propia
         # función la que abre y cierra su `transaction.atomic()`. Si el INSERT
@@ -415,31 +478,31 @@ class EtiquetaQR(models.Model):
 
 
 class AvisoUsuarioInactivo(models.Model):
-    """Marca que ya se avisó a los admins de un usuario inactivo con equipos.
+    """Marca que ya se avisó a los admins de un empleado de baja con equipos.
 
-    Un usuario desactivado (típicamente desde el panel de superadmin del
-    Portal, no desde Activos — BR-USR-03 ya bloquea desactivar desde aquí si
-    tiene equipos) puede quedar así indefinidamente si nadie reasigna. Sin
+    Un empleado dado de baja en Nomina (`activo=False` en portal_empleado)
+    puede seguir como responsable indefinidamente si nadie reasigna. Sin
     este marcador, el despachador diario (`enviar_notificaciones_activos`)
     repetiría el aviso cada día mientras la situación no cambie. Se borra
-    solo cuando el usuario se reactiva o se queda sin equipo asignado, así
+    solo cuando el empleado se reactiva o se queda sin equipo asignado, así
     que una recaída futura vuelve a avisar.
     """
 
-    usuario = models.OneToOneField(
-        settings.AUTH_USER_MODEL,
+    empleado = models.OneToOneField(
+        EmpleadoPortal,
         on_delete=models.CASCADE,
+        db_constraint=False,
         related_name="aviso_inactivo_activos",
     )
     enviado_en = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         db_table = TABLA("aviso_usuario_inactivo")
-        verbose_name = "Aviso de usuario inactivo"
-        verbose_name_plural = "Avisos de usuario inactivo"
+        verbose_name = "Aviso de empleado de baja"
+        verbose_name_plural = "Avisos de empleado de baja"
 
     def __str__(self):
-        return f"Aviso pendiente de {self.usuario_id}"
+        return f"Aviso pendiente de {self.empleado_id}"
 
 
 class AvisoPorUmbral(models.Model):

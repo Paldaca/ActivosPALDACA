@@ -1,43 +1,54 @@
 from django import forms
-from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+from django.db.models import Q
 
-from .models import Activo, Categoria, SubCategoria, Ubicacion
+from .models import Activo, Categoria, EmpleadoPortal, SubCategoria, Ubicacion
 
 
-def usuarios_asignables():
-    """Personas que pueden ser responsables de un activo, en orden alfabético.
+def empleados_asignables():
+    """Empleados de Nomina activos: los unicos que pueden recibir un equipo."""
+    return EmpleadoPortal.objects.filter(activo=True).order_by("apellidos", "nombres")
 
-    Los superusuarios del ecosistema (SSO/admin global) no reciben activos:
-    no aparecen en selectores ni en la gestión de personas del módulo.
+
+def etiqueta_empleado(empleado):
+    cargo = (empleado.cargo or "").strip()
+    return f"{empleado.nombre_completo} — {cargo}" if cargo else empleado.nombre_completo
+
+
+class ResponsableFormMixin:
+    """Campo `responsable` (empleado de Nomina) comun a los formularios de activo.
+
+    El responsable actual se admite aunque este dado de baja en Nomina: si no,
+    editar cualquier otro campo del activo fallaria con "elige una opcion
+    valida". Lo que no se permite es ELEGIR a alguien de baja.
     """
-    return get_user_model().objects.filter(
-        is_active=True,
-        is_superuser=False,
-    ).order_by("last_name", "first_name", "username")
 
-
-#: Alias interno histórico.
-_usuarios_asignables_queryset = usuarios_asignables
-
-
-def _label_usuario(user):
-    nombre = user.get_full_name().strip()
-    return nombre or user.username
-
-
-def _validar_usuario_asignable(usuario):
-    """Rechaza superusuarios (y cuentas inactivas) como responsables."""
-    if usuario is None:
-        return
-    if getattr(usuario, "is_superuser", False):
-        raise ValidationError(
-            "Los superusuarios no pueden tener activos asignados."
+    def _configurar_responsable(self, empty_label=None):
+        field = self.fields["responsable"]
+        actual = self.instance.responsable_id if self.instance else None
+        field.queryset = (
+            EmpleadoPortal.objects.filter(Q(activo=True) | Q(pk=actual))
+            if actual
+            else empleados_asignables()
         )
-    if not getattr(usuario, "is_active", True):
-        raise ValidationError(
-            "No se puede asignar un activo a un usuario inactivo."
-        )
+        field.required = False
+        field.label = "Responsable"
+        field.label_from_instance = etiqueta_empleado
+        if empty_label:
+            field.empty_label = empty_label
+
+    def clean_responsable(self):
+        empleado = self.cleaned_data.get("responsable")
+        if empleado is not None and not empleado.activo and "responsable" in self.changed_data:
+            raise ValidationError("Ese empleado está dado de baja en Nómina.")
+        return empleado
+
+    def save(self, commit=True):
+        if "responsable" in self.changed_data:
+            # Una asignacion explicita cierra la fase 1 de la migracion.
+            self.instance.usuario_legacy = None
+        return super().save(commit)
+
 
 class CategoriaForm(forms.ModelForm):
     """Formulario para Categoría"""
@@ -90,26 +101,18 @@ class UbicacionForm(forms.ModelForm):
         }
 
 
-class ActivoForm(forms.ModelForm):
+class ActivoForm(ResponsableFormMixin, forms.ModelForm):
     """Formulario para Activo"""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        field = self.fields["usuario_asignado"]
-        field.queryset = _usuarios_asignables_queryset()
-        field.required = False
-        field.label_from_instance = _label_usuario
-
-    def clean_usuario_asignado(self):
-        usuario = self.cleaned_data.get("usuario_asignado")
-        _validar_usuario_asignable(usuario)
-        return usuario
+        self._configurar_responsable()
 
     class Meta:
         model = Activo
         fields = [
             'subcategoria', 'marca', 'modelo', 'numero_serial',
-            'usuario_asignado', 'ubicacion',
+            'responsable', 'ubicacion',
             'observaciones', 'estado'
         ]
         widgets = {
@@ -129,8 +132,8 @@ class ActivoForm(forms.ModelForm):
                 'class': 'form-control',
                 'placeholder': 'Número de serie (opcional)'
             }),
-            # `ax-combo-native` activa el buscador de personas de activos-ui.js.
-            'usuario_asignado': forms.Select(attrs={
+            # `ax-combo-native` activa el buscador de empleados de activos-ui.js.
+            'responsable': forms.Select(attrs={
                 'class': 'form-select ax-combo-native'
             }),
             'ubicacion': forms.Select(attrs={
@@ -181,26 +184,18 @@ class ActivoFilterForm(forms.Form):
     )
 
 
-class ReasignarActivoForm(forms.ModelForm):
-    """Formulario para reasignar activo a otro usuario"""
+class ReasignarActivoForm(ResponsableFormMixin, forms.ModelForm):
+    """Formulario para reasignar activo a otro empleado"""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        field = self.fields["usuario_asignado"]
-        field.queryset = _usuarios_asignables_queryset()
-        field.required = False
-        field.label_from_instance = _label_usuario
-
-    def clean_usuario_asignado(self):
-        usuario = self.cleaned_data.get("usuario_asignado")
-        _validar_usuario_asignable(usuario)
-        return usuario
+        self._configurar_responsable()
 
     class Meta:
         model = Activo
-        fields = ['usuario_asignado']
+        fields = ['responsable']
         widgets = {
-            'usuario_asignado': forms.Select(attrs={
+            'responsable': forms.Select(attrs={
                 'class': 'form-select ax-combo-native'
             })
         }
@@ -280,7 +275,7 @@ class GenerarEtiquetasForm(forms.Form):
     )
 
 
-class AltaDesdeEtiquetaForm(forms.ModelForm):
+class AltaDesdeEtiquetaForm(ResponsableFormMixin, forms.ModelForm):
     """Alta de un activo escaneando su etiqueta, pensada para el móvil.
 
     Frente a `ActivoForm` faltan dos campos a propósito:
@@ -294,22 +289,13 @@ class AltaDesdeEtiquetaForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        field = self.fields["usuario_asignado"]
-        field.queryset = _usuarios_asignables_queryset()
-        field.required = False
-        field.label_from_instance = _label_usuario
-        field.empty_label = "Sin asignar por ahora"
-
-    def clean_usuario_asignado(self):
-        usuario = self.cleaned_data.get("usuario_asignado")
-        _validar_usuario_asignable(usuario)
-        return usuario
+        self._configurar_responsable(empty_label="Sin asignar por ahora")
 
     class Meta:
         model = Activo
         fields = [
             "marca", "modelo", "numero_serial",
-            "ubicacion", "usuario_asignado", "observaciones",
+            "ubicacion", "responsable", "observaciones",
         ]
         widgets = {
             "marca": forms.TextInput(attrs={
@@ -330,7 +316,7 @@ class AltaDesdeEtiquetaForm(forms.ModelForm):
                 "autocapitalize": "characters",
             }),
             "ubicacion": forms.Select(attrs={"class": "form-select ax-combo-native"}),
-            "usuario_asignado": forms.Select(attrs={
+            "responsable": forms.Select(attrs={
                 "class": "form-select ax-combo-native",
             }),
             "observaciones": forms.Textarea(attrs={

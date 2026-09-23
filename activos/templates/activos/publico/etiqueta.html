@@ -192,8 +192,8 @@
             <dl class="datos">
                 <div class="ancho-total">
                     <dt>Responsable</dt>
-                    <dd {% if not activo.usuario_asignado %}class="vacio"{% endif %}>
-                        {{ activo.usuario_asignado|nombre_completo }}
+                    <dd {% if not activo.tiene_responsable %}class="vacio"{% endif %}>
+                        {{ activo.persona_responsable|nombre_completo }}
                     </dd>
                 </div>
                 <div>

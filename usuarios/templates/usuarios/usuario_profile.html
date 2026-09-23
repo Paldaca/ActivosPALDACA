@@ -28,30 +28,27 @@
                 </span>
                 <div class="ax-min0">
                     <span class="ax-hero-eyebrow">
-                        {{ usuario.perfil.nombre|default:"Sin perfil asignado" }}
+                        {{ usuario.cargo|default:"Sin cargo registrado" }}
                     </span>
                     <h1 class="ax-hero-title">{{ usuario|nombre_completo }}</h1>
                     <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
-                        {% if usuario.is_active %}
+                        {% if usuario.activo %}
                         <span class="ax-estado ax-estado--onhero">
-                            <span class="ax-estado-dot"></span> Activa
+                            <span class="ax-estado-dot"></span> Activo en Nómina
                         </span>
                         {% else %}
                         <span class="ax-estado ax-estado--onhero">
-                            <span class="ax-estado-dot"></span> Desactivada
+                            <span class="ax-estado-dot"></span> De baja en Nómina
                         </span>
                         {% endif %}
-                        {% if usuario.disciplina %}
-                        <span class="ax-estado ax-estado--onhero">{{ usuario.disciplina.nombre }}</span>
+                        {% if not usuario.usuario_id %}
+                        <span class="ax-estado ax-estado--onhero">Sin acceso al Portal</span>
                         {% endif %}
                     </div>
                 </div>
             </div>
             <div class="ax-hero-actions">
                 <a href="{% url 'usuarios:usuario-search' %}" class="btn-pastel btn-pastel--glass">Volver</a>
-                <a href="{% url 'usuarios:usuario-update' usuario.pk %}" class="btn-pastel btn-pastel--cta">
-                    Editar datos
-                </a>
             </div>
         </div>
     </header>
@@ -147,8 +144,8 @@
                                            data-equipo="{{ activo.marca }} {{ activo.modelo }}"
                                            data-serial="{{ activo.numero_serial|default:'' }}"
                                            data-icono="{{ activo|icono_activo }}"
-                                           data-usuario-id="{{ activo.usuario_asignado_id|default:'' }}"
-                                           data-usuario-nombre="{{ activo.usuario_asignado|nombre_completo }}">
+                                           data-usuario-id="{{ activo.responsable_id|default:'' }}"
+                                           data-usuario-nombre="{{ activo.persona_responsable|nombre_completo }}">
                                             <i class="bi bi-person-gear"></i>
                                             <span class="visually-hidden">Reasignar {{ activo.codigo_inventario }}</span>
                                         </a>
@@ -180,7 +177,7 @@
             <div class="ax-sticky d-flex flex-column gap-3">
 
                 <section class="ax-card">
-                    <div class="ax-card-head"><h2 class="ax-card-title">Datos de contacto</h2></div>
+                    <div class="ax-card-head"><h2 class="ax-card-title">Datos del empleado</h2></div>
                     <div class="ax-card-body">
                         <div class="ax-spec" data-ax-stagger="6">
                             <div class="ax-spec-item">
@@ -196,14 +193,14 @@
                                 </div>
                             </div>
                             <div class="ax-spec-item">
-                                <div class="ax-spec-label">Perfil</div>
-                                <div class="ax-spec-value {% if not usuario.perfil %}ax-spec-value--muted{% endif %}">
-                                    {{ usuario.perfil.nombre|default:"Sin perfil asignado" }}
-                                </div>
+                                <div class="ax-spec-label">Cédula</div>
+                                <div class="ax-spec-value">{{ usuario.cedula }}</div>
                             </div>
                             <div class="ax-spec-item">
-                                <div class="ax-spec-label">Alta en el sistema</div>
-                                <div class="ax-spec-value">{{ usuario.date_joined|date:"d/m/Y" }}</div>
+                                <div class="ax-spec-label">Cargo</div>
+                                <div class="ax-spec-value {% if not usuario.cargo %}ax-spec-value--muted{% endif %}">
+                                    {{ usuario.cargo|default:"No registrado" }}
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -237,47 +234,16 @@
                 </section>
                 {% endif %}
 
-                {# Baja lógica: core_usuario es identidad SSO, jamás se elimina #}
-                <section class="ax-card">
-                    <div class="ax-card-head"><h2 class="ax-card-title">Estado de la cuenta</h2></div>
-                    <div class="ax-card-body">
-                        {% if usuario.is_active %}
-                            {% if total_activos %}
-                            <div class="ax-callout ax-callout--warn mb-3">
-                                <i class="bi bi-shield-exclamation"></i>
-                                <span>
-                                    Tiene <strong>{{ total_activos }}</strong> equipo(s) a su cargo.
-                                    Reasígnalos antes de desactivar la cuenta.
-                                </span>
-                            </div>
-                            {% else %}
-                            <p class="ax-hint mt-0 mb-3">
-                                Desactivar impide que se le asignen equipos. No se borra nada:
-                                la identidad es compartida por todos los programas Paldaca.
-                            </p>
-                            <form method="post" action="{% url 'usuarios:usuario-estado' usuario.pk %}">
-                                {% csrf_token %}
-                                <input type="hidden" name="activar" value="0">
-                                <button type="submit" class="btn-pastel btn-pastel--rosa btn-pastel--block">
-                                    Desactivar cuenta
-                                </button>
-                            </form>
-                            {% endif %}
-                        {% else %}
-                        <div class="ax-callout mb-3">
-                            <i class="bi bi-info-circle"></i>
-                            <span>Esta cuenta está desactivada y no aparece como asignable.</span>
-                        </div>
-                        <form method="post" action="{% url 'usuarios:usuario-estado' usuario.pk %}">
-                            {% csrf_token %}
-                            <input type="hidden" name="activar" value="1">
-                            <button type="submit" class="btn-pastel btn-pastel--menta btn-pastel--block">
-                                Reactivar cuenta
-                            </button>
-                        </form>
+                <div class="ax-callout">
+                    <i class="bi bi-info-circle"></i>
+                    <span>
+                        Los datos y la baja de un empleado se gestionan en Nómina.
+                        {% if not usuario.activo and total_activos %}
+                        <strong>Está de baja y sigue con {{ total_activos }} equipo(s):</strong>
+                        reasígnalos.
                         {% endif %}
-                    </div>
-                </section>
+                    </span>
+                </div>
             </div>
         </div>
     </div>

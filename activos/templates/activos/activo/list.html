@@ -279,13 +279,13 @@
                             <div class="ax-combo ax-combo--persona"
                                  data-combo-placeholder="Buscar por nombre…"
                                  data-combo-empty-label="Cualquier persona"
-                                 data-combo-remote-url="{% url 'activos:usuarios-asignables' %}">
-                                <select name="usuario_asignado" id="axResponsable"
+                                 data-combo-remote-url="{% url 'activos:empleados-asignables' %}">
+                                <select name="responsable" id="axResponsable"
                                         class="form-select ax-combo-native">
                                     <option value="">Cualquier persona</option>
-                                    {% if usuario_filtro %}
-                                    <option value="{{ usuario_filtro.pk }}" selected>
-                                        {{ usuario_filtro|nombre_completo }}
+                                    {% if responsable_filtro %}
+                                    <option value="{{ responsable_filtro.pk }}" selected>
+                                        {{ responsable_filtro|nombre_completo }}
                                     </option>
                                     {% endif %}
                                 </select>
@@ -403,7 +403,7 @@
                         </td>
 
                         <td data-label="Asignado a">
-                            {% include 'activos/includes/_persona.html' with persona=activo.usuario_asignado %}
+                            {% include 'activos/includes/_persona.html' with persona=activo.persona_responsable %}
                         </td>
 
                         <td data-label="Ubicación">
@@ -427,8 +427,8 @@
                                    data-equipo="{{ activo.marca }} {{ activo.modelo }}"
                                    data-serial="{{ activo.numero_serial|default:'' }}"
                                    data-icono="{{ activo|icono_activo }}"
-                                   data-usuario-id="{{ activo.usuario_asignado_id|default:'' }}"
-                                   data-usuario-nombre="{{ activo.usuario_asignado|nombre_completo }}">
+                                   data-usuario-id="{{ activo.responsable_id|default:'' }}"
+                                   data-usuario-nombre="{{ activo.persona_responsable|nombre_completo }}">
                                     <i class="bi bi-person-gear"></i>
                                     <span class="visually-hidden">Reasignar</span>
                                 </a>
@@ -472,9 +472,9 @@
                                                data-icono="{{ activo|icono_activo }}"
                                                data-titulo="Vas a eliminar este activo del inventario."
                                                data-codigo="{{ activo.codigo_inventario }}"
-                                               data-ficha="{{ activo.marca }} {{ activo.modelo }} · {{ activo.ubicacion.nombre }} · {{ activo.usuario_asignado|nombre_completo }}"
+                                               data-ficha="{{ activo.marca }} {{ activo.modelo }} · {{ activo.ubicacion.nombre }} · {{ activo.persona_responsable|nombre_completo }}"
                                                data-impacto="Se borrarán también su historial de movimientos y sus mantenimientos. No se puede deshacer."
-                                               {% if activo.usuario_asignado %}data-aviso="Está bajo la responsabilidad de {{ activo.usuario_asignado|nombre_completo }}. Si solo quieres liberarlo, reasígnalo en lugar de eliminarlo."{% endif %}
+                                               {% if activo.tiene_responsable %}data-aviso="Está bajo la responsabilidad de {{ activo.persona_responsable|nombre_completo }}. Si solo quieres liberarlo, reasígnalo en lugar de eliminarlo."{% endif %}
                                                data-confirmar="{{ activo.codigo_inventario }}">
                                                 <i class="bi bi-trash me-2"></i>Eliminar</a>
                                         </li>

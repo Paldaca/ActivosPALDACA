@@ -48,7 +48,8 @@ def _activos_para_planilla(ids):
     encontrados = Activo.objects.select_related(
         "subcategoria__categoria",
         "ubicacion",
-        "usuario_asignado__disciplina",
+        "responsable",
+        "usuario_legacy__disciplina",
     ).filter(pk__in=ids)
     por_id = {activo.pk: activo for activo in encontrados}
     return [por_id[pk] for pk in ids if pk in por_id]
@@ -57,7 +58,10 @@ def _activos_para_planilla(ids):
 def _error_entrega(activos):
     if not activos:
         return "Debe seleccionar al menos un activo."
-    responsables = {a.usuario_asignado_id for a in activos}
+    responsables = {
+        (type(a.persona_responsable), a.persona_responsable.pk) if a.tiene_responsable else None
+        for a in activos
+    }
     if None in responsables:
         return (
             "Hay equipos sin responsable; no hay quien reciba la planilla."
@@ -156,7 +160,9 @@ def constancia_asignacion(request):
 
 def _puede_ver_planilla_de(request, activo):
     """Admin, o el custodio actual del equipo. Nadie más, aunque tenga el módulo."""
-    return _es_admin_activos(request) or activo.usuario_asignado_id == request.user.pk
+    if _es_admin_activos(request):
+        return True
+    return activo.responsable_id is not None and activo.responsable.usuario_id == request.user.pk
 
 
 @requiere_modulo_paldaca
@@ -165,7 +171,7 @@ def descargar_planilla_vigente(request, pk):
     activo = get_object_or_404(Activo, pk=pk)
     if not _puede_ver_planilla_de(request, activo):
         return HttpResponseForbidden("No tienes acceso a este documento.")
-    if not activo.usuario_asignado_id:
+    if not activo.tiene_responsable:
         messages.error(request, "Este equipo no tiene responsable asignado.")
         return _redirect_planilla(request, [pk])
     return _respuesta_planilla(request, [pk])

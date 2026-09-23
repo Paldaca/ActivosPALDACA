@@ -211,14 +211,6 @@ PALDACA_NOTIFICACIONES_ACTIVAS = (
     os.getenv("PALDACA_NOTIFICACIONES_ACTIVAS", "true").lower() == "true"
 )
 
-# Directorio saliente de Nomina (satelite FEDERADO, BD propia): reenvio de la
-# cookie del operador para poblar el selector de personas asignables
-# (activos/services/nomina_directorio.py). Puerto 8086 en local, ver
-# Portal-Paldaca/scripts/modulos.py.
-PALDACA_NOMINA_API_URL = (
-    (os.getenv("PALDACA_NOMINA_API_URL") or "").strip().rstrip("/")
-    or ("http://127.0.0.1:8086/api" if _dev_env.exists() else "https://nomina.cpaldaca.com/api")
-)
 
 # Umbrales de las reglas por reloj (enviar_notificaciones_activos). Mismos
 # defaults que el catalogo sembrado en el Portal (TipoNotificacion.umbral_dias,

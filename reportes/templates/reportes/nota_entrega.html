@@ -225,8 +225,8 @@
                         </span>
                     </td>
                     <td>
-                        {% if activo.usuario_asignado %}
-                            {{ activo.usuario_asignado.first_name }} {{ activo.usuario_asignado.last_name }}
+                        {% if activo.tiene_responsable %}
+                            {{ activo.persona_responsable.get_full_name }}
                         {% else %}
                             Sin asignar
                         {% endif %}

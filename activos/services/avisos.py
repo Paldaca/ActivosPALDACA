@@ -4,23 +4,32 @@ Dos mecanismos, a propósito (mismo patrón híbrido que HDT):
 
 - **Al momento del hecho** (alta, asignación): se emite donde ocurre el
   cambio, vía `emitir_al_confirmar` (después del commit).
-- **Por reloj** (usuario desactivado con equipos): no hay ningún punto de
-  código en este repo que lo detecte — la desactivación ocurre fuera de
-  Activos (panel de superadmin del Portal) — así que lo evalúa el
-  despachador `enviar_notificaciones_activos`, vía `emitir_evento` directo.
+- **Por reloj** (empleado dado de baja con equipos): no hay ningún punto de
+  código en este repo que lo detecte — la baja ocurre en Nómina — así que lo
+  evalúa el despachador `enviar_notificaciones_activos`, vía `emitir_evento`
+  directo.
+
+Los avisos personales van a la CUENTA del Portal del responsable: un empleado
+sin cuenta no tiene campana, así que no recibe nada (ver `_cuenta_id`).
 """
 
 from datetime import timedelta
 
 from django.conf import settings
-from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.urls import reverse
 from django.utils import timezone
 
 from mantenimientos.models import Mantenimiento
 
-from ..models import Activo, AvisoPorUmbral, AvisoUsuarioInactivo, EtiquetaQR, HistorialMovimiento
+from ..models import (
+    Activo,
+    AvisoPorUmbral,
+    AvisoUsuarioInactivo,
+    EmpleadoPortal,
+    EtiquetaQR,
+    HistorialMovimiento,
+)
 from . import notificaciones_portal
 from .notificaciones_portal import emitir_al_confirmar, url_en_portal
 
@@ -36,9 +45,19 @@ CODIGO_ASIGNACION_SIN_PLANILLA = "activos.asignacion_sin_planilla"
 CODIGO_RESUMEN_SEMANAL = "activos.resumen_semanal_admins"
 
 
-def _nombre(usuario):
+def _nombre(persona):
     """Nombre y Apellido; nunca el username salvo que no haya nombre."""
-    return (usuario.get_full_name() or "").strip() or usuario.username
+    return (persona.get_full_name() or "").strip() or getattr(persona, "username", "")
+
+
+def _cuenta_id(persona):
+    """Cuenta del Portal a la que avisar: la vinculada al empleado, o la propia
+    cuenta si es una asignacion anterior pendiente de vincular (fase 1)."""
+    if persona is None:
+        return None
+    if isinstance(persona, EmpleadoPortal):
+        return persona.usuario_id
+    return persona.pk
 
 
 def _descripcion(activo):
@@ -66,8 +85,9 @@ def avisar_activo_creado(activo, emisor):
         "activo_id": activo.pk,
         "codigo_activo": activo.codigo_inventario,
     }
-    if activo.usuario_asignado_id:
-        payload["usuario_ids"] = [activo.usuario_asignado_id]
+    cuenta = _cuenta_id(activo.responsable)
+    if cuenta:
+        payload["usuario_ids"] = [cuenta]
     emitir_al_confirmar(
         codigo=CODIGO_ACTIVO_CREADO,
         titulo=f"Nuevo activo {activo.codigo_inventario}",
@@ -79,7 +99,8 @@ def avisar_activo_creado(activo, emisor):
 
 def avisar_activos_asignados(activos, usuario, emisor):
     """Un solo aviso por persona aunque la asignación masiva mueva varios equipos."""
-    if usuario is None or not activos:
+    cuenta = _cuenta_id(usuario)
+    if not cuenta or not activos:
         return
     if len(activos) == 1:
         activo = activos[0]
@@ -97,7 +118,7 @@ def avisar_activos_asignados(activos, usuario, emisor):
         titulo=titulo,
         cuerpo=cuerpo,
         payload={
-            "usuario_ids": [usuario.pk],
+            "usuario_ids": [cuenta],
             "url": url,
             "activo_ids": [a.pk for a in activos],
         },
@@ -112,7 +133,8 @@ def avisar_activos_desasignados(activos, usuario, emisor):
     ficha del activo: esa persona ya no lo tiene, así que `mis-activos-detail`
     le daría 404. Va siempre a su propio listado.
     """
-    if usuario is None or not activos:
+    cuenta = _cuenta_id(usuario)
+    if not cuenta or not activos:
         return
     if len(activos) == 1:
         activo = activos[0]
@@ -128,7 +150,7 @@ def avisar_activos_desasignados(activos, usuario, emisor):
         titulo=titulo,
         cuerpo=cuerpo,
         payload={
-            "usuario_ids": [usuario.pk],
+            "usuario_ids": [cuenta],
             "url": url_en_portal(reverse("activos:mis-activos-list")),
             "activo_ids": [a.pk for a in activos],
         },
@@ -139,8 +161,8 @@ def avisar_activos_desasignados(activos, usuario, emisor):
 def avisar_mantenimiento_iniciado(mantenimiento, emisor):
     """El activo entra a mantenimiento. Sin custodio, no hay a quién avisar."""
     activo = mantenimiento.activo
-    usuario = activo.usuario_asignado
-    if usuario is None:
+    cuenta = _cuenta_id(activo.persona_responsable)
+    if not cuenta:
         return
     emitir_al_confirmar(
         codigo=CODIGO_MANTENIMIENTO_INICIADO,
@@ -150,7 +172,7 @@ def avisar_mantenimiento_iniciado(mantenimiento, emisor):
             "Puede no estar disponible por un tiempo."
         ),
         payload={
-            "usuario_ids": [usuario.pk],
+            "usuario_ids": [cuenta],
             "url": _url_ficha_propia(activo),
             "activo_id": activo.pk,
             "mantenimiento_id": mantenimiento.pk,
@@ -162,15 +184,15 @@ def avisar_mantenimiento_iniciado(mantenimiento, emisor):
 def avisar_mantenimiento_finalizado(mantenimiento, emisor):
     """Se cerró el último mantenimiento en proceso y el activo vuelve a servicio."""
     activo = mantenimiento.activo
-    usuario = activo.usuario_asignado
-    if usuario is None:
+    cuenta = _cuenta_id(activo.persona_responsable)
+    if not cuenta:
         return
     emitir_al_confirmar(
         codigo=CODIGO_MANTENIMIENTO_FINALIZADO,
         titulo=f"{activo.codigo_inventario} volvió de mantenimiento",
         cuerpo=f"{_descripcion(activo)} ya está disponible de nuevo.",
         payload={
-            "usuario_ids": [usuario.pk],
+            "usuario_ids": [cuenta],
             "url": _url_ficha_propia(activo),
             "activo_id": activo.pk,
             "mantenimiento_id": mantenimiento.pk,
@@ -201,8 +223,9 @@ def avisar_activo_baja(activo, emisor, *, eliminado=False):
         "activo_id": activo.pk,
         "codigo_activo": activo.codigo_inventario,
     }
-    if activo.usuario_asignado_id:
-        payload["usuario_ids"] = [activo.usuario_asignado_id]
+    cuenta = _cuenta_id(activo.persona_responsable)
+    if cuenta:
+        payload["usuario_ids"] = [cuenta]
     emitir_al_confirmar(
         codigo=CODIGO_ACTIVO_BAJA,
         titulo=titulo,
@@ -216,18 +239,18 @@ def avisar_activo_baja(activo, emisor, *, eliminado=False):
 
 
 def usuarios_inactivos_con_equipos():
-    """Usuarios `is_active=False` que siguen con activos asignados.
+    """Empleados dados de baja en Nomina (`activo=False`) que siguen como
+    responsables de algun activo.
 
     Excluye a quienes ya tienen un aviso vigente (`AvisoUsuarioInactivo`): no
     se repite mientras la situación no cambie.
     """
-    ya_avisados = AvisoUsuarioInactivo.objects.values_list("usuario_id", flat=True)
+    ya_avisados = AvisoUsuarioInactivo.objects.values_list("empleado_id", flat=True)
     return list(
-        get_user_model()
-        .objects.filter(is_active=False, activos_asignados__isnull=False)
+        EmpleadoPortal.objects.filter(activo=False, activos_asignados__isnull=False)
         .exclude(pk__in=ya_avisados)
         .distinct()
-        .order_by("username")
+        .order_by("apellidos", "nombres")
     )
 
 
@@ -237,18 +260,18 @@ def _limpiar_avisos_resueltos():
     Así, si la situación se repite más adelante, vuelve a avisar en vez de
     quedar silenciada para siempre.
     """
-    for aviso in AvisoUsuarioInactivo.objects.select_related("usuario"):
-        usuario = aviso.usuario
-        if usuario.is_active or not Activo.objects.filter(usuario_asignado=usuario).exists():
+    for aviso in AvisoUsuarioInactivo.objects.select_related("empleado"):
+        empleado = aviso.empleado
+        if empleado.activo or not Activo.objects.filter(responsable=empleado).exists():
             aviso.delete()
 
 
 def avisar_usuarios_inactivos_con_equipos():
     """Un solo aviso a los admins por corrida, listando a quien se detectó.
 
-    Cada usuario incluido queda marcado (`AvisoUsuarioInactivo`) para no
+    Cada empleado incluido queda marcado (`AvisoUsuarioInactivo`) para no
     repetirse en la corrida del día siguiente mientras nadie reasigne su
-    equipo. Devuelve cuántos usuarios se incluyeron en el aviso (0 si no
+    equipo. Devuelve cuántos empleados se incluyeron en el aviso (0 si no
     había candidatos nuevos o el Portal no lo aceptó).
     """
     _limpiar_avisos_resueltos()
@@ -257,35 +280,38 @@ def avisar_usuarios_inactivos_con_equipos():
         return 0
 
     conteos = {
-        usuario.pk: Activo.objects.filter(usuario_asignado=usuario).count()
-        for usuario in candidatos
+        empleado.pk: Activo.objects.filter(responsable=empleado).count()
+        for empleado in candidatos
     }
 
     if len(candidatos) == 1:
-        usuario = candidatos[0]
-        n = conteos[usuario.pk]
-        titulo = f"{_nombre(usuario)} fue desactivado con {n} equipo{'s' if n != 1 else ''} asignado{'s' if n != 1 else ''}"
+        empleado = candidatos[0]
+        n = conteos[empleado.pk]
+        titulo = f"{_nombre(empleado)} fue dado de baja con {n} equipo{'s' if n != 1 else ''} asignado{'s' if n != 1 else ''}"
         cuerpo = (
-            f"Su cuenta se desactivó y sigue como custodio de {n} "
+            f"Se dio de baja en Nómina y sigue como responsable de {n} "
             f"equipo{'s' if n != 1 else ''}. Reasígna{'los' if n != 1 else 'lo'} desde su ficha."
         )
-        url = url_en_portal(reverse("usuarios:usuario-profile", args=[usuario.pk]))
+        url = url_en_portal(reverse("usuarios:usuario-profile", args=[empleado.pk]))
     else:
-        detalle = "; ".join(f"{_nombre(u)} ({conteos[u.pk]})" for u in candidatos)
-        titulo = f"{len(candidatos)} usuarios desactivados siguen con equipos asignados"
+        detalle = "; ".join(f"{_nombre(e)} ({conteos[e.pk]})" for e in candidatos)
+        titulo = f"{len(candidatos)} empleados dados de baja siguen con equipos asignados"
         cuerpo = f"Reasigna sus equipos antes de que queden huérfanos: {detalle}."
-        url = url_en_portal(reverse("usuarios:usuario-search"))
+        url = url_en_portal(reverse("usuarios:usuario-search") + "?estado=baja_con_activos")
 
     enviado = notificaciones_portal.emitir_evento(
         codigo=CODIGO_USUARIO_INACTIVO,
         titulo=titulo,
         cuerpo=cuerpo,
-        payload={"url": url, "usuario_ids": [u.pk for u in candidatos]},
+        payload={
+            "url": url,
+            "usuario_ids": [e.usuario_id for e in candidatos if e.usuario_id],
+        },
     )
     if not enviado:
         return 0
     AvisoUsuarioInactivo.objects.bulk_create(
-        [AvisoUsuarioInactivo(usuario=u) for u in candidatos]
+        [AvisoUsuarioInactivo(empleado=e) for e in candidatos]
     )
     return len(candidatos)
 

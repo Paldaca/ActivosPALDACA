@@ -77,7 +77,8 @@ def etiqueta_publica(request, token):
             "subcategoria__categoria",
             "activo__subcategoria__categoria",
             "activo__ubicacion",
-            "activo__usuario_asignado",
+            "activo__responsable",
+            "activo__usuario_legacy",
         )
         .filter(token=token)
         .first()

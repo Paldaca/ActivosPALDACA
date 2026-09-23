@@ -9,6 +9,7 @@ from django.urls import reverse
 from pypdf import PdfReader
 
 from activos.models import Activo, HistorialMovimiento
+from activos.tests.utils import empleado_de
 
 
 def _texto(response):
@@ -31,7 +32,7 @@ def _crear_activo(catalogo, codigo, usuario=None, serial=""):
         modelo="Latitude",
         numero_serial=serial or codigo,
         codigo_inventario=codigo,
-        usuario_asignado=usuario,
+        responsable=empleado_de(usuario),
         ubicacion=catalogo["ubicacion_almacen"],
         estado=Activo.EstadoActivo.ACTIVO,
     )
@@ -42,7 +43,7 @@ def test_reasignar_archiva_planilla_en_historial(client_auth, catalogo):
     act = _crear_activo(catalogo, "INV-PLAN-1")
     url = reverse("activos:activo-reasignar", args=[act.pk])
     r = client_auth.post(
-        url, {"usuario_asignado": catalogo["usuario_a"].pk}
+        url, {"responsable": catalogo["empleado_a"].pk}
     )
     assert r.status_code == 302
     assert f"constancia={act.pk}" in r.url
@@ -63,7 +64,7 @@ def test_editar_formulario_muestra_constancia(client_auth, catalogo):
             "marca": act.marca,
             "modelo": act.modelo,
             "numero_serial": act.numero_serial,
-            "usuario_asignado": catalogo["usuario_a"].pk,
+            "responsable": catalogo["empleado_a"].pk,
             "ubicacion": act.ubicacion_id,
             "observaciones": "",
             "estado": act.estado,
@@ -82,7 +83,7 @@ def test_descargar_planilla_desde_historial(client_auth, catalogo):
     act = _crear_activo(catalogo, "INV-HIST-DL")
     client_auth.post(
         reverse("activos:activo-reasignar", args=[act.pk]),
-        {"usuario_asignado": catalogo["usuario_a"].pk},
+        {"responsable": catalogo["empleado_a"].pk},
     )
     movimiento = act.historial_movimientos.filter(
         tipo_movimiento=HistorialMovimiento.TipoMovimiento.REASIGNACION
@@ -104,7 +105,7 @@ def test_perfil_muestra_enlace_planilla(client_auth, catalogo):
         catalogo, "INV-PLAN-PERFIL", usuario=catalogo["usuario_a"]
     )
     r = client_auth.get(
-        reverse("usuarios:usuario-profile", args=[catalogo["usuario_a"].pk])
+        reverse("usuarios:usuario-profile", args=[catalogo["empleado_a"].pk])
     )
     assert r.status_code == 200
     cuerpo = _texto(r)
@@ -156,11 +157,11 @@ def test_liberar_no_ofrece_constancia(client_auth, catalogo):
     )
     client_auth.post(
         reverse("activos:activo-reasignar", args=[act.pk]),
-        {"usuario_asignado": catalogo["usuario_b"].pk},
+        {"responsable": catalogo["empleado_b"].pk},
     )
     r = client_auth.post(
         reverse("activos:activo-reasignar", args=[act.pk]),
-        {"usuario_asignado": ""},
+        {"responsable": ""},
     )
     assert r.status_code == 302
     assert "constancia=" not in r.url
@@ -260,7 +261,7 @@ def test_aviso_constancia_en_ficha_tras_reasignar(client_auth, catalogo):
     act = _crear_activo(catalogo, "INV-AVISO")
     r = client_auth.post(
         reverse("activos:activo-reasignar", args=[act.pk]),
-        {"usuario_asignado": catalogo["usuario_a"].pk},
+        {"responsable": catalogo["empleado_a"].pk},
     )
     ficha = client_auth.get(r.url)
     assert ficha.status_code == 200

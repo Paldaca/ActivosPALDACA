@@ -42,9 +42,9 @@ urlpatterns = [
     # Acciones en lote (reasignar / reubicar varios activos a la vez)
     path('acciones-masivas/', views.acciones_masivas, name='activo-acciones-masivas'),
     path(
-        'usuarios-asignables/',
-        views.buscar_usuarios_asignables,
-        name='usuarios-asignables',
+        'empleados-asignables/',
+        views.buscar_empleados_asignables,
+        name='empleados-asignables',
     ),
 
     # URLs de Etiquetas QR
