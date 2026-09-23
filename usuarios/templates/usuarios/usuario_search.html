@@ -28,11 +28,6 @@
                     teléfono o incluso por el código de inventario que tiene asignado.
                 </p>
             </div>
-            <div class="ax-hero-actions">
-                <a href="{% url 'usuarios:usuario-create' %}" class="btn-pastel btn-pastel--cta">
-                    Registrar persona
-                </a>
-            </div>
         </div>
     </header>
 
@@ -225,10 +220,10 @@
             <a href="?estado=inactivos" class="btn-pastel btn-pastel--neutro">Ver desactivadas</a>
             {% else %}
             <h3>Aún no hay personas registradas</h3>
-            <p>Registra a quienes van a responder por los equipos del inventario.</p>
-            <a href="{% url 'usuarios:usuario-create' %}" class="btn-pastel btn-pastel--cta">
-                Registrar la primera
-            </a>
+            <p>
+                Las personas se dan de alta como empleados en Nómina y se vinculan al
+                Portal desde allí — Activos ya no crea personas nuevas.
+            </p>
             {% endif %}
         </div>
         {% endif %}

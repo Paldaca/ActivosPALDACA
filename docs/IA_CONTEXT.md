@@ -84,7 +84,8 @@ MODULO_CODIGO = "activos"  # activos/constants.py
 - No borrar `core_usuario` — solo `is_active=False` (`usuarios/views.py`)
 - No desactivar usuario con activos asignados
 - Categoría/subcategoría/ubicación: no delete si tienen hijos/activos
-- Crear usuario desde Activos → `set_unusable_password()`, **sin** auto-asignar `UsuarioModulo`
+- Activos **no** crea personas: el selector de responsables sale de Nómina PALDACA
+  (`activos/services/nomina_directorio.py`), no de una alta local en `core_usuario`
 
 ---
 
@@ -95,6 +96,7 @@ MODULO_CODIGO = "activos"  # activos/constants.py
 | Portal-Paldaca | SSO, logout API, `paldaca-nav.js/css`, API menú, bus de notificaciones: POST firmado al hecho (alta/asignación) y por reloj (`usuario_inactivo_con_equipos`, diario) — `activos/services/avisos.py`, `enviar_notificaciones_activos` |
 | MySQL compartido | `core_*` + `activos_*` + `django_session` |
 | Calidad/Codigos/HDT | Solo vía BD compartida (`core_*`), sin imports |
+| Nómina PALDACA (federado, BD propia) | Cookie-forwarding a `/api/empleados/directorio/asignables/` — `activos/services/nomina_directorio.py` |
 
 Nav: `core/context_processors.py` → `paldaca_nav_current_app = "activos"`.
 

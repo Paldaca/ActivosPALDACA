@@ -34,7 +34,7 @@ class MantenimientoForm(forms.ModelForm):
                 'step': '0.01'
             }),
             'estado': forms.Select(attrs={
-                'class': 'form-select'
+                'class': 'form-select ax-combo-native'
             }),
         }
         labels = {
@@ -53,12 +53,12 @@ class MantenimientoFilterForm(forms.Form):
     estado = forms.ChoiceField(
         choices=[('', 'Todos')] + list(Mantenimiento.EstadoMantenimiento.choices),
         required=False,
-        widget=forms.Select(attrs={'class': 'form-select'})
+        widget=forms.Select(attrs={'class': 'form-select ax-combo-native'})
     )
     activo = forms.ModelChoiceField(
         queryset=None,  # Se configurará en la vista
         required=False,
-        widget=forms.Select(attrs={'class': 'form-select'}),
+        widget=forms.Select(attrs={'class': 'form-select ax-combo-native'}),
         empty_label='Todos los activos'
     )
     buscar = forms.CharField(
@@ -75,12 +75,12 @@ class MantenimientoFilterForm(forms.Form):
             ('9', 'Septiembre'), ('10', 'Octubre'), ('11', 'Noviembre'), ('12', 'Diciembre')
         ],
         required=False,
-        widget=forms.Select(attrs={'class': 'form-select'})
+        widget=forms.Select(attrs={'class': 'form-select ax-combo-native'})
     )
     año = forms.ChoiceField(
         choices=[],  # Se llenará dinámicamente
         required=False,
-        widget=forms.Select(attrs={'class': 'form-select'})
+        widget=forms.Select(attrs={'class': 'form-select ax-combo-native'})
     )
     
     def __init__(self, *args, **kwargs):

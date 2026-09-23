@@ -253,10 +253,13 @@ Solo reglas **identificadas en el código**. Cada entrada indica dónde se imple
 - **Regla:** Listados, perfiles y formularios excluyen `is_superuser=True`.
 - **Implementación:** `usuarios/views.py` → `_usuarios_gestion_queryset()`, `UsuarioProfileView.get_queryset()`, etc.
 
-### BR-USR-05 — Alta de persona en Activos crea usuario SSO sin contraseña usable
+### BR-USR-05 — Activos no da de alta personas
 
-- **Regla:** Nuevo usuario recibe `set_unusable_password()` y username autogenerado si falta.
-- **Implementación:** `usuarios/forms.py` → `UsuarioForm.save()`, `_nuevo_username()`.
+- **Regla:** Este módulo ya no crea filas en `core_usuario`. Las personas asignables a
+  activos son empleados de Nómina, vinculados al Portal desde `/empleados/vinculos/`
+  en Nómina Paldaca — Activos solo edita y desactiva personas que ya existen.
+- **Implementación:** `usuarios/urls.py` no expone ruta de alta;
+  `activos/services/nomina_directorio.py` alimenta el selector de responsables.
 
 ### BR-USR-06 — Campos editables desde Activos
 
@@ -322,4 +325,3 @@ Solo reglas **identificadas en el código**. Cada entrada indica dónde se imple
 | Expectativa (documentación Suite) | Estado en Activos |
 |-----------------------------------|-------------------|
 | Registro de reportes generados | Modelo existe; **vistas no persisten** |
-| Asignación de módulo al crear usuario desde Activos | **No implementado** en `UsuarioForm` |

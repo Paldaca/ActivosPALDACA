@@ -319,7 +319,6 @@ def test_pantallas_usuarios_y_mantenimientos(cli, datos, mantenimiento):
         rv("usuarios:usuario-search") + "?estado=inactivos",
         rv("usuarios:usuario-search") + "?buscar=Ana",
         rv("usuarios:usuario-profile", args=[datos["ana"].pk]),
-        rv("usuarios:usuario-create"),
         rv("usuarios:usuario-update", args=[datos["ana"].pk]),
         rv("mantenimientos:mantenimiento-list"),
         rv("mantenimientos:mantenimiento-list") + "?estado=EP",

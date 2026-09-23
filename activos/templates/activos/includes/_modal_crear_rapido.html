@@ -72,12 +72,14 @@ seleccionada: cero recargas, cero pestañas nuevas.
                         </div>
 
                         <div data-modo="existente">
-                            <select name="categoria" id="axRapidoCategoria" class="form-select">
-                                <option value="">Elige una categoría…</option>
-                                {% for categoria in categorias_catalogo %}
-                                <option value="{{ categoria.pk }}">{{ categoria.nombre }}</option>
-                                {% endfor %}
-                            </select>
+                            <div class="ax-combo" data-combo-placeholder="Escribe una categoría…">
+                                <select name="categoria" id="axRapidoCategoria" class="form-select ax-combo-native">
+                                    <option value="">Elige una categoría…</option>
+                                    {% for categoria in categorias_catalogo %}
+                                    <option value="{{ categoria.pk }}">{{ categoria.nombre }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
                         </div>
 
                         <div data-modo="nueva" hidden>

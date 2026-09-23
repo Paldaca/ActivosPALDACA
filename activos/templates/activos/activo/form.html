@@ -109,7 +109,9 @@
                         Subcategoría <span class="ax-req">*</span>
                     </label>
                     <div class="input-group">
-                        {{ form.subcategoria }}
+                        <div class="ax-combo" data-combo-placeholder="Escribe una subcategoría…">
+                            {{ form.subcategoria }}
+                        </div>
                         <button type="button" class="btn-pastel btn-pastel--lila"
                                 style="border-radius: 0 var(--ax-r) var(--ax-r) 0;"
                                 data-ax-crear-abrir
@@ -179,7 +181,9 @@
                             Ubicación <span class="ax-req">*</span>
                         </label>
                         <div class="input-group">
-                            {{ form.ubicacion }}
+                            <div class="ax-combo" data-combo-placeholder="Escribe una ubicación…">
+                                {{ form.ubicacion }}
+                            </div>
                             <button type="button" class="btn-pastel btn-pastel--cielo"
                                     style="border-radius: 0 var(--ax-r) var(--ax-r) 0;"
                                     data-ax-crear-abrir
@@ -200,7 +204,9 @@
                         <label class="form-label" for="{{ form.estado.id_for_label }}">
                             Estado <span class="ax-req">*</span>
                         </label>
-                        {{ form.estado }}
+                        <div class="ax-combo" data-combo-placeholder="Escribe un estado…">
+                            {{ form.estado }}
+                        </div>
                         {% if form.estado.errors %}
                         <div class="ax-error"><i class="bi bi-exclamation-circle"></i> {{ form.estado.errors }}</div>
                         {% endif %}

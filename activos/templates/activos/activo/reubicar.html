@@ -76,7 +76,9 @@ Página completa de reubicación: respaldo del drawer lateral del listado.
                         Nueva ubicación <span class="ax-req">*</span>
                     </label>
                     <div class="input-group">
-                        {{ form.ubicacion }}
+                        <div class="ax-combo" data-combo-placeholder="Escribe una ubicación…">
+                            {{ form.ubicacion }}
+                        </div>
                         <button type="button" class="btn-pastel btn-pastel--cielo"
                                 style="border-radius: 0 var(--ax-r) var(--ax-r) 0;"
                                 data-ax-crear-abrir

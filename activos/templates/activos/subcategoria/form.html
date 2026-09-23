@@ -51,7 +51,9 @@
                         Categoría <span class="ax-req">*</span>
                     </label>
                     <div class="input-group">
-                        {{ form.categoria }}
+                        <div class="ax-combo" data-combo-placeholder="Escribe una categoría…">
+                            {{ form.categoria }}
+                        </div>
                         <button type="button" class="btn-pastel btn-pastel--lila"
                                 style="border-radius: 0 var(--ax-r) var(--ax-r) 0;"
                                 data-ax-crear-abrir

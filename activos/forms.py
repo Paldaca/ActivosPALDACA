@@ -68,7 +68,7 @@ class SubCategoriaForm(forms.ModelForm):
                 'maxlength': 5
             }),
             'categoria': forms.Select(attrs={
-                'class': 'form-select'
+                'class': 'form-select ax-combo-native'
             })
         }
 
@@ -114,7 +114,7 @@ class ActivoForm(forms.ModelForm):
         ]
         widgets = {
             'subcategoria': forms.Select(attrs={
-                'class': 'form-select',
+                'class': 'form-select ax-combo-native',
                 'id': 'id_subcategoria'
             }),
             'marca': forms.TextInput(attrs={
@@ -134,7 +134,7 @@ class ActivoForm(forms.ModelForm):
                 'class': 'form-select ax-combo-native'
             }),
             'ubicacion': forms.Select(attrs={
-                'class': 'form-select'
+                'class': 'form-select ax-combo-native'
             }),
             'observaciones': forms.Textarea(attrs={
                 'class': 'form-control',
@@ -142,7 +142,7 @@ class ActivoForm(forms.ModelForm):
                 'placeholder': 'Observaciones adicionales (opcional)'
             }),
             'estado': forms.Select(attrs={
-                'class': 'form-select'
+                'class': 'form-select ax-combo-native'
             })
         }
 
@@ -153,24 +153,24 @@ class ActivoFilterForm(forms.Form):
         queryset=Categoria.objects.all(),
         required=False,
         empty_label="Todas las categorías",
-        widget=forms.Select(attrs={'class': 'form-select'})
+        widget=forms.Select(attrs={'class': 'form-select ax-combo-native'})
     )
     subcategoria = forms.ModelChoiceField(
         queryset=SubCategoria.objects.select_related("categoria"),
         required=False,
         empty_label="Todas las subcategorías",
-        widget=forms.Select(attrs={'class': 'form-select'})
+        widget=forms.Select(attrs={'class': 'form-select ax-combo-native'})
     )
     ubicacion = forms.ModelChoiceField(
         queryset=Ubicacion.objects.all(),
         required=False,
         empty_label="Todas las ubicaciones",
-        widget=forms.Select(attrs={'class': 'form-select'})
+        widget=forms.Select(attrs={'class': 'form-select ax-combo-native'})
     )
     estado = forms.ChoiceField(
         choices=[('', 'Todos los estados')] + list(Activo.EstadoActivo.choices),
         required=False,
-        widget=forms.Select(attrs={'class': 'form-select'})
+        widget=forms.Select(attrs={'class': 'form-select ax-combo-native'})
     )
     buscar = forms.CharField(
         required=False,
@@ -213,7 +213,7 @@ class ReubicarActivoForm(forms.ModelForm):
         fields = ['ubicacion']
         widgets = {
             'ubicacion': forms.Select(attrs={
-                'class': 'form-select'
+                'class': 'form-select ax-combo-native'
             })
         }
 
@@ -226,13 +226,13 @@ class EtiquetaFilterForm(forms.Form):
         queryset=Categoria.objects.all(),
         required=False,
         empty_label="Todas las categorías",
-        widget=forms.Select(attrs={"class": "form-select"}),
+        widget=forms.Select(attrs={"class": "form-select ax-combo-native"}),
     )
     subcategoria = forms.ModelChoiceField(
         queryset=SubCategoria.objects.select_related("categoria"),
         required=False,
         empty_label="Todas las subcategorías",
-        widget=forms.Select(attrs={"class": "form-select"}),
+        widget=forms.Select(attrs={"class": "form-select ax-combo-native"}),
     )
 
     def __init__(self, *args, **kwargs):
@@ -263,7 +263,7 @@ class GenerarEtiquetasForm(forms.Form):
         empty_label="Selecciona una subcategoría",
         label="Subcategoría",
         help_text="Determina el prefijo del código: PAL-{PREFIJO}-NNN.",
-        widget=forms.Select(attrs={"class": "form-select"}),
+        widget=forms.Select(attrs={"class": "form-select ax-combo-native"}),
     )
     cantidad = forms.IntegerField(
         min_value=1,
@@ -329,7 +329,7 @@ class AltaDesdeEtiquetaForm(forms.ModelForm):
                 "autocomplete": "off",
                 "autocapitalize": "characters",
             }),
-            "ubicacion": forms.Select(attrs={"class": "form-select"}),
+            "ubicacion": forms.Select(attrs={"class": "form-select ax-combo-native"}),
             "usuario_asignado": forms.Select(attrs={
                 "class": "form-select ax-combo-native",
             }),

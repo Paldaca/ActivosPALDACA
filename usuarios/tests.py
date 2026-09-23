@@ -48,23 +48,11 @@ def test_busqueda_usuarios_core(usuario_activos_admin, client):
 
 
 @pytest.mark.django_db
-def test_crear_usuario_core(usuario_activos_admin, client):
-    response = client.post(
-        reverse("usuarios:usuario-create"),
-        {
-            "first_name": "María",
-            "last_name": "Gómez",
-            "email": "maria@test.com",
-            "telefono": "04141234567",
-            "perfil": "",
-            "is_active": "on",
-        },
-        follow=True,
-    )
-    assert response.status_code == 200
-    user = UserModel.objects.get(email="maria@test.com")
-    assert user.first_name == "María"
-    assert user.email == "maria@test.com"
+def test_no_existe_ruta_para_crear_usuario_desde_activos(usuario_activos_admin, client):
+    """Las personas ahora se dan de alta como empleados en Nomina, nunca
+    localmente desde Activos (ver activos/services/nomina_directorio.py)."""
+    with pytest.raises(Exception):
+        reverse("usuarios:usuario-create")
 
 
 @pytest.mark.django_db

@@ -1,5 +1,7 @@
 """Query budgets for the pages most often loaded inside the Portal iframe."""
 
+from unittest.mock import patch
+
 import pytest
 from django.contrib.auth import get_user_model
 from django.db import connection
@@ -77,12 +79,22 @@ def test_presupuesto_listado_activos(client_auth, catalogo):
 
 
 @pytest.mark.django_db
-def test_busqueda_asignables_es_paginada(client_auth, catalogo):
-    response = client_auth.get(
-        reverse("activos:usuarios-asignables"),
-        {"q": "Prueba"},
-    )
+def test_busqueda_asignables_consulta_a_nomina(client_auth, catalogo):
+    """Las personas asignables ahora vienen de Nomina (ver
+    activos/services/nomina_directorio.py), no de una consulta local a
+    core_usuario -- se sustituye el transporte HTTP, no la vista."""
+    resultado_nomina = {
+        "results": [{"id": 1, "text": "Prueba Uno — Analista"}],
+        "has_more": False,
+    }
+    with patch(
+        "activos.views.buscar_empleados_asignables", return_value=resultado_nomina
+    ) as mock_buscar:
+        response = client_auth.get(
+            reverse("activos:usuarios-asignables"),
+            {"q": "Prueba"},
+        )
     assert response.status_code == 200
-    payload = response.json()
-    assert payload["results"]
-    assert len(payload["results"]) <= 20
+    assert response.json() == resultado_nomina
+    mock_buscar.assert_called_once()
+    assert mock_buscar.call_args.kwargs == {"q": "Prueba", "page": 1}

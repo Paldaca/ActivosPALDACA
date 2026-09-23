@@ -23,6 +23,7 @@ from .decorators import (
     requiere_admin_activo,
     requiere_modulo_paldaca,
 )
+from .services.nomina_directorio import buscar_empleados_asignables
 from .services.avisos import (
     avisar_activo_baja,
     avisar_activo_creado,
@@ -400,30 +401,14 @@ class ActivoListView(AdminActivoRequiredMixin, ListView):
 @require_GET
 @requiere_admin_activo
 def buscar_usuarios_asignables(request):
-    """Return a small, searchable page of assignable people."""
+    """Personas asignables, en vivo: empleados activos de Nomina (no
+    `core_usuario` local -- ver activos/services/nomina_directorio.py)."""
     query = (request.GET.get('q') or '').strip()[:80]
     try:
         page = max(1, int(request.GET.get('page', '1')))
     except ValueError:
         page = 1
-    page_size = 20
-    queryset = usuarios_asignables()
-    if query:
-        queryset = queryset.filter(
-            Q(first_name__icontains=query)
-            | Q(last_name__icontains=query)
-            | Q(username__icontains=query)
-            | Q(email__icontains=query)
-        )
-    start = (page - 1) * page_size
-    rows = list(queryset[start:start + page_size + 1])
-    return JsonResponse({
-        'results': [
-            {'id': user.pk, 'text': _nombre(user)}
-            for user in rows[:page_size]
-        ],
-        'has_more': len(rows) > page_size,
-    })
+    return JsonResponse(buscar_empleados_asignables(request, q=query, page=page))
 
 
 class ActivoDetailView(AdminActivoRequiredMixin, DetailView):

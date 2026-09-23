@@ -4,7 +4,7 @@ from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
 from django.views.decorators.http import require_POST
-from django.views.generic import CreateView, DetailView, ListView, UpdateView
+from django.views.generic import DetailView, ListView, UpdateView
 
 from activos.decorators import (
     AdminActivoRequiredMixin,
@@ -125,24 +125,6 @@ class UsuarioProfileView(AdminActivoRequiredMixin, DetailView):
             activo.estado == "EM" for activo in activos
         )
         return context
-
-
-class UsuarioCreateView(AdminActivoRequiredMixin, CreateView):
-    model = UserModel
-    form_class = UsuarioForm
-    template_name = "usuarios/usuario_form.html"
-
-    def form_valid(self, form):
-        response = super().form_valid(form)
-        messages.success(
-            self.request,
-            f"{self.object.get_full_name()} se registró correctamente.",
-        )
-        return response
-
-    def get_success_url(self):
-        # Tras crear a alguien lo habitual es asignarle equipos: se abre su ficha.
-        return reverse("usuarios:usuario-profile", kwargs={"pk": self.object.pk})
 
 
 class UsuarioUpdateView(AdminActivoRequiredMixin, UpdateView):

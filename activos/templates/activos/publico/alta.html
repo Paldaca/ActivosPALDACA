@@ -175,6 +175,10 @@
                      data-combo-remote-url="{% url 'activos:usuarios-asignables' %}">
                     {{ campo }}
                 </div>
+                {% elif campo.name == "ubicacion" %}
+                <div class="ax-combo" data-combo-placeholder="Escribe una ubicación…">
+                    {{ campo }}
+                </div>
                 {% else %}
                 {{ campo }}
                 {% endif %}

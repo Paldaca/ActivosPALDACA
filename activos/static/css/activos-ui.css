@@ -1519,6 +1519,19 @@ tr:hover .ax-avatar { transform: scale(1.1); }
     font-size: .84rem;
 }
 
+/* El combo dentro de un input-group (select + botón "crear rápido"):
+   Bootstrap solo reparte flex-grow a .form-control/.form-select, asi que sin
+   esto el combo se queda al ancho de su contenido y el boton le queda
+   pegado a la izquierda en vez de al borde derecho del grupo. */
+.input-group > .ax-combo {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+.input-group > .ax-combo .ax-combo-input {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
 /* Cuando JS toma el control, ocultamos el <select> nativo pero lo dejamos en el DOM */
 .ax-combo-native.is-enhanced {
     position: absolute;
