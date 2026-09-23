@@ -26,6 +26,9 @@ from django.conf import settings
 logger = logging.getLogger(__name__)
 
 TIMEOUT_SEGUNDOS = 3
+#: El User-Agent por defecto de urllib ("Python-urllib/3.x") lo bloquean muchos
+#: WAF/CDN con un 403 antes de llegar a Nomina.
+USER_AGENT = "PALDACA-Activos/1.0"
 
 
 def buscar_empleados_asignables(request, *, q: str = "", page: int = 1) -> dict:
@@ -52,6 +55,7 @@ def buscar_empleados_asignables(request, *, q: str = "", page: int = 1) -> dict:
         method="GET",
         headers={
             "Accept": "application/json",
+            "User-Agent": USER_AGENT,
             "X-Paldaca-Client": settings.PALDACA_MODULO_CODIGO,
             "Cookie": f"{cookie_nombre}={cookie_valor}",
         },

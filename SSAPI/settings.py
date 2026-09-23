@@ -217,7 +217,7 @@ PALDACA_NOTIFICACIONES_ACTIVAS = (
 # Portal-Paldaca/scripts/modulos.py.
 PALDACA_NOMINA_API_URL = (
     (os.getenv("PALDACA_NOMINA_API_URL") or "").strip().rstrip("/")
-    or ("http://localhost:8086/api" if _dev_env.exists() else "https://nomina.cpaldaca.com/api")
+    or ("http://127.0.0.1:8086/api" if _dev_env.exists() else "https://nomina.cpaldaca.com/api")
 )
 
 # Umbrales de las reglas por reloj (enviar_notificaciones_activos). Mismos
