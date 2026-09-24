@@ -78,6 +78,26 @@ def test_vector_de_firma_compartido_con_el_portal(settings):
     )
 
 
+def test_vector_del_secreto_propio_compartido_con_el_portal(settings):
+    # Mismo vector que backend/notificaciones/tests.py del Portal (FirmaPorModuloTests).
+    settings.SECRET_KEY = "clave-de-prueba-paldaca"
+    settings.PALDACA_NOTIF_SECRET = "s" * 40
+    assert (
+        notificaciones_portal.firmar(b'{"codigo": "x"}', "hdt", "1700000000")
+        == "f0304a6ca434986600f828fa81963d787b98d2a377a5848695dd13d250ee2c53"
+    )
+
+
+def test_un_secreto_propio_demasiado_corto_se_ignora(settings):
+    # El Portal tambien lo ignora: lo unico que valida es el esquema legado.
+    settings.SECRET_KEY = "clave-de-prueba-paldaca"
+    settings.PALDACA_NOTIF_SECRET = "corto"
+    assert (
+        notificaciones_portal.firmar(b'{"codigo": "x"}', "hdt", "1700000000")
+        == "3a9d0e031e7a715ce0336a9820b5f5afa39307eea7e5e78850b35b9b8f7b8a0d"
+    )
+
+
 @pytest.mark.django_db
 def test_alta_con_custodio_emite_un_solo_aviso_con_su_id(
     client_auth, catalogo, user, emitir, django_capture_on_commit_callbacks

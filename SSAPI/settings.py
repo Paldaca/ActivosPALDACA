@@ -210,6 +210,10 @@ PALDACA_PORTAL_API_URL = (
 PALDACA_NOTIFICACIONES_ACTIVAS = (
     os.getenv("PALDACA_NOTIFICACIONES_ACTIVAS", "true").lower() == "true"
 )
+# Secreto PROPIO de este modulo para firmar avisos al Portal (>= 32 caracteres).
+# Vacio = esquema legado (derivado de DJANGO_SECRET_KEY, que conocen los demas
+# repos). Debe coincidir con PALDACA_NOTIF_SECRET_ACTIVOS del Portal.
+PALDACA_NOTIF_SECRET = os.getenv("PALDACA_NOTIF_SECRET", "")
 
 
 # Umbrales de las reglas por reloj (enviar_notificaciones_activos). Mismos
