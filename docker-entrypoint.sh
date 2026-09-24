@@ -48,6 +48,11 @@ PY
 echo "Aplicando migraciones..."
 python manage.py migrate --noinput
 
+echo "Verificando el contrato con portal_empleado (Portal)..."
+# No bloquea el arranque: si el Portal cambio el esquema o aun no migro, el
+# aviso queda en el log y Activos sigue sirviendo lo que no depende de eso.
+python manage.py verificar_portal_empleado || echo "AVISO: contrato con portal_empleado incumplido; ver el error de arriba."
+
 echo "Recopilando estáticos..."
 python manage.py collectstatic --noinput
 

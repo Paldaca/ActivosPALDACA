@@ -179,7 +179,16 @@ escribe). Nómina es el único que la escribe, por dos vías (ver
 
 - al guardar/eliminar un empleado en Nómina, se envía el cambio al Portal;
 - el botón «Sincronizar con el Portal» (Empleados > Vínculos) manda la
-  plantilla completa y da de baja a quien falte. Nunca se borran filas.
+  plantilla completa y da de baja a quien falte. Nunca se borran filas;
+- cada noche, un cron de Nómina reconcilia la plantilla completa (firmado, sin
+  sesión de nadie). Ver `Portal-Paldaca/docs/PALDACA_SUITE/CONTRATO_DATOS_MAESTROS.md`.
+
+**Contrato de esquema.** `EmpleadoPortal` es una copia manual de una tabla ajena:
+el Portal se compromete a solo **añadir** columnas. Para detectar que no se
+cumplió, `python manage.py verificar_portal_empleado` compara las columnas que
+espera el modelo contra la tabla real (falla y nombra las que faltan). Corre en
+cada arranque del contenedor (`docker-entrypoint.sh`) sin bloquearlo. Los tests
+no pueden hacerlo: `conftest.py` crea la tabla desde el propio modelo.
 
 Como la tabla vive en la BD compartida, **no hay llamadas HTTP en tiempo de
 ejecución**: el combo de Responsable (`activos:empleados-asignables`) es una
