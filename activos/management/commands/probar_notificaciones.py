@@ -62,12 +62,13 @@ class Command(BaseCommand):
         cliente = settings.PALDACA_MODULO_CODIGO
         timestamp = str(int(time.time()))
         url = f"{settings.PALDACA_PORTAL_API_URL}/notificaciones/tipos/{codigo}/config/"
-        self.stdout.write(f"GET {url}")
+        self.stdout.write(f"GET {url}  (User-Agent: {np.USER_AGENT})")
         peticion = urllib.request.Request(
             url,
             method="GET",
             headers={
                 "Accept": "application/json",
+                "User-Agent": np.USER_AGENT,
                 "X-Paldaca-Client": cliente,
                 "X-Paldaca-Timestamp": timestamp,
                 "X-Paldaca-Signature": np.firmar(b"", cliente, timestamp),
@@ -79,6 +80,12 @@ class Command(BaseCommand):
                 status = respuesta.status
         except urllib.error.HTTPError as exc:
             detalle = exc.read()[:300].decode(errors="replace")
+            if "cloudflare" in detalle.lower():
+                raise CommandError(
+                    f"Cloudflare bloqueo la peticion ({exc.code}) ANTES de llegar al Portal: "
+                    f"{detalle}\nNo es un problema de firma: revisa en Cloudflare la regla, "
+                    f"el WAF o el Browser Integrity Check de /api/ (User-Agent: {np.USER_AGENT})."
+                ) from exc
             raise CommandError(
                 f"Portal respondio {exc.code}: {detalle}\n{DIAGNOSTICO.get(exc.code, '')}"
             ) from exc

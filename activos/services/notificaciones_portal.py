@@ -22,6 +22,9 @@ from django.db import transaction
 logger = logging.getLogger(__name__)
 
 TIMEOUT_SEGUNDOS = 4
+#: El User-Agent por defecto de urllib ("Python-urllib/3.x") lo bloquea
+#: Cloudflare delante del Portal (error 1010, 403 antes de llegar a Django).
+USER_AGENT = "PALDACA-Activos/1.0"
 _SAL = b"paldaca.notificaciones.v1:"
 
 
@@ -99,6 +102,7 @@ def emitir_evento(*, codigo, titulo, cuerpo, payload=None, emisor=None, clave_ag
         method="POST",
         headers={
             "Content-Type": "application/json",
+            "User-Agent": USER_AGENT,
             "X-Paldaca-Client": cliente,
             "X-Paldaca-Timestamp": timestamp,
             "X-Paldaca-Signature": firmar(cuerpo_json, cliente, timestamp),
@@ -146,6 +150,7 @@ def obtener_config_tipo(codigo: str) -> dict | None:
         f"{settings.PALDACA_PORTAL_API_URL}/notificaciones/tipos/{codigo}/config/",
         method="GET",
         headers={
+            "User-Agent": USER_AGENT,
             "X-Paldaca-Client": cliente,
             "X-Paldaca-Timestamp": timestamp,
             "X-Paldaca-Signature": firmar(b"", cliente, timestamp),

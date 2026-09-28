@@ -119,6 +119,8 @@ def test_probar_notificaciones_informa_firma_aceptada(settings):
     peticion = urlopen.call_args.args[0]
     assert peticion.get_method() == "GET"
     assert peticion.get_header("X-paldaca-client") == "activos"
+    # Cloudflare (error 1010) bloquea el User-Agent por defecto de urllib.
+    assert peticion.get_header("User-agent") == notificaciones_portal.USER_AGENT
     assert "propio (huella 3923fb83)" in salida.getvalue()
     assert "OK 200" in salida.getvalue()
 
