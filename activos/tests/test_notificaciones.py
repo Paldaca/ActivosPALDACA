@@ -98,6 +98,31 @@ def test_un_secreto_propio_demasiado_corto_se_ignora(settings):
     )
 
 
+def test_huella_del_secreto_coincide_con_la_del_portal(settings):
+    # Mismo vector que diagnosticar_firmas / NOTIF_FIRMA_RECHAZADA del Portal.
+    settings.PALDACA_NOTIF_SECRET = "s" * 40
+    assert notificaciones_portal.esquema_firma() == ("propio", "3923fb83")
+    settings.PALDACA_NOTIF_SECRET = "corto"
+    assert notificaciones_portal.esquema_firma()[0] == "legado"
+
+
+@pytest.mark.django_db
+def test_probar_notificaciones_informa_firma_aceptada(settings):
+    settings.PALDACA_NOTIFICACIONES_ACTIVAS = True
+    settings.PALDACA_NOTIF_SECRET = "s" * 40
+    respuesta = mock.MagicMock(status=200)
+    respuesta.read.return_value = b'{"codigo": "activos.usuario_inactivo_con_equipos", "activo": true}'
+    respuesta.__enter__.return_value = respuesta
+    salida = StringIO()
+    with mock.patch("urllib.request.urlopen", return_value=respuesta) as urlopen:
+        call_command("probar_notificaciones", stdout=salida)
+    peticion = urlopen.call_args.args[0]
+    assert peticion.get_method() == "GET"
+    assert peticion.get_header("X-paldaca-client") == "activos"
+    assert "propio (huella 3923fb83)" in salida.getvalue()
+    assert "OK 200" in salida.getvalue()
+
+
 @pytest.mark.django_db
 def test_alta_con_custodio_emite_un_solo_aviso_con_su_id(
     client_auth, catalogo, user, emitir, django_capture_on_commit_callbacks

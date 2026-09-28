@@ -377,6 +377,13 @@ LOGGING = {
             'level': 'INFO',
             'propagate': False,
         },
+        # Avisos al Portal (NOTIFICACION_EMITIDA / _RECHAZADA, CONFIG_TIPO_*):
+        # sin esto el INFO de activos.* no salia en los logs del contenedor.
+        'activos': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
     },
 }
 
